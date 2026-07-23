@@ -502,45 +502,118 @@ class HomeController extends GetxController with LoadingMixin, LoadingApiMixin {
   OriginDestinationModel selectedLocationModel = OriginDestinationModel();
 
   Future<void> searchPlace(String value, {bool forDestination = false}) async {
+    if (value.trim().isEmpty) {
+      searchList.clear();
+      return;
+    }
+
+    final apiKey = placeApi?.trim() ?? '';
+    if (apiKey.isEmpty) {
+      LogUtils.printError('Google Maps API key is missing');
+      searchList.clear();
+      return;
+    }
+
     try {
       searchLoading(true);
 
-      String url =
-          "https://maps.googleapis.com/maps/api/place/autocomplete/json?input=$value&";
+      final countryCode = LocationService().country.trim().isEmpty
+          ? 'HU'
+          : LocationService().country.trim().toUpperCase();
 
-      if (LocationService().currentUserLatLg.value != null) {
-        url +=
-            "location=${LocationService().currentUserLatLg.value?.latitude},${LocationService().currentUserLatLg.value?.longitude}&radius=25000&";
+      final body = <String, dynamic>{
+        'input': value.trim(),
+        'languageCode': 'hu',
+        'regionCode': 'HU',
+        'includedRegionCodes': [countryCode.toLowerCase()],
+      };
+
+      final currentLocation = LocationService().currentUserLatLg.value;
+      if (currentLocation != null) {
+        body['locationBias'] = {
+          'circle': {
+            'center': {
+              'latitude': currentLocation.latitude,
+              'longitude': currentLocation.longitude,
+            },
+            'radius': 25000.0,
+          },
+        };
       }
-      url +=
-          "components=country:${LocationService().country.isEmpty ? 'IN' : LocationService().country}&key=$placeApi";
 
       if (forDestination) {
-        log('[DESTINATION_API] Typing destination → Google Places Autocomplete API');
         log(
-          '[DESTINATION_API] GET ${url.replaceAll(RegExp(r'key=.*'), 'key=***')}',
+          '[DESTINATION_API] Typing destination → Places API (New) Autocomplete',
         );
       }
 
-      var result = await http.post(Uri.parse(url));
+      final response = await http.post(
+        Uri.parse('https://places.googleapis.com/v1/places:autocomplete'),
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Goog-Api-Key': apiKey,
+          'X-Goog-FieldMask':
+              'suggestions.placePrediction.placeId,'
+              'suggestions.placePrediction.text.text,'
+              'suggestions.placePrediction.structuredFormat.mainText.text,'
+              'suggestions.placePrediction.structuredFormat.secondaryText.text,'
+              'suggestions.placePrediction.types',
+        },
+        body: jsonEncode(body),
+      );
 
       if (forDestination) {
-        log('[DESTINATION_API] Autocomplete response status: ${result.statusCode}');
+        log(
+          '[DESTINATION_API] Autocomplete response status: '
+          '${response.statusCode}',
+        );
       }
 
-      if (result.statusCode == 200) {
-        AddressPlaceModel model = AddressPlaceModel.fromJson(
-          jsonDecode(result.body),
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        throw Exception(
+          'Places autocomplete failed (${response.statusCode}): '
+          '${response.body}',
         );
-        searchList.value = model.predictions ?? [];
-        if (forDestination) {
-          log(
-            '[DESTINATION_API] Autocomplete suggestions: ${searchList.length}',
-          );
-        }
+      }
+
+      final decoded = jsonDecode(response.body) as Map<String, dynamic>;
+      final suggestions = decoded['suggestions'] as List<dynamic>? ?? const [];
+
+      searchList.value = suggestions
+          .map((item) {
+            final suggestion = item as Map<String, dynamic>;
+            final prediction =
+                suggestion['placePrediction'] as Map<String, dynamic>?;
+            if (prediction == null) return null;
+
+            final text = prediction['text'] as Map<String, dynamic>?;
+            final structured =
+                prediction['structuredFormat'] as Map<String, dynamic>?;
+            final mainText = structured?['mainText'] as Map<String, dynamic>?;
+            final secondaryText =
+                structured?['secondaryText'] as Map<String, dynamic>?;
+
+            return Prediction(
+              description: text?['text']?.toString() ?? '',
+              placeId: prediction['placeId']?.toString(),
+              structuredFormatting: StructuredFormatting(
+                mainText: mainText?['text']?.toString() ?? '',
+                secondaryText: secondaryText?['text']?.toString() ?? '',
+              ),
+              types: (prediction['types'] as List<dynamic>?)
+                  ?.map((type) => type.toString())
+                  .toList(),
+            );
+          })
+          .whereType<Prediction>()
+          .toList();
+
+      if (forDestination) {
+        log('[DESTINATION_API] Autocomplete suggestions: ${searchList.length}');
       }
     } catch (e, st) {
-      LogUtils.printError("Error;$e , $st");
+      searchList.clear();
+      LogUtils.printError('Places autocomplete error: $e, $st');
       if (forDestination) {
         log('[DESTINATION_API] Autocomplete error: $e');
       }
@@ -558,26 +631,50 @@ class HomeController extends GetxController with LoadingMixin, LoadingApiMixin {
   Future<Map<String, dynamic>?> _getPlaceDetails(String placeId) async {
     getLatLngLoading(true);
     try {
-      final url = Uri.parse(
-        "https://maps.googleapis.com/maps/api/place/details/json"
-        "?place_id=$placeId"
-        "&fields=geometry,formatted_address,name"
-        "&key=$placeApi",
+      final apiKey = placeApi?.trim() ?? '';
+      if (apiKey.isEmpty) {
+        throw Exception('Google Maps API key is missing');
+      }
+
+      final response = await http.get(
+        Uri.parse(
+          'https://places.googleapis.com/v1/places/'
+          '${Uri.encodeComponent(placeId)}?languageCode=hu&regionCode=HU',
+        ),
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Goog-Api-Key': apiKey,
+          'X-Goog-FieldMask': 'id,displayName,formattedAddress,location',
+        },
       );
 
-      final response = await http.get(url);
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        if (data['status'] == 'OK') {
-          return data['result'];
-        } else {
-          throw Exception("Error: ${data['status']}");
-        }
-      } else {
-        throw Exception("Failed to load place details");
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        throw Exception(
+          'Place details failed (${response.statusCode}): ${response.body}',
+        );
       }
+
+      final data = jsonDecode(response.body) as Map<String, dynamic>;
+      final location = data['location'] as Map<String, dynamic>?;
+      if (location == null ||
+          location['latitude'] == null ||
+          location['longitude'] == null) {
+        throw Exception('Place details response does not contain coordinates');
+      }
+
+      final displayName = data['displayName'] as Map<String, dynamic>?;
+      return {
+        'formatted_address': data['formattedAddress']?.toString() ?? '',
+        'name': displayName?['text']?.toString() ?? '',
+        'geometry': {
+          'location': {
+            'lat': (location['latitude'] as num).toDouble(),
+            'lng': (location['longitude'] as num).toDouble(),
+          },
+        },
+      };
     } catch (e, st) {
-      LogUtils.printError(" get lat lng error ;;$e , $st");
+      LogUtils.printError('Get place details error: $e, $st');
       rethrow;
     } finally {
       getLatLngLoading(false);
@@ -625,9 +722,8 @@ class HomeController extends GetxController with LoadingMixin, LoadingApiMixin {
       log('[DESTINATION_API] Destination selected → $name ($address)');
       log('[DESTINATION_API] placeId: $placeId');
       log(
-        '[DESTINATION_API] Google Place Details API → '
-        'https://maps.googleapis.com/maps/api/place/details/json'
-        '?place_id=$placeId&fields=geometry,formatted_address,name&key=***',
+        '[DESTINATION_API] Places API (New) Place Details → '
+        'https://places.googleapis.com/v1/places/$placeId',
       );
 
       destinationAddress = (await _getPlaceDetails(placeId)) ?? {};
