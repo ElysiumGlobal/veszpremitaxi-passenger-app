@@ -1,0 +1,5 @@
+# Production release signing only. Do not commit real values.
+storePassword=
+keyPassword=
+keyAlias=
+storeFile=/absolute/path/to/upload-keystore.jks

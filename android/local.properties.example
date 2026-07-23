@@ -1,0 +1,9 @@
+# Copy this file to local.properties or use scripts/build_android_debug.*
+# Use absolute paths. On Windows, forward slashes are recommended.
+sdk.dir=/absolute/path/to/Android/Sdk
+flutter.sdk=/absolute/path/to/flutter
+flutter.buildMode=debug
+flutter.versionName=1.0.1
+flutter.versionCode=10
+# Optional. The APK builds without it, but Google Maps will not load.
+google.maps.api.key=
