@@ -48,7 +48,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     final live = LocationService().currentUserLatLg.value;
     if (live != null && _isValidLatLng(live)) return live;
     if (_isValidLatLng(demoLaeLong)) return demoLaeLong;
-    return const LatLng(21.1702, 72.8311);
+    return const LatLng(47.0933, 17.9115);
   }
 
   void _refreshMapForLocation(LatLng location) {

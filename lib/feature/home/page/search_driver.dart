@@ -383,7 +383,7 @@ class _SearchDriverScreenState extends State<SearchDriverScreen> {
                         initialCameraPosition: CameraPosition(
                           target: userOrigin.value != null
                               ? userOrigin.value!
-                              : LatLng(23.2599, 72.5248),
+                              : const LatLng(47.0933, 17.9115),
                           // Bhuj coordinates
                           zoom: 14,
                         ),

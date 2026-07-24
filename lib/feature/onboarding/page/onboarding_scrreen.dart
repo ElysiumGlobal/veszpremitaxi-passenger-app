@@ -91,7 +91,13 @@ class _OnboardingScreensState extends State<OnboardingScreens> {
                 return Stack(
                   fit: StackFit.expand,
                   children: [
-                    Image.asset(slide.image, fit: BoxFit.cover),
+                    Image.asset(
+                      slide.image,
+                      fit: BoxFit.cover,
+                      alignment: Alignment.center,
+                      filterQuality: FilterQuality.high,
+                    ),
+                    const ColoredBox(color: Color(0x52000000)),
                     const DecoratedBox(
                       decoration: BoxDecoration(
                         gradient: LinearGradient(
