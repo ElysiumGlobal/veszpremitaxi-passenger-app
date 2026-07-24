@@ -7,7 +7,6 @@ import 'package:e_taxi/utils/app_preferences.dart';
 import 'package:e_taxi/utils/assets.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:http/http.dart' as http;
 
 import '../../../core/helper/network_service/network_info.dart';
@@ -56,7 +55,7 @@ class _SplaceScreenState extends State<SplaceScreen> {
       AppConstant().appStoreId = data['data']['appstoreId'] ?? '';
       AppConstant().currency = data['data']['currency'] ?? 'HUF';
     } catch (_) {
-      // The splash must never block the user because of a settings request.
+      // A betöltőképernyő hálózati hiba esetén sem tarthatja fel az appot.
     }
   }
 
@@ -83,7 +82,7 @@ class _SplaceScreenState extends State<SplaceScreen> {
   Widget build(BuildContext context) {
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: const SystemUiOverlayStyle(
-        statusBarColor: AppColors.brandNavy,
+        statusBarColor: Colors.transparent,
         statusBarIconBrightness: Brightness.light,
         statusBarBrightness: Brightness.dark,
         systemNavigationBarColor: AppColors.brandNavy,
@@ -91,41 +90,12 @@ class _SplaceScreenState extends State<SplaceScreen> {
       ),
       child: Scaffold(
         backgroundColor: AppColors.brandNavy,
-        body: SafeArea(
-          child: Center(
-            child: Padding(
-              padding: EdgeInsets.symmetric(horizontal: 44.w),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Image.asset(
-                    ImagesAsset.vapPassengerLogo,
-                    width: 260.w,
-                    fit: BoxFit.contain,
-                  ),
-                  26.verticalSpace,
-                  Text(
-                    'VESZPRÉMI TAXI',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 18.sp,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 4.2,
-                    ),
-                  ),
-                  8.verticalSpace,
-                  Text(
-                    'UTAS',
-                    style: TextStyle(
-                      color: AppColors.mainPrimaryColor,
-                      fontSize: 13.sp,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 5,
-                    ),
-                  ),
-                ],
-              ),
-            ),
+        body: SizedBox.expand(
+          child: Image.asset(
+            ImagesAsset.loadingScreen,
+            fit: BoxFit.cover,
+            alignment: Alignment.center,
+            filterQuality: FilterQuality.high,
           ),
         ),
       ),

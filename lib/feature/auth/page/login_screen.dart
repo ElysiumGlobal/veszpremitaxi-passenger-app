@@ -15,6 +15,7 @@ import 'package:e_taxi/widgets/custome_img.dart';
 import 'package:e_taxi/widgets/custom_button.dart';
 import 'package:e_taxi/widgets/custom_textfeild.dart';
 import 'package:e_taxi/widgets/webview_screen.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -30,6 +31,21 @@ class LoginScreen extends StatefulWidget {
 
 class _LoginScreenState extends State<LoginScreen> {
   final AuthController _authController = Get.put(AuthController());
+
+  @override
+  void initState() {
+    super.initState();
+
+    // Presentation convenience only. Release builds never receive demo values.
+    if (kDebugMode) {
+      if (_authController.emailController.text.trim().isEmpty) {
+        _authController.emailController.text = 'utas@veszpremitaxi.hu';
+      }
+      if (_authController.passwordController.text.isEmpty) {
+        _authController.passwordController.text = 'Vap12345';
+      }
+    }
+  }
 
   Future<void> _continueWithEmail() async {
     final email = _authController.emailController.text.trim();
@@ -84,7 +100,7 @@ class _LoginScreenState extends State<LoginScreen> {
       child: Stack(
         fit: StackFit.expand,
         children: [
-          Image.asset(ImagesAsset.loginBg, fit: BoxFit.cover),
+          Image.asset(ImagesAsset.onBoarding1, fit: BoxFit.cover),
           const DecoratedBox(
             decoration: BoxDecoration(
               gradient: LinearGradient(
@@ -106,11 +122,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Image.asset(
-                    ImagesAsset.vapPassengerLogo,
-                    width: 116.w,
-                    fit: BoxFit.contain,
-                  ),
+                  const SizedBox.shrink(),
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [

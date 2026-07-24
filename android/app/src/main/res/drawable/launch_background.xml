@@ -3,7 +3,7 @@
     <item android:drawable="@color/brand_navy" />
     <item>
         <bitmap
-            android:gravity="center"
-            android:src="@drawable/vap_splash_logo" />
+            android:gravity="fill"
+            android:src="@drawable/vap_launch_image" />
     </item>
 </layer-list>

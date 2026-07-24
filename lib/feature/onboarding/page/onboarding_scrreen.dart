@@ -35,7 +35,7 @@ class _OnboardingScreensState extends State<OnboardingScreens> {
       title: 'Éjjel-nappal számíthatsz ránk',
       subtitle:
           'Kulturált autók, helyismerettel rendelkező sofőrök és közvetlen veszprémi támogatás.',
-      image: ImagesAsset.loginBg,
+      image: ImagesAsset.onBoarding3,
     ),
   ];
 

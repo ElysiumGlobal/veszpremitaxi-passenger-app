@@ -2,9 +2,8 @@
 <resources>
     <style name="LaunchTheme" parent="Theme.AppCompat.Light.NoActionBar">
         <item name="android:windowSplashScreenBackground">@color/brand_navy</item>
-        <item name="android:windowSplashScreenAnimatedIcon">@drawable/vap_splash_logo</item>
-        <item name="android:windowSplashScreenIconBackgroundColor">@color/brand_navy</item>
-        <item name="android:postSplashScreenTheme">@style/NormalTheme</item>
+        <item name="android:windowSplashScreenAnimatedIcon">@drawable/transparent_splash_icon</item>
+        <item name="android:windowSplashScreenAnimationDuration">0</item>
         <item name="android:windowLightStatusBar">false</item>
         <item name="android:statusBarColor">@color/brand_navy</item>
         <item name="android:navigationBarColor">@color/brand_navy</item>
