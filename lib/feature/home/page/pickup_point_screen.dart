@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:e_taxi/feature/home/controller/home_controller.dart';
+import 'package:e_taxi/feature/home/widget/dialog.dart';
 import 'package:e_taxi/utils/app_colors.dart';
 import 'package:e_taxi/utils/assets.dart';
 import 'package:e_taxi/widgets/common_text.dart';
