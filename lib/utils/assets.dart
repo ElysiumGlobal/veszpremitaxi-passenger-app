@@ -2,6 +2,7 @@ class ImagesAsset {
   static const String _images = 'assets/images';
   static const String logoSplace = '$_images/splace_img.png';
   static const String vapPassengerLogo = '$_images/vap_passenger_logo.png';
+  static const String firstLoadingScreen = '$_images/vap_loading_screen.png';
   static const String loadingScreen = '$_images/kezdokep2.png';
   static const String onBoarding1 = '$_images/onboarding1.png';
   static const String onBoarding2 = '$_images/onboarding2.png';

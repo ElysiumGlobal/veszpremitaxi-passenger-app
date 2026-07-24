@@ -22,16 +22,40 @@ class SplaceScreen extends StatefulWidget {
 }
 
 class _SplaceScreenState extends State<SplaceScreen> {
+  bool _showSecondImage = false;
+  Timer? _imageTimer;
+  bool _imagesPrecached = false;
+
   @override
   void initState() {
     super.initState();
     NetworkInfo.setListener();
+    _imageTimer = Timer(const Duration(milliseconds: 1500), () {
+      if (mounted) {
+        setState(() => _showSecondImage = true);
+      }
+    });
     _start();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_imagesPrecached) return;
+    _imagesPrecached = true;
+    precacheImage(const AssetImage(ImagesAsset.firstLoadingScreen), context);
+    precacheImage(const AssetImage(ImagesAsset.loadingScreen), context);
+  }
+
+  @override
+  void dispose() {
+    _imageTimer?.cancel();
+    super.dispose();
   }
 
   Future<void> _start() async {
     await Future.wait<void>([
-      Future<void>.delayed(const Duration(milliseconds: 1250)),
+      Future<void>.delayed(const Duration(milliseconds: 3000)),
       getSetting().timeout(
         const Duration(seconds: 3),
         onTimeout: () {},
@@ -90,12 +114,21 @@ class _SplaceScreenState extends State<SplaceScreen> {
       ),
       child: Scaffold(
         backgroundColor: AppColors.brandNavy,
-        body: SizedBox.expand(
-          child: Image.asset(
-            ImagesAsset.loadingScreen,
-            fit: BoxFit.cover,
-            alignment: Alignment.center,
-            filterQuality: FilterQuality.high,
+        body: AnimatedSwitcher(
+          duration: const Duration(milliseconds: 260),
+          switchInCurve: Curves.easeOut,
+          switchOutCurve: Curves.easeIn,
+          child: SizedBox.expand(
+            key: ValueKey<bool>(_showSecondImage),
+            child: Image.asset(
+              _showSecondImage
+                  ? ImagesAsset.loadingScreen
+                  : ImagesAsset.firstLoadingScreen,
+              fit: BoxFit.cover,
+              alignment: Alignment.center,
+              filterQuality: FilterQuality.high,
+              gaplessPlayback: true,
+            ),
           ),
         ),
       ),

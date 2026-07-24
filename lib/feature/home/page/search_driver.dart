@@ -689,7 +689,7 @@ class _SearchDriverScreenState extends State<SearchDriverScreen> {
 
                           // Trip Details Button
                           CustomButton(
-                            text: "Trip details",
+                            text: AppString.tripDetails.tr,
                             buttonColor: AppColors.mainPrimaryColor,
                             textColor: AppColors.whiteColor,
                             height: 56.h,

@@ -110,7 +110,7 @@ class AppString {
   static const String searchingDriver = "Searching Driver...";
   static const String weAreLookingForDriver =
       "We’re looking for the perfect driver to make your ride joyful.";
-  static const String tripDetails = "Trip Details";
+  static const String tripDetails = "Utazás részletei";
   static const String areYouSureAddAddress =
       "Are you sure you want to add this address?";
   static const String cancelRide = "Cancel Ride";
