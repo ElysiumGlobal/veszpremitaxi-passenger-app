@@ -11,13 +11,13 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
+
 import 'core/helper/language_provider/localization/language/english.dart';
 import 'core/helper/notification_service/firebase_notification_service.dart';
 import 'firebase_options.dart';
 
-Future updateLocal() async {
-  final index = AppPreference.getInt(AppPreference.languageIndex);
-  return Utils.updateLanguage(index);
+Future<Locale> updateLocal() async {
+  return const Locale('hu', 'HU');
 }
 
 Future<void> main() async {
@@ -25,28 +25,48 @@ Future<void> main() async {
   await dotenv.load(fileName: "assets/.env");
 
   if (BuildConfig.firebaseEnabled) {
-    await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
-    await FireBaseNotification().firebaseCloudMessagingLSetup();
-    await FireBaseNotification().setUpLocalNotification();
+    try {
+      await Firebase.initializeApp(
+        options: DefaultFirebaseOptions.currentPlatform,
+      );
+      if (BuildConfig.pushNotificationsEnabled) {
+        await FireBaseNotification().firebaseCloudMessagingLSetup();
+        await FireBaseNotification().setUpLocalNotification();
+      }
+    } catch (error, stack) {
+      debugPrint('Firebase initialization failed: $error\n$stack');
+    }
   }
+
   await AppPreference.initMySharedPreferences();
+
   SystemChrome.setSystemUIOverlayStyle(
-    SystemUiOverlayStyle(
+    const SystemUiOverlayStyle(
       statusBarColor: AppColors.transparent,
       statusBarIconBrightness: Brightness.dark,
       statusBarBrightness: Brightness.light,
     ),
   );
-  final local = await updateLocal();
-  await Utils().setCurrentMarker();
-  await Utils().setCarMarker();
-  runApp(MyApp(initialLocale: local));
+
+  final locale = await updateLocal();
+
+  try {
+    await Utils().setCurrentMarker();
+    await Utils().setCarMarker();
+  } catch (error, stack) {
+    debugPrint('Map marker initialization failed: $error\n$stack');
+  }
+
+  runApp(MyApp(initialLocale: locale));
 }
 
 class MyApp extends StatelessWidget {
   final Locale initialLocale;
 
-  const MyApp({super.key, required this.initialLocale});
+  const MyApp({
+    super.key,
+    required this.initialLocale,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -59,25 +79,18 @@ class MyApp extends StatelessWidget {
           debugShowCheckedModeBanner: false,
           translations: AppTranslations(),
           locale: initialLocale,
-          // locale: Locale('en', 'US'),
-          fallbackLocale: const Locale('en', 'US'),
+          fallbackLocale: const Locale('hu', 'HU'),
           supportedLocales: const [
-            Locale('en', 'US'), // English
-            Locale('hi', 'IN'), // Hindi
-            Locale('ar', 'AE'), // Arabic
-            Locale('pt', 'PT'), // Portuguese
-            Locale('he', 'IL'), // Hebrew
-            Locale('ru', 'RU'), // Russian
+            Locale('hu', 'HU'),
           ],
           localizationsDelegates: const [
             GlobalMaterialLocalizations.delegate,
             GlobalWidgetsLocalizations.delegate,
             GlobalCupertinoLocalizations.delegate,
           ],
-          // initialBinding: AppBidding(),
           theme: ThemeData(
             fontFamily: Constants.fontFamily,
-            textSelectionTheme: TextSelectionThemeData(
+            textSelectionTheme: const TextSelectionThemeData(
               selectionHandleColor: AppColors.mainPrimaryColor,
               selectionColor: AppColors.transparent,
             ),

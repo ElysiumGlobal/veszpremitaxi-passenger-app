@@ -9,7 +9,7 @@ class AppPreference {
   static late SharedPreferences _prefs;
 
   static const String _languageKey = 'languageKey1';
-  static const String onboardingDone = "OnBoardingDone1";
+  static const String onboardingDone = "VapPassengerOnboardingV2";
   static const String userToken = "userToken1";
   static const String userLogin = "userLogin1";
 
@@ -74,7 +74,7 @@ class AppPreference {
 
   static String getLanguage() {
     final String? value = _prefs.getString(_languageKey);
-    return value ?? 'en';
+    return value ?? 'hu';
   }
 
   static Future setLanguage(String value) async {

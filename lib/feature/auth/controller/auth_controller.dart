@@ -286,68 +286,96 @@ class AuthController extends GetxController with LoadingMixin, LoadingApiMixin {
 
   String profileImage = "";
 
-  Future<dynamic> emailLogin() async {
-    dynamic data;
-    handleLoading(true);
+  Future<void> emailLogin() async {
+    final email = emailController.text.trim();
+    final password = passwordController.text.trim();
 
+    dynamic emailState;
     try {
-      data = await AuthService.emailCheck(email: emailController.text.trim());
-      log(">>>>>>>>$data");
-      LogUtils.printSuccess(data.toString());
+      emailState = await AuthService.emailCheck(email: email);
     } catch (e) {
-      LogUtils.printAction("Email check error ::$e");
+      LogUtils.printAction('Email check error::$e');
     }
 
-    if (data['data']['is_register'] == 1 &&
-        data['data']['login_device'] != "email") {
-      handleLoading(false);
+    final data = emailState is Map ? emailState['data'] : null;
+    final isRegistered = data is Map && data['is_register'].toString() == '1';
+    final loginDevice = data is Map
+        ? (data['login_device'] ?? '').toString().toLowerCase()
+        : '';
+
+    if (isRegistered && loginDevice.isNotEmpty && loginDevice != 'email') {
       AppSnackBar.showErrorSnackBar(
-        message: AppString.emailAlreadyRegister.tr,
+        message:
+            'Ez az e-mail-cím korábban más belépési móddal lett regisztrálva.',
         isError: true,
       );
-      debugPrint("DATA::::$data");
       return;
-    } else {
-      Map result = await firbaseEmailLogin(
-        email: emailController.text.trim(),
-        password: passwordController.text.trim(),
+    }
+
+    // Until the Veszprémi Taxi Firebase project is connected, email/password
+    // authentication goes directly to the Laravel backend. This keeps the
+    // passenger app independent from the vendor Firebase project.
+    if (!BuildConfig.firebaseEnabled) {
+      await processApi(
+        () => AuthService.emailLogin(
+          email: email,
+          pass: password,
+          fcmToken: '',
+          loginType: 'email',
+          fUid: '',
+        ),
+        result: (result) {
+          AppPreference.setBoolean(AppPreference.onboardingDone, value: true);
+          AppConstant().userLoginType = LoginType.email.name;
+          phoneController.clear();
+          redirectUser(result, loginType: 'email');
+        },
+        error: (error, stack) {
+          LogUtils.printError('Direct email login error::$error\n$stack');
+        },
+        loading: handleLoading,
+      );
+      return;
+    }
+
+    handleLoading(true);
+    try {
+      final firebaseResult = await firbaseEmailLogin(
+        email: email,
+        password: password,
       );
 
-      if (result['done']) {
-        _auth.currentUser?.reload();
-        if (_auth.currentUser?.emailVerified == false) {
-          if (result['old']) {
-            _auth.currentUser?.sendEmailVerification();
-            AppSnackBar.showErrorSnackBar(
-              message: AppString.emailnotVerified,
-              dismisDuration: 10,
-              isError: true,
-            );
-          }
-          handleLoading(false);
-          return;
-        }
+      if (firebaseResult['done'] != true) return;
 
-        await _ensureFcmToken();
-        await processApi(
-          () => AuthService.emailLogin(
-            email: emailController.text.trim(),
-            pass: passwordController.text.trim(),
-            fcmToken: FireBaseNotification().fcmToken,
-            loginType: "email",
-            fUid: _firebaseUid,
-          ),
-          result: (data) {
-            LogUtils.showLogs(message: "boddy:::${data.toJson()}");
-            AppPreference.setBoolean(AppPreference.onboardingDone, value: true);
-            AppConstant().userLoginType = LoginType.email.name;
-            phoneController.text = "";
-            redirectUser(data, loginType: "email");
-          },
-          loading: handleLoading,
-        );
+      await _auth.currentUser?.reload();
+      if (_auth.currentUser?.emailVerified == false) {
+        if (firebaseResult['old'] == true) {
+          await _auth.currentUser?.sendEmailVerification();
+          AppSnackBar.showErrorSnackBar(
+            message: AppString.emailnotVerified,
+            dismisDuration: 10,
+            isError: true,
+          );
+        }
+        return;
       }
 
+      await _ensureFcmToken();
+      final result = await AuthService.emailLogin(
+        email: email,
+        pass: password,
+        fcmToken: FireBaseNotification().fcmToken,
+        loginType: 'email',
+        fUid: _firebaseUid,
+      );
+
+      AppPreference.setBoolean(AppPreference.onboardingDone, value: true);
+      AppConstant().userLoginType = LoginType.email.name;
+      phoneController.clear();
+      redirectUser(result, loginType: 'email');
+    } catch (e, st) {
+      LogUtils.printError('Firebase email login error::$e\n$st');
+    } finally {
       handleLoading(false);
     }
   }
@@ -432,6 +460,14 @@ class AuthController extends GetxController with LoadingMixin, LoadingApiMixin {
   }
 
   Future googleLogin() async {
+    if (!BuildConfig.googleLoginEnabled) {
+      AppSnackBar.showErrorSnackBar(
+        message: 'A Google-belépés a saját Veszprémi Taxi Firebase bekötése után aktiválódik.',
+        isError: true,
+      );
+      return;
+    }
+
     processApi(
       () => _googleAuthLogin(),
       result: (data) {
@@ -478,6 +514,14 @@ class AuthController extends GetxController with LoadingMixin, LoadingApiMixin {
   }
 
   Future appleLogin() async {
+    if (!BuildConfig.appleLoginEnabled) {
+      AppSnackBar.showErrorSnackBar(
+        message: 'Az Apple-belépés a saját alkalmazásfiók bekötése után aktiválódik.',
+        isError: true,
+      );
+      return;
+    }
+
     processApi(
       () => _appleUserLogin(),
       result: (data) {

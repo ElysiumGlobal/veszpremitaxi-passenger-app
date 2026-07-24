@@ -187,7 +187,7 @@ class Utils with LoadingMixin {
     }
     DateTime dateTime = DateTime.parse(dateStr).toLocal();
 
-    return DateFormat("dd MMM yyyy, h:mm a").format(dateTime);
+    return DateFormat("yyyy. MM. dd. HH:mm").format(dateTime);
   }
 
   String convertDate(String dateStr) {
@@ -196,7 +196,7 @@ class Utils with LoadingMixin {
     }
     DateTime dateTime = DateTime.parse(dateStr).toLocal();
 
-    return DateFormat("dd MMM yyyy").format(dateTime);
+    return DateFormat("yyyy. MM. dd.").format(dateTime);
   }
 
   List<String> getString(String address) {
@@ -235,29 +235,16 @@ class Utils with LoadingMixin {
   }
 
   static final List _languageList = [
-    {"languageName": "English", "local": const ui.Locale('en', "US")},
     {
-      "languageName": "Hindi",
-      "subTitle": "Datos arraigados",
-      "local": const ui.Locale('hi', 'IN'),
-    },
-    {"languageName": "Arebic", "local": const ui.Locale('ar', 'AE')},
-    {"languageName": "Portuguese", "local": const ui.Locale('pt', 'PT')},
-    {
-      "languageName": "Hebrew",
-      "subTitle": "Datos arraigados",
-      "local": const ui.Locale('he', 'IL'),
-    },
-    {
-      "languageName": "Russian",
-      "subTitle": "données enracinées",
-      "local": const ui.Locale('ru', 'RU'),
+      "languageName": "Magyar",
+      "local": const ui.Locale('hu', 'HU'),
     },
   ];
 
   static updateLanguage(index) {
-    Get.updateLocale(_languageList[index]['local']);
-    return _languageList[index]['local'];
+    const locale = ui.Locale('hu', 'HU');
+    Get.updateLocale(locale);
+    return locale;
   }
 
   String getdateTimeDateWise({required String date}) {
@@ -280,37 +267,37 @@ class Utils with LoadingMixin {
     Duration duration = now.difference(getTime).abs();
 
     if (duration.inSeconds < 60) {
-      return '${duration.inSeconds} Seconds';
+      return '${duration.inSeconds} másodperc';
     } else if (duration.inMinutes < 60) {
-      return '${duration.inMinutes} Minute${duration.inMinutes > 1 ? 's' : ''}';
+      return '${duration.inMinutes} perc';
     } else if (duration.inHours < 24) {
-      return '${duration.inHours} Hour${duration.inHours > 1 ? 's' : ''}';
+      return '${duration.inHours} óra';
     } else if (duration.inDays < 7) {
-      return '${duration.inDays} Day${duration.inDays > 1 ? 's' : ''}';
+      return '${duration.inDays} nap';
     } else {
-      int weeks = (duration.inDays / 7).floor();
+      final weeks = (duration.inDays / 7).floor();
       if (weeks < 52) {
-        return '$weeks Week${weeks > 1 ? 's' : ''}';
+        return '$weeks hét';
       } else {
-        int years = (weeks / 52).floor();
-        return '$years Year${years > 1 ? 's' : ''}';
+        final years = (weeks / 52).floor();
+        return '$years év';
       }
     }
   }
 
   static String formatCurrency(String? amount) {
-    if (amount == null || amount.isEmpty) {
-      amount = "0.0";
-    }
+    final normalizedAmount = (amount == null || amount.isEmpty)
+        ? "0"
+        : amount.replaceAll(",", "");
 
-    double finalAmount = double.parse(amount.replaceAll(",", ""));
+    final finalAmount = double.tryParse(normalizedAmount) ?? 0;
 
     final format = NumberFormat.currency(
-      locale: AppConstant().local,
-      symbol: NumberFormat.simpleCurrency(
-        name: AppConstant().currency,
-      ).currencySymbol,
+      locale: 'hu_HU',
+      symbol: 'Ft',
+      decimalDigits: 0,
     );
+
     return format.format(finalAmount);
   }
 
@@ -320,7 +307,7 @@ class Utils with LoadingMixin {
     }
     DateTime dt = DateTime.parse(timeString).toLocal();
 
-    return DateFormat('hh:mm a').format(dt);
+    return DateFormat('HH:mm').format(dt);
   }
 
   Future<void> downloadPdf(String url, String fileName) async {
