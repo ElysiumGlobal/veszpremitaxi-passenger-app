@@ -51,12 +51,49 @@ class HomeService {
     }
   }
 
+  static Future<BookingCreateModel> bookingEstimate({
+    required LatLng originLatLng,
+    required LatLng destinationLatLng,
+    String? rideTypeId,
+  }) async {
+    const apiTag =
+        'POST ${ApiConstants.baseUrl}${ApiConstants.bookingEstimate}';
+    try {
+      final body = <String, dynamic>{
+        "pickup_latitude": originLatLng.latitude,
+        "pickup_longitude": originLatLng.longitude,
+        "dropoff_latitude": destinationLatLng.latitude,
+        "dropoff_longitude": destinationLatLng.longitude,
+      };
+
+      if (rideTypeId != null && rideTypeId.trim().isNotEmpty) {
+        body['ride_type_id'] = rideTypeId.trim();
+      }
+
+      final response = await Api().post(
+        ApiConstants.bookingEstimate,
+        bodyData: body,
+      );
+      await ResponseHandler.checkResponseError(
+        response,
+        showException: false,
+        apiTag: apiTag,
+      );
+      return BookingCreateModel.fromJson(jsonDecode(response.body));
+    } catch (e, st) {
+      LogUtils.printError("BOOKING ESTIMATE ERROR ==> $e, $st");
+      rethrow;
+    }
+  }
+
   static Future<BookingCreateModel> bookingCreate({
     required int bookingContactId,
     required String originAddress,
-    required destinationAddress,
+    required String destinationAddress,
     required LatLng originLatLng,
     required LatLng destinationLatLng,
+    required String rideTypeId,
+    required String paymentMethod,
   }) async {
     const apiTag = 'POST ${ApiConstants.baseUrl}${ApiConstants.bookingCreate}';
     try {
@@ -71,6 +108,8 @@ class HomeService {
           "dropoff_longitude": destinationLatLng.longitude,
           "dropoff_address": destinationAddress,
           "booking_contact_id": bookingContactId,
+          "ride_type_id": rideTypeId,
+          "payment_method": paymentMethod,
         },
       );
 

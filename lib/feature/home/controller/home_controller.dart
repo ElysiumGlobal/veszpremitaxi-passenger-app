@@ -9,7 +9,6 @@ import 'package:e_taxi/feature/home/service/home_service.dart';
 import 'package:e_taxi/feature/trip/controller/trip_controller.dart';
 import 'package:e_taxi/feature/wallet/controller/wallet_controller.dart';
 import 'package:e_taxi/utils/api_constants.dart';
-import 'package:e_taxi/utils/api_constants.dart';
 import 'package:e_taxi/utils/common_api_caller.dart';
 import 'package:e_taxi/utils/constants.dart';
 import 'package:e_taxi/utils/loading_mixin.dart';
@@ -753,7 +752,7 @@ class HomeController extends GetxController with LoadingMixin, LoadingApiMixin {
           'navigating to BookVehicleScreen',
         );
         log(
-          '[DESTINATION_API] Next backend API: POST ${ApiConstants.baseUrl}${ApiConstants.bookingCreate}',
+          '[DESTINATION_API] Next backend API: POST ${ApiConstants.baseUrl}${ApiConstants.bookingEstimate}',
         );
         LogUtils.printAction(
           "origin:${selectedLocationModel.oAddress}, ${selectedLocationModel.dAddress}, ${selectedLocationModel.oLatLng}, ${selectedLocationModel.dLatLng}",
@@ -920,48 +919,113 @@ class HomeController extends GetxController with LoadingMixin, LoadingApiMixin {
   RxBool bookRideLoading = false.obs;
   Rxn<BookingCreateModel> bookingCreateModel = Rxn<BookingCreateModel>();
 
-  Future<String> startBooking({
-    required String origin,
-    required String destination,
+  RxBool finalizingBooking = false.obs;
+
+  Future<String> estimateBooking({
     required LatLng originLatLng,
     required LatLng destinationLatLng,
-    required int userNameId,
   }) async {
-    String res = "";
+    String errorMessage = "";
     bookingCreateModel.value = null;
+    AppConstant().bookingId = "";
     isDriverCome.value = false;
     bookRideLoading(true);
-    LogUtils.printAction(
-      '[ERROR_TRACE] HomeController.startBooking → origin: $origin, destination: $destination',
-    );
+
     await processApi(
-      () => HomeService.bookingCreate(
-        originAddress: origin,
-        destinationAddress: destination,
+      () => HomeService.bookingEstimate(
         originLatLng: originLatLng,
         destinationLatLng: destinationLatLng,
-        bookingContactId: userNameId,
       ),
       result: (data) {
         bookingCreateModel.value = data;
-        AppConstant().bookingId =
-            bookingCreateModel.value?.data?.booking?.id ?? "";
         riderBookingModel.value = null;
         isDriverCome.value = false;
         tripType.value = 0;
+
+        if ((data.data?.rideOptions ?? []).isEmpty) {
+          errorMessage = "Ehhez a felvételi ponthoz nincs elérhető járműtípus.";
+        }
       },
       error: (error, stack) {
         handleLoading(false);
-        LogUtils.printAction(
-          '[ERROR_TRACE] HomeController.startBooking FAILED → $error',
-        );
-        LogUtils.printAction("ERROR:::$error ,$stack");
-        res = error.toString();
+        errorMessage = error.toString();
+        LogUtils.printError("BOOKING ESTIMATE FAILED ==> $error, $stack");
       },
     );
 
     bookRideLoading(false);
-    return res;
+    return errorMessage;
+  }
+
+  Future<bool> finalizePassengerBooking({
+    required String origin,
+    required String destination,
+    required LatLng originLatLng,
+    required LatLng destinationLatLng,
+    required int bookingContactId,
+    required String rideTypeId,
+    required String paymentMethod,
+  }) async {
+    if (finalizingBooking.value) {
+      return false;
+    }
+
+    finalizingBooking(true);
+    try {
+      final bookingResponse = await HomeService.bookingCreate(
+        originAddress: origin,
+        destinationAddress: destination,
+        originLatLng: originLatLng,
+        destinationLatLng: destinationLatLng,
+        bookingContactId: bookingContactId,
+        rideTypeId: rideTypeId,
+        paymentMethod: paymentMethod,
+      );
+
+      final bookingId = bookingResponse.data?.booking?.id ?? "";
+      if (bookingId.isEmpty) {
+        throw Exception("A szerver nem adott vissza booking azonosítót.");
+      }
+
+      bookingCreateModel.value = bookingResponse;
+      AppConstant().bookingId = bookingId;
+      saveBookingFare(
+        bookingId,
+        bookingResponse.data?.booking?.estimatedFare ??
+            bookingResponse.data?.rideTypeEstimate?.fareBreakdown?.total,
+      );
+
+      final confirmation = await HomeService.confirmRide(bookingId);
+      final status = confirmation['data']?['status']?.toString() ?? "";
+      if (status.isNotEmpty) {
+        bookingCreateModel.value?.data?.booking?.status = status;
+        bookingCreateModel.refresh();
+      }
+
+      if (status != "searching") {
+        throw Exception(
+          "A rendelés nem searching állapotban jött létre (állapot: $status).",
+        );
+      }
+
+      Navigation.pushNamed(
+        Routes.searchDriverScreen,
+        arg: {
+          "origin": originLatLng,
+          "destination": destinationLatLng,
+        },
+      );
+      return true;
+    } catch (error, stack) {
+      LogUtils.printError("FINALIZE BOOKING FAILED ==> $error, $stack");
+      AppSnackBar.showErrorSnackBar(
+        message: error.toString().replaceFirst('Exception: ', ''),
+        isError: true,
+      );
+      return false;
+    } finally {
+      finalizingBooking(false);
+    }
   }
 
   Future<bool> bookVehicle({

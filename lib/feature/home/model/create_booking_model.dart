@@ -91,7 +91,7 @@ class Data {
     detectedCity: json["detected_city"] == null
         ? null
         : DetectedCity.fromJson(json["detected_city"]),
-    fareBreakdown: json["FareBreakdown"] == null
+    fareBreakdown: json["fare_breakdown"] == null
         ? null
         : FareBreakdown.fromJson(json["fare_breakdown"]),
     debtAmount: json["debt_amount"] ?? "",
@@ -550,10 +550,10 @@ class RideTypeEstimate {
         fareBreakdown: json["fare_breakdown"] == null
             ? null
             : FareBreakdown.fromJson(json["fare_breakdown"]),
-        distance: json["distance"],
-        duration: json["duration"],
-        estimatedEta: json["estimated_eta"],
-        estimateArrivedTime: json["estimate_arrived_time"],
+        distance: json["distance"]?.toString(),
+        duration: json["duration"]?.toString(),
+        estimatedEta: json["estimated_eta"]?.toString(),
+        estimateArrivedTime: json["estimate_arrived_time"]?.toString(),
         etaBreakdown: json["eta_breakdown"] == null
             ? null
             : EtaBreakdown.fromJson(json["eta_breakdown"]),

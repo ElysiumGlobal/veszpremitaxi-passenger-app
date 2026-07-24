@@ -15,6 +15,7 @@ class ApiConstants {
   static const String rideTypeList = "ride-types";
 
 
+  static const String bookingEstimate = "bookings/estimate";
   static const String bookingCreate = "bookings/create";
   static const String bookingPrefix = "bookings/";
   static const String vehicleBook = "bookings/select-ride-type";

@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:ui' as ui;
 import 'package:e_taxi/feature/home/controller/home_controller.dart';
 import 'package:e_taxi/feature/home/model/create_booking_model.dart';
-import 'package:e_taxi/feature/home/widget/dialog.dart';
 import 'package:e_taxi/feature/home/widget/select_vehicle.dart';
 import 'package:e_taxi/utils/app_colors.dart';
 import 'package:e_taxi/utils/app_string.dart';
@@ -44,29 +43,22 @@ class _BookVehicleScreenState extends State<BookVehicleScreen> {
       sourceLatLog = originDestinationModel?.oLatLng;
       destinationLatLog = originDestinationModel?.dLatLng;
       setMapMarkerPoliline();
-      initRide();
+      loadEstimate();
       _createCustomMarker();
     }
   }
 
-  Future<void> initRide() async {
-    debugPrint(
-      '[ERROR_TRACE] BookVehicleScreen.initRide → starting booking create',
+  Future<void> loadEstimate() async {
+    final error = await homeController.estimateBooking(
+      originLatLng: originDestinationModel?.oLatLng ?? const LatLng(0, 0),
+      destinationLatLng:
+          originDestinationModel?.dLatLng ?? const LatLng(0, 0),
     );
-    final res = await homeController.startBooking(
-      origin: originDestinationModel?.oAddress ?? "",
-      destination: originDestinationModel?.dAddress ?? "",
-      originLatLng: originDestinationModel?.oLatLng ?? LatLng(0, 0),
-      destinationLatLng: originDestinationModel?.dLatLng ?? LatLng(0, 0),
-      userNameId: originDestinationModel?.userNameId ?? 0,
-    );
-    if (res.isNotEmpty) {
-      debugPrint(
-        '[ERROR_TRACE] BookVehicleScreen.initRide ← error received: $res',
-      );
+
+    if (error.isNotEmpty && mounted) {
       Get.back();
       AppSnackBar.showErrorSnackBar(
-        message: res.split(":").last,
+        message: error.split(":").last.trim(),
         isError: true,
       );
     }
@@ -578,71 +570,12 @@ class _BookVehicleScreenState extends State<BookVehicleScreen> {
                                 color: AppColors.textFieldBorderColor,
                               ),
                               Expanded(
-                                child: GestureDetector(
-                                  onTap: () async {
-                                    Map? res = await Navigation.pushNamed(
-                                      Routes.offerScreen,
-                                      params: {
-                                        "vehicleId":
-                                            homeController
-                                                .bookingCreateModel
-                                                .value
-                                                ?.data
-                                                ?.rideOptions?[selectedVehicleIndex
-                                                    .value]
-                                                .rideTypeId ??
-                                            "",
-                                        "offerCode": codeApply.isNotEmpty
-                                            ? "${codeApply['data']['promo_code']}"
-                                            : "",
-                                      },
-                                    );
-                                    if (res != null) {
-                                      codeApply.value = res;
-                                    }
-                                  },
-                                  child: Container(
-                                    alignment: Alignment.center,
-
-                                    child: Row(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.center,
-
-                                      children: [
-                                        Expanded(
-                                          child: Column(
-                                            mainAxisAlignment:
-                                                MainAxisAlignment.center,
-                                            children: [
-                                              CommonText(
-                                                string: codeApply.isNotEmpty
-                                                    ? "${codeApply['data']['promo_code']}"
-                                                    : "Offers",
-                                                fontSize: 14.sp,
-                                              ),
-                                              Obx(
-                                                () => codeApply.isNotEmpty
-                                                    ? CommonText(
-                                                        string:
-                                                            "Coupon Applied",
-                                                        color: codeApply.isEmpty
-                                                            ? AppColors
-                                                                  .textCaptionColor
-                                                            : AppColors
-                                                                  .successColor,
-                                                      )
-                                                    : SizedBox.shrink(),
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                        16.horizontalSpace,
-                                        Icon(
-                                          Icons.arrow_forward_ios_rounded,
-                                          size: 14,
-                                        ),
-                                      ],
-                                    ),
+                                child: Container(
+                                  alignment: Alignment.center,
+                                  child: CommonText(
+                                    string: "Kupon a rendelés után",
+                                    fontSize: 12.sp,
+                                    color: AppColors.textCaptionColor,
                                   ),
                                 ),
                               ),
@@ -651,147 +584,38 @@ class _BookVehicleScreenState extends State<BookVehicleScreen> {
                         ),
                         16.verticalSpace,
                         CustomButton(
-                          text: AppString.joinNow.tr,
+                          text: "Tovább a felvételi ponthoz",
                           onTap: () async {
-                            if (homeController.bookingCreateModel.value !=
-                                null) {
-                              if (("${homeController.bookingCreateModel.value?.data?.debtAmount ?? ""}")
-                                  .isNotEmpty) {
-                                AppDialog.commonDialog(
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(16),
-                                  ),
-                                  childs: Column(
-                                    mainAxisSize: MainAxisSize.min,
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.center,
-                                    children: [
-                                      CustomImage(
-                                        image: IconAsset.infoCircle,
-                                        ht: 40.w,
-                                        wt: 40.w,
-                                        fit: BoxFit.cover,
-                                      ),
-
-                                      16.verticalSpace,
-                                      CommonText(
-                                        string:
-                                            "This is the cancellation charge for your previous trip : ${Utils.formatCurrency("${homeController.bookingCreateModel.value?.data?.debtAmount ?? ""}")}",
-                                        softWrap: true,
-                                        color: AppColors.redColor,
-                                        fontSize: 18.sp,
-                                        fontWeight: FontWeight.w500,
-                                        textAlign: TextAlign.center,
-                                      ),
-                                      16.verticalSpace,
-                                      CustomButton(
-                                        text: AppString.goAhead.tr,
-                                        onTap: () async {
-                                          Get.back();
-                                          double lat = double.parse(
-                                            homeController
-                                                    .bookingCreateModel
-                                                    .value
-                                                    ?.data
-                                                    ?.booking
-                                                    ?.pickupLatitude ??
-                                                "0.0",
-                                          );
-                                          double lng = double.parse(
-                                            homeController
-                                                    .bookingCreateModel
-                                                    .value
-                                                    ?.data
-                                                    ?.booking
-                                                    ?.pickupLongitude ??
-                                                "0.0",
-                                          );
-                                          bool
-                                          res = await homeController.bookVehicle(
-                                            bookingId:
-                                                homeController
-                                                    .bookingCreateModel
-                                                    .value
-                                                    ?.data
-                                                    ?.booking
-                                                    ?.id ??
-                                                "",
-                                            vehicleId:
-                                                homeController
-                                                    .bookingCreateModel
-                                                    .value
-                                                    ?.data
-                                                    ?.rideOptions?[selectedVehicleIndex
-                                                        .value]
-                                                    .rideTypeId ??
-                                                "",
-                                            latLng: LatLng(lat, lng),
-                                            paymentType: paymentType.value
-                                                .toLowerCase(),
-                                          );
-                                          if (res == false) {
-                                            codeApply.clear();
-                                          }
-                                        },
-                                      ),
-                                      12.verticalSpace,
-                                      CustomButton(
-                                        buttonColor: AppColors.whiteColor,
-                                        borderColor: AppColors.mainPrimaryColor,
-                                        text: AppString.goBack.tr,
-
-                                        onTap: () {
-                                          Get.back();
-                                        },
-                                      ),
-                                    ],
-                                  ),
-                                );
-                              } else {
-                                double lat = double.parse(
-                                  homeController
-                                          .bookingCreateModel
-                                          .value
-                                          ?.data
-                                          ?.booking
-                                          ?.pickupLatitude ??
-                                      "0.0",
-                                );
-                                double lng = double.parse(
-                                  homeController
-                                          .bookingCreateModel
-                                          .value
-                                          ?.data
-                                          ?.booking
-                                          ?.pickupLongitude ??
-                                      "0.0",
-                                );
-                                bool res = await homeController.bookVehicle(
-                                  bookingId:
-                                      homeController
-                                          .bookingCreateModel
-                                          .value
-                                          ?.data
-                                          ?.booking
-                                          ?.id ??
-                                      "",
-                                  vehicleId:
-                                      homeController
-                                          .bookingCreateModel
-                                          .value
-                                          ?.data
-                                          ?.rideOptions?[selectedVehicleIndex
-                                              .value]
-                                          .rideTypeId ??
-                                      "",
-                                  latLng: LatLng(lat, lng),
-                                  paymentType: paymentType.value.toLowerCase(),
-                                );
-                                if (res == false) {
-                                  codeApply.clear();
-                                }
-                              }
+                            final rideOptions = homeController
+                                    .bookingCreateModel.value?.data?.rideOptions ??
+                                [];
+                            if (rideOptions.isEmpty) {
+                              return;
                             }
+
+                            final selectedRide =
+                                rideOptions[selectedVehicleIndex.value];
+                            final rideTypeId = selectedRide.rideTypeId ?? "";
+                            if (rideTypeId.isEmpty ||
+                                originDestinationModel == null ||
+                                sourceLatLog == null) {
+                              AppSnackBar.showErrorSnackBar(
+                                message:
+                                    "A rendelés adatai hiányosak. Kérjük, válassza ki újra az útvonalat.",
+                                isError: true,
+                              );
+                              return;
+                            }
+
+                            Navigation.pushNamed(
+                              Routes.pickupScreen,
+                              arg: {
+                                "pickUpLatLng": sourceLatLog,
+                                "originDestination": originDestinationModel,
+                                "rideTypeId": rideTypeId,
+                                "paymentType": paymentType.value.toLowerCase(),
+                              },
+                            );
                           },
                         ),
                         12.verticalSpace,

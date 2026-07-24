@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:e_taxi/feature/home/controller/home_controller.dart';
-import 'package:e_taxi/feature/home/widget/dialog.dart';
 import 'package:e_taxi/utils/app_colors.dart';
 import 'package:e_taxi/utils/assets.dart';
 import 'package:e_taxi/widgets/common_text.dart';
@@ -13,6 +12,7 @@ import 'package:get/get.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 import '../../../utils/app_string.dart';
+import '../model/origin_destination_model.dart';
 import '../../../utils/google_utils.dart';
 import '../../../utils/log_utils.dart';
 import '../../../utils/navigation_utils/navigation.dart';
@@ -29,6 +29,9 @@ class PickupPointScreen extends StatefulWidget {
 
 class _PickupPointScreenState extends State<PickupPointScreen> {
   Completer<GoogleMapController> _controller = Completer();
+  OriginDestinationModel? originDestinationModel;
+  String rideTypeId = "";
+  String paymentType = "cash";
 
   @override
   void initState() {
@@ -36,18 +39,30 @@ class _PickupPointScreenState extends State<PickupPointScreen> {
     super.initState();
 
     if (Get.arguments != null) {
-      var arg = Get.arguments;
-      pickUpLatLng.value = arg['pickUpLatLng'];
+      final arg = Get.arguments as Map;
+      pickUpLatLng.value = arg['pickUpLatLng'] as LatLng;
+      originDestinationModel =
+          arg['originDestination'] as OriginDestinationModel?;
+      rideTypeId = arg['rideTypeId']?.toString() ?? "";
+      paymentType = arg['paymentType']?.toString() ?? "cash";
 
       userSelectLatLng = pickUpLatLng.value;
       updateCameraPosition();
 
       Future.microtask(() {
         title.value = Utils()
-            .getString(homeController.selectedLocationModel.oAddress ?? "")
+            .getString(
+              originDestinationModel?.oAddress ??
+                  homeController.selectedLocationModel.oAddress ??
+                  "",
+            )
             .first;
         subTitle.value = Utils()
-            .getString(homeController.selectedLocationModel.oAddress ?? "")
+            .getString(
+              originDestinationModel?.oAddress ??
+                  homeController.selectedLocationModel.oAddress ??
+                  "",
+            )
             .last;
       });
     }
@@ -426,38 +441,37 @@ class _PickupPointScreenState extends State<PickupPointScreen> {
 
           child: Obx(
             () => CustomButton(
-              text: isChangeAddress.value == false
-                  ? AppString.confirmPickup.tr
-                  : AppString.saveUpdatePickUp.tr,
-              onTap: () {
-                if (isChangeAddress.value == false) {
-                  // old address
-
-                  homeController.confirmRide(
-                    bookingId:
-                        homeController
-                            .bookingCreateModel
-                            .value
-                            ?.data
-                            ?.booking
-                            ?.id ??
-                        "",
-                    latLng: userSelectLatLng!,
+              text: "Rendelés véglegesítése",
+              isLoader: homeController.finalizingBooking.value,
+              isDisabled: homeController.finalizingBooking.value,
+              onTap: () async {
+                final draft = originDestinationModel;
+                final pickup = userSelectLatLng;
+                if (draft == null ||
+                    pickup == null ||
+                    draft.dLatLng == null ||
+                    rideTypeId.isEmpty) {
+                  AppSnackBar.showErrorSnackBar(
+                    message:
+                        "A rendelés adatai hiányosak. Kérjük, kezdje újra a címválasztást.",
+                    isError: true,
                   );
-                } else {
-                  homeController.updatePickUpLocation(
-                    bookingId:
-                        homeController
-                            .bookingCreateModel
-                            .value
-                            ?.data
-                            ?.booking
-                            ?.id ??
-                        "",
-                    address: "${title.value}, ${subTitle.value}",
-                    latLng: userSelectLatLng!,
-                  );
+                  return;
                 }
+
+                final pickupAddress = isChangeAddress.value
+                    ? "${title.value}, ${subTitle.value}"
+                    : (draft.oAddress ?? "${title.value}, ${subTitle.value}");
+
+                await homeController.finalizePassengerBooking(
+                  origin: pickupAddress,
+                  destination: draft.dAddress ?? "",
+                  originLatLng: pickup,
+                  destinationLatLng: draft.dLatLng!,
+                  bookingContactId: draft.userNameId ?? 0,
+                  rideTypeId: rideTypeId,
+                  paymentMethod: paymentType,
+                );
               },
             ),
           ),
