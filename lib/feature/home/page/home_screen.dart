@@ -35,12 +35,10 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
-  Completer<GoogleMapController> _controller =
+  final Completer<GoogleMapController> _controller =
       Completer<GoogleMapController>();
 
   LatLng demoLaeLong = LatLng(0, 0);
-  bool _mapHasUserLocation = false;
-
   bool _isValidLatLng(LatLng location) =>
       location.latitude != 0 || location.longitude != 0;
 
@@ -51,17 +49,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     return const LatLng(47.0933, 17.9115);
   }
 
-  void _refreshMapForLocation(LatLng location) {
-    final hasLocation = _isValidLatLng(location);
-    if (_mapHasUserLocation == hasLocation || !mounted) return;
-
-    if (hasLocation && !_mapHasUserLocation) {
-      _controller = Completer<GoogleMapController>();
-      _hasAutoCentered = false;
-    }
-    setState(() => _mapHasUserLocation = hasLocation);
-  }
-
   void setLocationFromLocal() {
     String latLong = AppPreference.getString(AppPreference.location);
 
@@ -70,8 +57,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         double.parse(latLong.split("@").first),
         double.parse(latLong.split("@").last),
       );
-      _mapHasUserLocation = _isValidLatLng(demoLaeLong);
-      setState(() {});
+      _onLocationReady(demoLaeLong, moveCamera: true);
     }
   }
 
@@ -82,8 +68,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
     demoLaeLong = location;
     currentUser.value = location;
-    _refreshMapForLocation(location);
-    if (mounted) setState(() {});
     getAddressFromLatLng(location);
 
     if (moveCamera || !_hasAutoCentered) {
@@ -218,16 +202,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           children: [
             SizedBox(
               height: Get.height,
-              child: Obx(
-                () {
-                  final target = _mapTarget;
-                  return GoogleMap(
-                    key: ValueKey(
-                      _mapHasUserLocation ? 'map_located' : 'map_waiting',
-                    ),
+              child: GoogleMap(
+                    key: const ValueKey('passenger_home_map'),
                     padding: EdgeInsets.only(top: 62.h),
                     initialCameraPosition: CameraPosition(
-                      target: target,
+                      target: _mapTarget,
                       zoom: 13,
                     ),
                     onMapCreated: (controller) {
@@ -283,9 +262,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                             ),
                           ),
                     markers: _marker.value,
-                  );
-                },
-              ),
+                  ),
             ),
             Positioned(
               right: 16.w,
