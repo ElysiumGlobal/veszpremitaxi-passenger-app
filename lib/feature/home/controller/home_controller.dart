@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:developer';
 import 'dart:io';
+import 'package:e_taxi/core/debug/passenger_flow_debug.dart';
 import 'package:e_taxi/core/location_utils.dart';
 import 'package:e_taxi/feature/home/model/offer_model.dart';
 import 'package:e_taxi/feature/home/page/payment_screen.dart';
@@ -271,215 +272,281 @@ class HomeController extends GetxController with LoadingMixin, LoadingApiMixin {
   bool changePolyLine = false;
 
   void socketData({bool isFirstTime = false}) {
-    String status = riderBookingModel.value?.data?.booking?.status ?? "";
-    log("STATUS::::::::$status:${Get.currentRoute}:");
-    if (isFirstTime && (status != "completed")) {
-      double lat = double.parse(
-        riderBookingModel.value?.data?.pickup?.latitude ?? "0",
-      );
-      double lng = double.parse(
-        riderBookingModel.value?.data?.pickup?.longitude ?? "0",
-      );
-      double lat1 = double.parse(
-        riderBookingModel.value?.data?.dropoff?.latitude ?? "0",
-      );
-      double lng1 = double.parse(
-        riderBookingModel.value?.data?.dropoff?.longitude ?? "0",
-      );
+    final booking = riderBookingModel.value?.data?.booking;
+    final status = (booking?.status ?? '').toLowerCase().trim();
+    final bookingId = '${booking?.id ?? AppConstant().bookingId}'.trim();
+    const activeStatuses = <String>{
+      'searching',
+      'accepted',
+      'arrived',
+      'started',
+    };
+    const terminalStatuses = <String>{
+      'completed',
+      'cancelled',
+      'expired',
+    };
 
-      Navigation.pushNamed(
-        Routes.searchDriverScreen,
-        arg: {"origin": LatLng(lat, lng), "destination": LatLng(lat1, lng1)},
-      );
+    log('PASSENGER STATUS: $status / $bookingId / ${Get.currentRoute}');
+    PassengerFlowDebug.send(
+      'booking_state_received',
+      bookingId: bookingId,
+      data: <String, dynamic>{
+        'status': status,
+        'is_first_time': isFirstTime,
+        'route': Get.currentRoute,
+      },
+    );
+
+    if (isFirstTime && activeStatuses.contains(status)) {
+      final pickupLat = double.tryParse(
+            riderBookingModel.value?.data?.pickup?.latitude ?? '',
+          ) ??
+          0;
+      final pickupLng = double.tryParse(
+            riderBookingModel.value?.data?.pickup?.longitude ?? '',
+          ) ??
+          0;
+      final dropoffLat = double.tryParse(
+            riderBookingModel.value?.data?.dropoff?.latitude ?? '',
+          ) ??
+          0;
+      final dropoffLng = double.tryParse(
+            riderBookingModel.value?.data?.dropoff?.longitude ?? '',
+          ) ??
+          0;
+
+      if (pickupLat != 0 &&
+          pickupLng != 0 &&
+          dropoffLat != 0 &&
+          dropoffLng != 0 &&
+          Get.currentRoute != Routes.searchDriverScreen) {
+        PassengerFlowDebug.send(
+          'active_trip_screen_open_requested',
+          bookingId: bookingId,
+          data: <String, dynamic>{'status': status},
+        );
+        Navigation.pushNamed(
+          Routes.searchDriverScreen,
+          arg: <String, LatLng>{
+            'origin': LatLng(pickupLat, pickupLng),
+            'destination': LatLng(dropoffLat, dropoffLng),
+          },
+        );
+      }
     }
+
     try {
-      if ((riderBookingModel.value?.data?.booking?.status ?? "") ==
-          "accepted") {
+      if (status == 'accepted') {
         isDriverCome.value = false;
         tripType.value = 1;
-
         changePolyLine = true;
-
         AppPreference.removeKey(AppPreference.RideTime);
-      } else if ((riderBookingModel.value?.data?.booking?.status ?? "") ==
-          "arrived") {
+      } else if (status == 'arrived') {
         changePolyLine = false;
         tripType.value = 1;
         isDriverCome.value = true;
-        getRideTimer(
-          int.parse(
-            riderBookingModel
-                    .value
-                    ?.data
-                    ?.booking
-                    ?.rideType
-                    ?.waitingTimeLimit ??
-                "0",
-          ),
-        );
-      } else if ((riderBookingModel.value?.data?.booking?.status ?? "") ==
-          "started") {
+        final waitingLimit = int.tryParse(
+              booking?.rideType?.waitingTimeLimit ?? '0',
+            ) ??
+            0;
+        getRideTimer(waitingLimit);
+      } else if (status == 'started') {
         tripType.value = 2;
         AppPreference.removeKey(AppPreference.RideTime);
-      } else if ((riderBookingModel.value?.data?.booking?.status ?? "") ==
-          "completed") {
-        AppConstant().reportString.value = "";
-        AppConstant().bookingId = "";
-        clearSavedBookingFare();
-        Navigation.pushNamed(
-          Routes.paymentSelectScreen,
-          arg: {
-            "method":
-                riderBookingModel.value?.data?.booking?.paymentMethod ?? "",
-            "finalAmount": isFirstTime
-                ? riderBookingModel.value?.data?.tripDetails?.fare ?? "0"
-                : null,
-          },
+      } else if (terminalStatuses.contains(status)) {
+        final paymentMethod = booking?.paymentMethod ?? '';
+        final finalAmount =
+            riderBookingModel.value?.data?.tripDetails?.fare ?? '0';
+
+        _clearCurrentBookingState(
+          bookingId: bookingId,
+          reason: 'terminal_status_received',
+          status: status,
         );
 
-        Future.delayed(Duration(milliseconds: 300), () {
+        if (isFirstTime) {
+          PassengerFlowDebug.send(
+            'terminal_booking_ignored_on_restore',
+            bookingId: bookingId,
+            data: <String, dynamic>{'status': status},
+          );
+          if (Get.currentRoute != Routes.dashboardScreen) {
+            Navigation.popupUtil(Routes.dashboardScreen);
+          }
+          return;
+        }
+
+        if (status == 'completed') {
+          AppConstant().reportString.value = '';
+          Navigation.pushNamed(
+            Routes.paymentSelectScreen,
+            arg: <String, dynamic>{
+              'method': paymentMethod,
+              'finalAmount': finalAmount,
+            },
+          );
+
+          Future<void>.delayed(const Duration(milliseconds: 300), () {
+            AppDialog.commonDialog(
+              childs: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  CustomImage(
+                    image: ImagesAsset.tripComplete,
+                    wt: 200.w,
+                    ht: 110.h,
+                  ),
+                  16.verticalSpace,
+                  CommonText(
+                    string: AppString.tripCompleteSuccessfully.tr,
+                    fontSize: 16.sp,
+                    fontWeight: FontWeight.w600,
+                  ),
+                  12.verticalSpace,
+                  CommonText(
+                    string: AppString.yourTripSummaryRecord.tr,
+                    softWrap: true,
+                    color: AppColors.textCaptionColor,
+                  ),
+                  16.verticalSpace,
+                  CustomButton(
+                    text: AppString.done.tr,
+                    onTap: () => Get.back(),
+                  ),
+                ],
+              ),
+            );
+          });
+        } else if (status == 'cancelled') {
           AppDialog.commonDialog(
+            barrierDismissible: false,
             childs: Column(
-              mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.center,
+              mainAxisSize: MainAxisSize.min,
               children: [
-                CustomImage(
-                  image: ImagesAsset.tripComplete,
-                  wt: 200.w,
-                  ht: 110.h,
-                ),
+                CustomImage(image: ImagesAsset.rideCancel),
                 16.verticalSpace,
                 CommonText(
-                  string: AppString.tripCompleteSuccessfully.tr,
+                  string: AppString.weAreSadToCancel.tr,
                   fontSize: 16.sp,
-                  fontWeight: FontWeight.w600,
+                  fontWeight: FontWeight.w500,
+                  textAlign: TextAlign.center,
+                  softWrap: true,
                 ),
                 12.verticalSpace,
                 CommonText(
-                  string: AppString.yourTripSummaryRecord.tr,
-                  softWrap: true,
+                  string: AppString.makeYourNextRideHappiest.tr,
+                  fontSize: 14.sp,
+                  fontWeight: FontWeight.w400,
                   color: AppColors.textCaptionColor,
+                  softWrap: true,
+                  textAlign: TextAlign.center,
                 ),
                 16.verticalSpace,
                 CustomButton(
-                  text: AppString.done.tr,
+                  text: AppString.backToHome.tr,
                   onTap: () {
                     Get.back();
+                    Navigation.popupUtil(Routes.dashboardScreen);
                   },
                 ),
               ],
             ),
           );
-        });
-      } else if ((riderBookingModel.value?.data?.booking?.status ?? "") ==
-          "cancelled") {
-        AppDialog.commonDialog(
-          barrierDismissible: false,
-          childs: Column(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              CustomImage(image: ImagesAsset.rideCancel),
-              16.verticalSpace,
-              CommonText(
-                string: AppString.weAreSadToCancel.tr,
-                fontSize: 16.sp,
-                fontWeight: FontWeight.w500,
-                textAlign: TextAlign.center,
-                softWrap: true,
-              ),
-              12.verticalSpace,
-              CommonText(
-                string: AppString.makeYourNextRideHappiest.tr,
-                fontSize: 14.sp,
-                fontWeight: FontWeight.w400,
-                color: AppColors.textCaptionColor,
-                softWrap: true,
-                textAlign: TextAlign.center,
-              ),
-              16.verticalSpace,
-              CustomButton(
-                text: AppString.backToHome.tr,
-                onTap: () {
-                  Get.back();
-                  AppConstant().bookingId = "";
-                  clearSavedBookingFare();
-                  Navigation.popupUtil(Routes.dashboardScreen);
-                },
-              ),
-            ],
-          ),
-        );
-      } else if ((riderBookingModel.value?.data?.booking?.status ?? "") ==
-          "expired") {
-        // driver not available...
-        AppDialog.commonBottomSheetWidget(
-          isDismiss: false,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Align(
-                alignment: AlignmentDirectional.topStart,
-                child: CommonText(
-                  string: AppString.noRideAvailable.tr,
-                  fontSize: 18.sp,
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.titleTextColor,
+        } else if (status == 'expired') {
+          AppDialog.commonBottomSheetWidget(
+            isDismiss: false,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Align(
+                  alignment: AlignmentDirectional.topStart,
+                  child: CommonText(
+                    string: AppString.noRideAvailable.tr,
+                    fontSize: 18.sp,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.titleTextColor,
+                  ),
                 ),
-              ),
-              SizedBox(height: 8.h),
-
-              Container(height: 1.h, color: AppColors.textFieldBorderColor),
-              24.verticalSpace,
-
-              Center(
-                child: CustomImage(
-                  image: ImagesAsset.noRide,
-                  ht: 160.h,
-                  wt: 180.w,
+                SizedBox(height: 8.h),
+                Container(height: 1.h, color: AppColors.textFieldBorderColor),
+                24.verticalSpace,
+                Center(
+                  child: CustomImage(
+                    image: ImagesAsset.noRide,
+                    ht: 160.h,
+                    wt: 180.w,
+                  ),
                 ),
-              ),
-              20.verticalSpace,
-
-              // Message
-              Center(
-                child: CommonText(
-                  string: AppString.noRideAvailableRightNow.tr,
-                  fontSize: 16.sp,
-                  fontWeight: FontWeight.w500,
-                  color: AppColors.titleTextColor,
+                20.verticalSpace,
+                Center(
+                  child: CommonText(
+                    string: AppString.noRideAvailableRightNow.tr,
+                    fontSize: 16.sp,
+                    fontWeight: FontWeight.w500,
+                    color: AppColors.titleTextColor,
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+                6.verticalSpace,
+                CommonText(
+                  string: AppString.pleaseTryAgainAfter.tr,
+                  softWrap: true,
+                  fontSize: 14.sp,
+                  color: AppColors.textCaptionColor,
                   textAlign: TextAlign.center,
+                ).paddingSymmetric(horizontal: 42.w),
+                32.verticalSpace,
+                CustomButton(
+                  text: AppString.tryAgain.tr,
+                  buttonColor: AppColors.mainPrimaryColor,
+                  height: 48.h,
+                  width: double.infinity,
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigation.popupUtil(Routes.dashboardScreen);
+                  },
                 ),
-              ),
-              6.verticalSpace,
-              CommonText(
-                string: AppString.pleaseTryAgainAfter.tr,
-                softWrap: true,
-                fontSize: 14.sp,
-                color: AppColors.textCaptionColor,
-                textAlign: TextAlign.center,
-              ).paddingSymmetric(horizontal: 42.w),
-              32.verticalSpace,
-
-              CustomButton(
-                text: AppString.tryAgain.tr,
-                buttonColor: AppColors.mainPrimaryColor,
-                height: 48.h,
-                width: double.infinity,
-                onTap: () {
-                  Navigator.pop(context);
-                  Navigation.popupUtil(Routes.dashboardScreen);
-                },
-              ),
-              12.verticalSpace,
-            ],
-          ),
-        );
+                12.verticalSpace,
+              ],
+            ),
+          );
+        }
       }
-    } catch (e, st) {
-      log("SOCKET STATUS ERROR ::$e, $st");
+    } catch (error, stack) {
+      log('PASSENGER STATUS ERROR: $error, $stack');
+      PassengerFlowDebug.send(
+        'booking_state_apply_error',
+        bookingId: bookingId,
+        data: <String, dynamic>{'status': status, 'error': '$error'},
+      );
     }
+  }
+
+  void _clearCurrentBookingState({
+    required String bookingId,
+    required String reason,
+    required String status,
+  }) {
+    AppConstant().bookingId = '';
+    clearSavedBookingFare();
+    riderBookingModel.value = null;
+    tripType.value = 0;
+    isDriverCome.value = false;
+    changePolyLine = false;
+    AppPreference.removeKey(AppPreference.RideTime);
+
+    PassengerFlowDebug.send(
+      'local_booking_state_cleared',
+      bookingId: bookingId,
+      data: <String, dynamic>{
+        'reason': reason,
+        'status': status,
+      },
+    );
   }
 
   void closeDebounce() {
@@ -926,6 +993,15 @@ class HomeController extends GetxController with LoadingMixin, LoadingApiMixin {
     required LatLng destinationLatLng,
   }) async {
     String errorMessage = "";
+    PassengerFlowDebug.send(
+      'booking_estimate_requested',
+      data: <String, dynamic>{
+        'pickup_latitude': PassengerFlowDebug.coordinate(originLatLng.latitude),
+        'pickup_longitude': PassengerFlowDebug.coordinate(originLatLng.longitude),
+        'dropoff_latitude': PassengerFlowDebug.coordinate(destinationLatLng.latitude),
+        'dropoff_longitude': PassengerFlowDebug.coordinate(destinationLatLng.longitude),
+      },
+    );
     bookingCreateModel.value = null;
     AppConstant().bookingId = "";
     isDriverCome.value = false;
@@ -942,6 +1018,14 @@ class HomeController extends GetxController with LoadingMixin, LoadingApiMixin {
         isDriverCome.value = false;
         tripType.value = 0;
 
+        PassengerFlowDebug.send(
+          'booking_estimate_success',
+          data: <String, dynamic>{
+            'ride_option_count': (data.data?.rideOptions ?? []).length,
+            'estimated_distance': data.data?.booking?.estimatedDistance ?? '',
+            'estimated_duration': data.data?.booking?.estimatedDuration ?? '',
+          },
+        );
         if ((data.data?.rideOptions ?? []).isEmpty) {
           errorMessage = "Ehhez a felvételi ponthoz nincs elérhető járműtípus.";
         }
@@ -949,6 +1033,10 @@ class HomeController extends GetxController with LoadingMixin, LoadingApiMixin {
       error: (error, stack) {
         handleLoading(false);
         errorMessage = error.toString();
+        PassengerFlowDebug.send(
+          'booking_estimate_error',
+          data: <String, dynamic>{'error': '$error'},
+        );
         LogUtils.printError("BOOKING ESTIMATE FAILED ==> $error, $stack");
       },
     );
@@ -971,6 +1059,14 @@ class HomeController extends GetxController with LoadingMixin, LoadingApiMixin {
     }
 
     finalizingBooking(true);
+    PassengerFlowDebug.send(
+      'finalize_booking_requested',
+      data: <String, dynamic>{
+        'ride_type_id': rideTypeId,
+        'payment_method': paymentMethod,
+        'booking_contact_id': bookingContactId,
+      },
+    );
     try {
       final bookingResponse = await HomeService.bookingCreate(
         originAddress: origin,
@@ -989,6 +1085,14 @@ class HomeController extends GetxController with LoadingMixin, LoadingApiMixin {
 
       bookingCreateModel.value = bookingResponse;
       AppConstant().bookingId = bookingId;
+      PassengerFlowDebug.send(
+        'booking_create_success',
+        bookingId: bookingId,
+        data: <String, dynamic>{
+          'status': bookingResponse.data?.booking?.status ?? '',
+          'ride_type_id': rideTypeId,
+        },
+      );
       saveBookingFare(
         bookingId,
         bookingResponse.data?.booking?.estimatedFare ??
@@ -997,6 +1101,11 @@ class HomeController extends GetxController with LoadingMixin, LoadingApiMixin {
 
       final confirmation = await HomeService.confirmRide(bookingId);
       final status = confirmation['data']?['status']?.toString() ?? "";
+      PassengerFlowDebug.send(
+        'booking_confirm_response',
+        bookingId: bookingId,
+        data: <String, dynamic>{'status': status},
+      );
       if (status.isNotEmpty) {
         bookingCreateModel.value?.data?.booking?.status = status;
         bookingCreateModel.refresh();
@@ -1008,6 +1117,11 @@ class HomeController extends GetxController with LoadingMixin, LoadingApiMixin {
         );
       }
 
+      PassengerFlowDebug.send(
+        'search_driver_screen_open_requested',
+        bookingId: bookingId,
+        data: <String, dynamic>{'status': status},
+      );
       Navigation.pushNamed(
         Routes.searchDriverScreen,
         arg: {
@@ -1017,6 +1131,11 @@ class HomeController extends GetxController with LoadingMixin, LoadingApiMixin {
       );
       return true;
     } catch (error, stack) {
+      PassengerFlowDebug.send(
+        'finalize_booking_error',
+        bookingId: AppConstant().bookingId,
+        data: <String, dynamic>{'error': '$error'},
+      );
       LogUtils.printError("FINALIZE BOOKING FAILED ==> $error, $stack");
       AppSnackBar.showErrorSnackBar(
         message: error.toString().replaceFirst('Exception: ', ''),

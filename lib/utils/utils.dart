@@ -35,6 +35,8 @@ class Utils with LoadingMixin {
   }
 
   BitmapDescriptor? customIcon;
+  BitmapDescriptor? sourceMarkerIcon;
+  BitmapDescriptor? destinationMarkerIcon;
   BitmapDescriptor? carIcon;
 
   static const double vehicleMarkerSize = 48;
@@ -56,6 +58,19 @@ class Utils with LoadingMixin {
 
   Future<void> setCurrentMarker() async {
     customIcon = await getMarkerIcon(IconAsset.userLocation, 60);
+  }
+
+  Future<void> setRouteMarkers() async {
+    sourceMarkerIcon = await getMarkerIcon(
+      ImagesAsset.sourceIcon,
+      96,
+      displaySize: 46,
+    );
+    destinationMarkerIcon = await getMarkerIcon(
+      ImagesAsset.destinationIcon,
+      96,
+      displaySize: 46,
+    );
   }
 
   Future<void> setCarMarker() async {

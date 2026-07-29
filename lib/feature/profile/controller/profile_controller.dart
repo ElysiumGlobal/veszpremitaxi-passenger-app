@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:developer';
 
+import 'package:e_taxi/core/debug/passenger_flow_debug.dart';
 import 'package:e_taxi/feature/profile/model/emergency_model.dart';
 import 'package:e_taxi/feature/profile/model/user_model.dart';
 import 'package:e_taxi/feature/profile/service/profile_service.dart';
@@ -31,27 +32,112 @@ class ProfileController extends GetxController
       result: (data) async {
         userModel.value = data.data;
 
-        if (isRedirect &&
-            data.currentBooking != null &&
-            (data.isCash ?? 0) == 0) {
+        final currentBooking = data.currentBooking;
+        final status = (currentBooking?.booking?.status ??
+                currentBooking?.status ??
+                '')
+            .toLowerCase()
+            .trim();
+        final bookingId =
+            '${currentBooking?.booking?.id ?? currentBooking?.bookingId ?? ''}'
+                .trim();
+        const activeStatuses = <String>{
+          'searching',
+          'accepted',
+          'arrived',
+          'started',
+        };
+
+        PassengerFlowDebug.send(
+          'passenger_profile_loaded',
+          bookingId: bookingId,
+          data: <String, dynamic>{
+            'redirect_requested': isRedirect,
+            'current_booking_present': currentBooking != null,
+            'status': status,
+            'is_cash': data.isCash ?? 0,
+          },
+        );
+
+        if (currentBooking == null) {
+          if (AppConstant().bookingId.isNotEmpty ||
+              riderBookingModel.value != null) {
+            _clearLocalBookingState(reason: 'profile_has_no_current_booking');
+          }
+          return;
+        }
+
+        if (!activeStatuses.contains(status)) {
+          _clearLocalBookingState(
+            reason: 'profile_terminal_or_unknown_status',
+            bookingId: bookingId,
+            status: status,
+          );
+          return;
+        }
+
+        if (isRedirect && (data.isCash ?? 0) == 0) {
           try {
             riderBookingModel.value = NewRideModel.fromJson({
-              "data": jsonEncode(data.currentBooking?.toJson()),
+              'data': jsonEncode(currentBooking.toJson()),
             });
-            log("PRofile::${data.currentBooking?.toJson()}");
-            AppConstant().bookingId =
-                riderBookingModel.value?.data?.booking?.id ?? "";
+            log('Profile current booking restored: $bookingId / $status');
+            AppConstant().bookingId = bookingId;
             persistBookingFareFromModel(riderBookingModel.value?.data);
 
-            await Future.delayed(Duration(seconds: 1));
+            PassengerFlowDebug.send(
+              'active_booking_restored',
+              bookingId: bookingId,
+              data: <String, dynamic>{'status': status},
+            );
+
+            await Future<void>.delayed(const Duration(milliseconds: 350));
             Get.find<HomeController>().socketData(isFirstTime: true);
-          } catch (e) {
-            LogUtils.printError("ASdasdsadasdd:::$e");
+          } catch (error, stack) {
+            LogUtils.printError('ACTIVE BOOKING RESTORE ERROR: $error, $stack');
+            PassengerFlowDebug.send(
+              'active_booking_restore_error',
+              bookingId: bookingId,
+              data: <String, dynamic>{'status': status, 'error': '$error'},
+            );
           }
         }
       },
     );
     isCall = false;
+  }
+
+
+  void _clearLocalBookingState({
+    required String reason,
+    String bookingId = '',
+    String status = '',
+  }) {
+    final staleBookingId = bookingId.isNotEmpty
+        ? bookingId
+        : (AppConstant().bookingId.isNotEmpty
+            ? AppConstant().bookingId
+            : '${riderBookingModel.value?.data?.booking?.id ?? ''}');
+
+    AppConstant().bookingId = '';
+    clearSavedBookingFare();
+    riderBookingModel.value = null;
+
+    if (Get.isRegistered<HomeController>()) {
+      final homeController = Get.find<HomeController>();
+      homeController.tripType.value = 0;
+      homeController.isDriverCome.value = false;
+      homeController.changePolyLine = false;
+    }
+
+    PassengerFlowDebug.send(
+      'stale_booking_cleared',
+      bookingId: staleBookingId,
+      data: <String, dynamic>{
+        'reason': reason,
+        'status': status,
+      },
+    );
   }
 
   Future<void> updateProfile({

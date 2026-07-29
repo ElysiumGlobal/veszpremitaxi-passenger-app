@@ -30,7 +30,7 @@ class _SplaceScreenState extends State<SplaceScreen> {
   void initState() {
     super.initState();
     NetworkInfo.setListener();
-    _imageTimer = Timer(const Duration(milliseconds: 1500), () {
+    _imageTimer = Timer(const Duration(milliseconds: 2800), () {
       if (mounted) {
         setState(() => _showSecondImage = true);
       }
@@ -55,7 +55,7 @@ class _SplaceScreenState extends State<SplaceScreen> {
 
   Future<void> _start() async {
     await Future.wait<void>([
-      Future<void>.delayed(const Duration(milliseconds: 3000)),
+      Future<void>.delayed(const Duration(milliseconds: 5000)),
       getSetting().timeout(
         const Duration(seconds: 3),
         onTimeout: () {},
@@ -77,7 +77,7 @@ class _SplaceScreenState extends State<SplaceScreen> {
       AppConstant().iosLink = data['data']['appleShareLink'] ?? '';
       AppConstant().androidLink = data['data']['androidShareLink'] ?? '';
       AppConstant().appStoreId = data['data']['appstoreId'] ?? '';
-      AppConstant().currency = data['data']['currency'] ?? 'HUF';
+      AppConstant().currency = 'HUF';
     } catch (_) {
       // A betöltőképernyő hálózati hiba esetén sem tarthatja fel az appot.
     }

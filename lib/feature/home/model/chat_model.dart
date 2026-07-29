@@ -1,4 +1,24 @@
+
 import 'dart:convert';
+
+String? _stringValue(dynamic value) {
+  if (value == null) return null;
+  return value.toString();
+}
+
+int? _intValue(dynamic value) {
+  if (value == null || value.toString().trim().isEmpty) return null;
+  return int.tryParse(value.toString());
+}
+
+bool? _boolValue(dynamic value) {
+  if (value == null) return null;
+  if (value is bool) return value;
+  final normalized = value.toString().toLowerCase().trim();
+  if (normalized == '1' || normalized == 'true') return true;
+  if (normalized == '0' || normalized == 'false') return false;
+  return null;
+}
 
 ChatListModel chatListModelFromJson(String str) =>
     ChatListModel.fromJson(json.decode(str));
@@ -47,7 +67,7 @@ class Chat {
   String? bookingStatus;
   String? message;
   String? messageType;
-  List<dynamic>? metadata;
+  dynamic metadata;
   bool? isRead;
   bool? isFromMe;
   OtherParticipant? sender;
@@ -80,7 +100,7 @@ class Chat {
     String? bookingStatus,
     String? message,
     String? messageType,
-    List<dynamic>? metadata,
+    dynamic metadata,
     bool? isRead,
     bool? isFromMe,
     OtherParticipant? sender,
@@ -107,16 +127,14 @@ class Chat {
   );
 
   factory Chat.fromJson(Map<String, dynamic> json) => Chat(
-    id: json["id"],
-    bookingId: json["booking_id"],
-    bookingStatus: json["booking_status"],
-    message: json["message"],
-    messageType: json["message_type"],
-    metadata: json["metadata"] == null
-        ? []
-        : List<dynamic>.from(json["metadata"]!.map((x) => x)),
-    isRead: json["is_read"],
-    isFromMe: json["is_from_me"],
+    id: _stringValue(json["id"]),
+    bookingId: _stringValue(json["booking_id"]),
+    bookingStatus: _stringValue(json["booking_status"]),
+    message: _stringValue(json["message"]),
+    messageType: _stringValue(json["message_type"]),
+    metadata: json["metadata"],
+    isRead: _boolValue(json["is_read"]),
+    isFromMe: _boolValue(json["is_from_me"]),
     sender: json["sender"] == null
         ? null
         : OtherParticipant.fromJson(json["sender"]),
@@ -126,9 +144,9 @@ class Chat {
     otherParticipant: json["other_participant"] == null
         ? null
         : OtherParticipant.fromJson(json["other_participant"]),
-    createdAt: json["created_at"],
-    updatedAt: json["updated_at"],
-    readAt: json["read_at"],
+    createdAt: _stringValue(json["created_at"]),
+    updatedAt: _stringValue(json["updated_at"]),
+    readAt: _stringValue(json["read_at"]),
   );
 
   Map<String, dynamic> toJson() => {
@@ -137,9 +155,7 @@ class Chat {
     "booking_status": bookingStatus,
     "message": message,
     "message_type": messageType,
-    "metadata": metadata == null
-        ? []
-        : List<dynamic>.from(metadata!.map((x) => x)),
+    "metadata": metadata,
     "is_read": isRead,
     "is_from_me": isFromMe,
     "sender": sender?.toJson(),
@@ -186,12 +202,12 @@ class OtherParticipant {
 
   factory OtherParticipant.fromJson(Map<String, dynamic> json) =>
       OtherParticipant(
-        id: json["id"],
-        name: json["name"],
-        phone: json["phone"],
-        profilePhoto: json["profile_photo"],
-        role: json["role"],
-        senderType: json["sender_type"],
+        id: _stringValue(json["id"]),
+        name: _stringValue(json["name"]),
+        phone: _stringValue(json["phone"]),
+        profilePhoto: _stringValue(json["profile_photo"]),
+        role: _stringValue(json["role"]),
+        senderType: _stringValue(json["sender_type"]),
       );
 
   Map<String, dynamic> toJson() => {
@@ -238,12 +254,12 @@ class Pagination {
   );
 
   factory Pagination.fromJson(Map<String, dynamic> json) => Pagination(
-    currentPage: json["current_page"],
-    lastPage: json["last_page"],
-    perPage: json["per_page"],
-    total: json["total"],
-    from: json["from"],
-    to: json["to"],
+    currentPage: _intValue(json["current_page"]),
+    lastPage: _intValue(json["last_page"]),
+    perPage: _intValue(json["per_page"]),
+    total: _intValue(json["total"]),
+    from: _intValue(json["from"]),
+    to: _intValue(json["to"]),
   );
 
   Map<String, dynamic> toJson() => {

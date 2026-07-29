@@ -4,6 +4,7 @@ import 'dart:developer';
 
 import 'package:e_taxi/core/api/api.dart';
 import 'package:e_taxi/core/api/responce_handler.dart';
+import 'package:e_taxi/core/debug/passenger_flow_debug.dart';
 import 'package:e_taxi/utils/api_constants.dart';
 import 'package:e_taxi/utils/app_colors.dart';
 import 'package:e_taxi/utils/app_preferences.dart';
@@ -33,140 +34,307 @@ class ChatScreen extends StatefulWidget {
 }
 
 class _ChatScreenState extends State<ChatScreen> {
-  RxBool isLoading = true.obs;
+  final RxBool isLoading = true.obs;
+  final RxBool isSending = false.obs;
+  final SocketChannelService _socketService = SocketChannelService();
+  final TextEditingController controller = TextEditingController();
+  final String userId = AppPreference.getString(AppPreference.userId);
+
+  StreamSubscription<dynamic>? _socketStream;
+  Timer? _historyPollingTimer;
 
   @override
   void initState() {
-    // TODO: implement initState
     super.initState();
-    socketAuthConnection();
-    getMsgHistory();
+    PassengerFlowDebug.send(
+      'passenger_chat_opened',
+      bookingId: widget.bookingId,
+    );
+    unawaited(getMsgHistory());
+    unawaited(socketAuthConnection());
+    _historyPollingTimer = Timer.periodic(
+      const Duration(seconds: 4),
+      (_) => unawaited(getMsgHistory(silent: true)),
+    );
+    _listenToSocket();
+  }
+
+  void _listenToSocket() {
+    _socketStream?.cancel();
     _socketStream = _socketService.onSocketDataListen.listen((events) {
       try {
-        if (events != null) {
-          var event = jsonDecode(events);
-          log("EVENT ::$event");
-
-          if (event['event'] == "client-send-message") {
-            chatList.insert(
-              0,
-              Chat(
-                message: (jsonDecode(event['data']))['message'],
-                createdAt:
-                    "${DateTime.now().toUtc().toIso8601String().split('.').first}.000000Z",
-              ),
-            );
-          }
+        if (events == null) return;
+        final dynamic event = jsonDecode(events);
+        if (event is! Map) return;
+        final String eventName = event['event']?.toString() ?? '';
+        if (eventName != 'chat.message' &&
+            eventName != 'client-send-message') {
+          return;
         }
-      } catch (e, st) {
-        LogUtils.printWhite("socket error :$e , $st");
+
+        dynamic payload = event['data'];
+        if (payload is String) payload = jsonDecode(payload);
+        if (payload is! Map) return;
+        dynamic rawChat = payload['chat'] ?? payload;
+        if (rawChat is! Map) return;
+
+        final chat = Chat.fromJson(Map<String, dynamic>.from(rawChat));
+        _upsertChat(chat);
+        PassengerFlowDebug.send(
+          'passenger_chat_socket_received',
+          bookingId: widget.bookingId,
+          data: <String, dynamic>{
+            'event_name': eventName,
+            'message_id': chat.id ?? '',
+            'sender_id': chat.sender?.id ?? '',
+          },
+        );
+      } catch (error, stack) {
+        LogUtils.printError('PASSENGER CHAT SOCKET ERROR: $error, $stack');
+        PassengerFlowDebug.send(
+          'passenger_chat_socket_error',
+          bookingId: widget.bookingId,
+          data: <String, dynamic>{'error': '$error'},
+        );
       }
     });
   }
 
-  StreamSubscription<dynamic>? _socketStream;
+  void _upsertChat(Chat chat) {
+    final String chatId = chat.id?.trim() ?? '';
+    if (chatId.isNotEmpty) {
+      final index = chatList.indexWhere((item) => item.id == chatId);
+      if (index >= 0) {
+        chatList[index] = chat;
+        chatList.refresh();
+        return;
+      }
+    }
+    chatList.insert(0, chat);
+  }
 
-  final SocketChannelService _socketService = SocketChannelService();
+  Future<void> getMsgHistory({bool silent = false}) async {
+    try {
+      if (!silent) isLoading.value = true;
+      final response = await Api().get(
+        '${ApiConstants.getChatHistory}${widget.bookingId}',
+      );
+      PassengerFlowDebug.send(
+        'passenger_chat_history_response',
+        bookingId: widget.bookingId,
+        data: <String, dynamic>{
+          'http_status': response.statusCode,
+          'body_length': response.body.length,
+          'silent': silent,
+        },
+      );
+      await ResponseHandler.checkResponseError(
+        response,
+        showException: false,
+      );
 
-  @override
-  void dispose() {
-    // TODO: implement dispose
-    super.dispose();
-    chatList.clear();
-    _socketStream?.cancel();
+      final model = ChatListModel.fromJson(jsonDecode(response.body));
+      chatList.assignAll(model.chats ?? <Chat>[]);
+      unawaited(_markMessagesRead());
+    } catch (error, stack) {
+      LogUtils.printError('PASSENGER CHAT HISTORY ERROR: $error, $stack');
+      PassengerFlowDebug.send(
+        'passenger_chat_history_error',
+        bookingId: widget.bookingId,
+        data: <String, dynamic>{'error': '$error', 'silent': silent},
+      );
+      if (!silent) {
+        AppSnackBar.showErrorSnackBar(
+          message: 'Az üzeneteket most nem sikerült betölteni.',
+          isError: true,
+        );
+      }
+    } finally {
+      if (!silent) isLoading.value = false;
+    }
+  }
 
-    _socketService.sendPusherEvent("pusher:unsubscribe", {
-      "channel": "private-chat.booking.${widget.bookingId}",
-    });
+  Future<void> _markMessagesRead() async {
+    try {
+      await Api().post(
+        ApiConstants.markChatRead,
+        bodyData: <String, dynamic>{'booking_id': widget.bookingId},
+      );
+    } catch (_) {
+      // Az olvasottság hibája nem akadályozhatja a chat használatát.
+    }
   }
 
   Future<void> socketAuthConnection() async {
     try {
       if (AppConstant().socketId.isEmpty) {
-        await Future.delayed(Duration(seconds: 3));
+        await Future<void>.delayed(const Duration(seconds: 2));
+      }
+      if (AppConstant().socketId.isEmpty) {
+        PassengerFlowDebug.send(
+          'passenger_chat_socket_auth_skipped',
+          bookingId: widget.bookingId,
+          data: <String, dynamic>{'reason': 'missing_socket_id'},
+        );
+        return;
       }
 
       final response = await Api().post(
         ApiConstants.socketAuthentication,
-        bodyData: {
-          "socket_id": AppConstant().socketId,
-          "channel_name": "private-chat.booking.${widget.bookingId}",
+        bodyData: <String, dynamic>{
+          'socket_id': AppConstant().socketId,
+          'channel_name': 'private-chat.booking.${widget.bookingId}',
         },
       );
 
-      if (response.statusCode == 200) {
-        var data = jsonDecode(response.body);
+      PassengerFlowDebug.send(
+        'passenger_chat_socket_auth_response',
+        bookingId: widget.bookingId,
+        data: <String, dynamic>{'http_status': response.statusCode},
+      );
 
-        _socketService.sendPusherEvent("pusher:subscribe", {
-          "channel": "private-chat.booking.${widget.bookingId}",
-          "auth": "${data['auth']}",
-        });
-      } else {
-        throw "Statuscode :${response.statusCode} ::${response.body}";
-      }
-    } catch (e, st) {
-      LogUtils.printError("SOCKET AUTH ERROR $e, $st");
-      Get.back();
-      AppSnackBar.showErrorSnackBar(message: "Something are wrong!");
-    } finally {}
+      if (response.statusCode != 200) return;
+      final dynamic data = jsonDecode(response.body);
+      final String auth = data is Map ? data['auth']?.toString() ?? '' : '';
+      if (auth.isEmpty) return;
+      _socketService.sendPusherEvent('pusher:subscribe', <String, dynamic>{
+        'channel': 'private-chat.booking.${widget.bookingId}',
+        'auth': auth,
+      });
+    } catch (error, stack) {
+      log('PASSENGER CHAT SOCKET AUTH ERROR: $error');
+      LogUtils.printError('PASSENGER CHAT SOCKET AUTH ERROR: $error, $stack');
+      PassengerFlowDebug.send(
+        'passenger_chat_socket_auth_error',
+        bookingId: widget.bookingId,
+        data: <String, dynamic>{'error': '$error'},
+      );
+      // A 4 másodperces HTTP frissítés miatt a chat socket nélkül is működhet.
+    }
   }
 
   Future<void> sendMessage(String msg) async {
-    if (msg.isEmpty) {
-      return;
-    }
-    try {
-      _socketService.sendPusherEventChanel("client-send-message", {
-        "message": msg,
-        "message_type": "text",
-        "metadata": {},
-      }, channel: "private-chat.booking.${widget.bookingId}");
+    final String message = msg.trim();
+    if (message.isEmpty || isSending.value) return;
 
-      chatList.insert(
-        0,
-        Chat(
-          message: msg,
-          sender: OtherParticipant(
-            id: AppPreference.getString(AppPreference.userId),
-          ),
-          createdAt:
-              "${DateTime.now().toUtc().toIso8601String().split('.').first}.000000Z",
-        ),
+    isSending.value = true;
+    PassengerFlowDebug.send(
+      'passenger_chat_send_requested',
+      bookingId: widget.bookingId,
+      data: <String, dynamic>{'message_length': message.length},
+    );
+
+    try {
+      final response = await Api().post(
+        ApiConstants.sendChatMessage,
+        bodyData: <String, dynamic>{
+          'booking_id': widget.bookingId,
+          'message': message,
+          'message_type': 'text',
+          'metadata': <String, dynamic>{},
+        },
       );
+      PassengerFlowDebug.send(
+        'passenger_chat_send_response',
+        bookingId: widget.bookingId,
+        data: <String, dynamic>{
+          'http_status': response.statusCode,
+          'body_length': response.body.length,
+        },
+      );
+      await ResponseHandler.checkResponseError(
+        response,
+        showException: false,
+      );
+
+      final dynamic decoded = jsonDecode(response.body);
+      final dynamic rawChat = decoded is Map ? decoded['chat'] : null;
+      if (rawChat is Map) {
+        _upsertChat(Chat.fromJson(Map<String, dynamic>.from(rawChat)));
+      } else {
+        await getMsgHistory(silent: true);
+      }
       controller.clear();
-    } catch (e, st) {
-      LogUtils.printError("send Msg Error :$e, $st");
-    }
-  }
-
-  Future<void> getMsgHistory() async {
-    try {
-      final response = await Api().get(
-        "${ApiConstants.getChatHistory}${widget.bookingId}",
+      PassengerFlowDebug.send(
+        'passenger_chat_send_success',
+        bookingId: widget.bookingId,
       );
-      await ResponseHandler.checkResponseError(response);
-
-      chatList.value =
-          (ChatListModel.fromJson(jsonDecode(response.body))).chats ?? [];
-    } catch (e) {
-      LogUtils.printError("error:::$e");
+    } catch (error, stack) {
+      LogUtils.printError('PASSENGER CHAT SEND ERROR: $error, $stack');
+      PassengerFlowDebug.send(
+        'passenger_chat_send_error',
+        bookingId: widget.bookingId,
+        data: <String, dynamic>{'error': '$error'},
+      );
+      AppSnackBar.showErrorSnackBar(
+        message: 'Az üzenetet nem sikerült elküldeni. Próbáld újra.',
+        isError: true,
+      );
     } finally {
-      isLoading(false);
+      isSending.value = false;
     }
   }
 
-  TextEditingController controller = TextEditingController();
-  String userId = AppPreference.getString(AppPreference.userId);
+  Future<void> _deleteMessage(Chat chat) async {
+    final id = chat.id?.trim() ?? '';
+    if (id.isEmpty || chat.sender?.id != userId) return;
+    final bool confirmed = await Get.dialog<bool>(
+          AlertDialog(
+            title: const Text('Üzenet törlése'),
+            content: const Text('Biztosan törlöd ezt az üzenetet?'),
+            actions: [
+              TextButton(
+                onPressed: () => Get.back(result: false),
+                child: const Text('Mégse'),
+              ),
+              FilledButton(
+                onPressed: () => Get.back(result: true),
+                child: const Text('Törlés'),
+              ),
+            ],
+          ),
+        ) ??
+        false;
+    if (!confirmed) return;
+
+    try {
+      final response = await Api().delete('${ApiConstants.deleteChatMessage}$id');
+      await ResponseHandler.checkResponseError(response, showException: false);
+      await getMsgHistory(silent: true);
+    } catch (_) {
+      AppSnackBar.showErrorSnackBar(
+        message: 'Az üzenet nem törölhető. Csak a saját, friss üzeneted törölhető.',
+        isError: true,
+      );
+    }
+  }
+
+  @override
+  void dispose() {
+    PassengerFlowDebug.send(
+      'passenger_chat_closed',
+      bookingId: widget.bookingId,
+      data: <String, dynamic>{'message_count': chatList.length},
+    );
+    _historyPollingTimer?.cancel();
+    _socketStream?.cancel();
+    _socketService.sendPusherEvent('pusher:unsubscribe', <String, dynamic>{
+      'channel': 'private-chat.booking.${widget.bookingId}',
+    });
+    chatList.clear();
+    controller.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.whiteGrey,
-      appBar: CustomAppBar(centerTitle: false, title: "Chat"),
+      appBar: const CustomAppBar(centerTitle: false, title: 'Üzenetek'),
       body: SafeArea(
         child: Obx(
           () => isLoading.value
-              ? Center(child: CircularProgressIndicator())
+              ? const Center(child: CircularProgressIndicator())
               : Stack(
                   children: [
                     Container(
@@ -180,43 +348,116 @@ class _ChatScreenState extends State<ChatScreen> {
                     Column(
                       mainAxisAlignment: MainAxisAlignment.end,
                       children: [
-                        Obx(
-                          () => Expanded(
-                            child: ListView.separated(
-                              separatorBuilder: (context, index) =>
-                                  16.verticalSpace,
-                              itemCount: chatList.length,
-                              reverse: true,
-                              itemBuilder: (context, index) {
-                                final data = chatList[index];
-                                return data.sender?.id == userId
-                                    ? sender(data)
-                                    : receiver(data);
-                              },
-                            ),
-                          ),
+                        Expanded(
+                          child: chatList.isEmpty
+                              ? Center(
+                                  child: Container(
+                                    padding: EdgeInsets.symmetric(
+                                      horizontal: 18.w,
+                                      vertical: 12.h,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: AppColors.whiteColor.withValues(
+                                        alpha: 0.92,
+                                      ),
+                                      borderRadius: BorderRadius.circular(12.r),
+                                    ),
+                                    child: const Text(
+                                      'Még nincs üzenet. Írj a sofőrnek!',
+                                      textAlign: TextAlign.center,
+                                    ),
+                                  ),
+                                )
+                              : ListView.separated(
+                                  separatorBuilder: (_, __) => 6.verticalSpace,
+                                  itemCount: chatList.length,
+                                  reverse: true,
+                                  itemBuilder: (context, index) {
+                                    final data = chatList[index];
+                                    final bool mine = data.sender?.id == userId;
+                                    final bool deleted =
+                                        data.messageType == 'deleted';
+                                    return GestureDetector(
+                                      onLongPress: mine && !deleted
+                                          ? () => _deleteMessage(data)
+                                          : null,
+                                      child: Column(
+                                        mainAxisSize: MainAxisSize.min,
+                                        crossAxisAlignment: mine
+                                            ? CrossAxisAlignment.end
+                                            : CrossAxisAlignment.start,
+                                        children: [
+                                          Container(
+                                            margin: EdgeInsets.only(
+                                              left: mine ? Get.width * 0.22 : 0,
+                                              right: mine ? 0 : Get.width * 0.22,
+                                            ),
+                                            padding: EdgeInsets.all(12.w),
+                                            decoration: BoxDecoration(
+                                              color: mine
+                                                  ? AppColors.mainPrimaryColor
+                                                  : AppColors.primaryContainer,
+                                              borderRadius:
+                                                  BorderRadius.circular(12.r),
+                                            ),
+                                            child: Text(
+                                              deleted
+                                                  ? 'Ez az üzenet törölve lett.'
+                                                  : data.message ?? '',
+                                              style: TextStyle(
+                                                fontStyle: deleted
+                                                    ? FontStyle.italic
+                                                    : FontStyle.normal,
+                                              ),
+                                            ),
+                                          ),
+                                          if (Utils()
+                                              .time(data.createdAt ?? '')
+                                              .isNotEmpty)
+                                            CommonText(
+                                              string: Utils().time(
+                                                data.createdAt ?? '',
+                                              ),
+                                              fontSize: 12.sp,
+                                            ),
+                                        ],
+                                      ),
+                                    );
+                                  },
+                                ),
                         ),
-                        16.verticalSpace,
+                        12.verticalSpace,
                         Row(
                           children: [
                             Expanded(
-                              child: CustomTextField(controller: controller),
+                              child: CustomTextField(
+                                controller: controller,
+                                hintText: 'Írj üzenetet…',
+                              ),
                             ),
-
                             8.horizontalSpace,
                             GestureDetector(
-                              onTap: () {
-                                sendMessage(controller.text.trim());
-                              },
-                              child: Container(
-                                height: 48.h,
-                                width: 48.h,
-                                decoration: BoxDecoration(
-                                  borderRadius: BorderRadius.circular(4.r),
-                                  color: AppColors.mainPrimaryColor,
+                              onTap: () => sendMessage(controller.text),
+                              child: Obx(
+                                () => Container(
+                                  height: 48.h,
+                                  width: 48.h,
+                                  decoration: BoxDecoration(
+                                    borderRadius: BorderRadius.circular(10.r),
+                                    color: AppColors.mainPrimaryColor,
+                                  ),
+                                  alignment: Alignment.center,
+                                  child: isSending.value
+                                      ? SizedBox(
+                                          height: 20.h,
+                                          width: 20.h,
+                                          child: const CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                            color: AppColors.brandNavy,
+                                          ),
+                                        )
+                                      : CustomImage(image: IconAsset.sendIcon),
                                 ),
-                                alignment: Alignment.center,
-                                child: CustomImage(image: IconAsset.sendIcon),
                               ),
                             ),
                           ],
@@ -229,56 +470,6 @@ class _ChatScreenState extends State<ChatScreen> {
       ).paddingAll(16.w),
     );
   }
-}
-
-Widget sender(Chat data) {
-  return Column(
-    mainAxisSize: MainAxisSize.min,
-    crossAxisAlignment: CrossAxisAlignment.end,
-    children: [
-      Container(
-        margin: EdgeInsets.only(left: Get.width * 0.4),
-        padding: EdgeInsets.all(12.w),
-        decoration: BoxDecoration(
-          color: AppColors.primaryContainer,
-          borderRadius: BorderRadius.only(
-            topLeft: Radius.circular(8.r),
-            topRight: Radius.circular(0.r),
-            bottomLeft: Radius.circular(8.r),
-            bottomRight: Radius.circular(8.r),
-          ),
-        ),
-        child: Text(data.message ?? ""),
-      ),
-      if (Utils().time(data.createdAt ?? "").isNotEmpty)
-        CommonText(string: Utils().time(data.createdAt ?? ""), fontSize: 12.sp),
-    ],
-  );
-}
-
-Widget receiver(Chat data) {
-  return Column(
-    mainAxisSize: MainAxisSize.min,
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      Container(
-        margin: EdgeInsets.only(right: Get.width * .4),
-        padding: EdgeInsets.all(12.w),
-        decoration: BoxDecoration(
-          color: AppColors.primaryContainer,
-          borderRadius: BorderRadius.only(
-            topLeft: Radius.circular(0.r),
-            topRight: Radius.circular(8.r),
-            bottomLeft: Radius.circular(8.r),
-            bottomRight: Radius.circular(8.r),
-          ),
-        ),
-        child: Text(data.message ?? ""),
-      ),
-      if (Utils().time(data.createdAt ?? "").isNotEmpty)
-        CommonText(string: Utils().time(data.createdAt ?? ""), fontSize: 12.sp),
-    ],
-  );
 }
 
 RxList<Chat> chatList = <Chat>[].obs;

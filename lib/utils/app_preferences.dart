@@ -9,7 +9,7 @@ class AppPreference {
   static late SharedPreferences _prefs;
 
   static const String _languageKey = 'languageKey1';
-  static const String onboardingDone = "VapPassengerOnboardingV2";
+  static const String onboardingDone = "VapPassengerOnboardingV3";
   static const String userToken = "userToken1";
   static const String userLogin = "userLogin1";
 

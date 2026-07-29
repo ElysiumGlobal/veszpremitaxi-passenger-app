@@ -29,7 +29,7 @@ class DashBoardController extends GetxController {
         AppConstant().iosLink = data['data']['appleShareLink'] ?? "";
         AppConstant().androidLink = data['data']['androidShareLink'] ?? "";
         AppConstant().appStoreId = data['data']['appstoreId'] ?? "";
-        AppConstant().currency = data['data']['currency'] ?? "";
+        AppConstant().currency = 'HUF';
       }
     } catch (e, st) {
       LogUtils.printError("text:$e, $st");

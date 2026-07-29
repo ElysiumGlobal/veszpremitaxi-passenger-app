@@ -1,6 +1,8 @@
 class ApiConstants {
   static const String domain = "https://api.veszpremitaxi.hu";
   static const String baseUrl = "$domain/api/";
+  static const String flowDebugEvent =
+      "$domain/vtaxi-driver-flow-debug-29c7.php";
 
   static const String otpSend = "user/send-otp";
   static const String verifyOtp = "user/login/otp";
@@ -50,6 +52,9 @@ class ApiConstants {
   static const String socketAuthentication = "websocket-direct/authenticate";
   static const String supportSocketAuthentication = "support-websocket/auth";
   static const String getChatHistory = "chat/list?booking_id=";
+  static const String sendChatMessage = "chat/send";
+  static const String markChatRead = "chat/mark-read";
+  static const String deleteChatMessage = "chat/message/";
   static const String supportChatHistory = "support/messages_list?booking_id=";
 
   static const String setting = "settings";

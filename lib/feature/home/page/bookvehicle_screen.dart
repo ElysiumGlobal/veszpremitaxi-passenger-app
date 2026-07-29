@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:ui' as ui;
+import 'package:e_taxi/core/debug/passenger_flow_debug.dart';
 import 'package:e_taxi/feature/home/controller/home_controller.dart';
 import 'package:e_taxi/feature/home/model/create_booking_model.dart';
 import 'package:e_taxi/feature/home/widget/select_vehicle.dart';
@@ -43,6 +44,13 @@ class _BookVehicleScreenState extends State<BookVehicleScreen> {
       sourceLatLog = originDestinationModel?.oLatLng;
       destinationLatLog = originDestinationModel?.dLatLng;
       setMapMarkerPoliline();
+      PassengerFlowDebug.send(
+        'book_vehicle_screen_opened',
+        data: <String, dynamic>{
+          'pickup_ready': sourceLatLog != null,
+          'destination_ready': destinationLatLog != null,
+        },
+      );
       loadEstimate();
       _createCustomMarker();
     }
@@ -188,7 +196,7 @@ class _BookVehicleScreenState extends State<BookVehicleScreen> {
 
     final Uint8List markerIcon1 = await _createMarkerImage(
       title: originDestinationModel?.dName ?? "",
-      subtitle: '(Coming Soon)',
+      subtitle: '',
       markerImagePath: ImagesAsset.destinationIcon,
     );
     final marker1 = Marker(
@@ -234,7 +242,7 @@ class _BookVehicleScreenState extends State<BookVehicleScreen> {
 
     final boxPaint = Paint()..color = AppColors.whiteColor;
     final borderPaint = Paint()
-      ..color = AppColors.blueAccent
+      ..color = AppColors.brandNavy
       ..style = PaintingStyle.stroke
       ..strokeWidth = 3;
 

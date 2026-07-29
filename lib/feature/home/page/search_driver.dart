@@ -2,8 +2,11 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:developer';
 import 'package:dotted_line/dotted_line.dart';
+import 'package:e_taxi/core/debug/passenger_flow_debug.dart';
 import 'package:e_taxi/core/location_utils.dart';
 import 'package:e_taxi/feature/home/controller/home_controller.dart';
+import 'package:e_taxi/feature/home/model/get_socket_model.dart';
+import 'package:e_taxi/feature/profile/service/profile_service.dart';
 import 'package:e_taxi/feature/home/widget/origin_destination_widget.dart';
 import 'package:e_taxi/utils/app_colors.dart';
 import 'package:e_taxi/utils/app_preferences.dart';
@@ -25,6 +28,7 @@ import '../../../utils/navigation_utils/navigation.dart';
 import '../../../utils/navigation_utils/routes.dart';
 import '../../../widgets/common_text.dart';
 import '../../../widgets/custom_button.dart';
+import '../../../widgets/app_snackbar.dart';
 import '../widget/driver_details_widget.dart';
 import '../widget/trip_modals.dart';
 
@@ -146,6 +150,10 @@ class _SearchDriverScreenState extends State<SearchDriverScreen> {
 
   StreamSubscription? _sub;
   Worker? _rideModelWorker;
+  Timer? _bookingStatusPollingTimer;
+  bool _bookingStatusPollInProgress = false;
+  String _lastAppliedBookingState = '';
+  int _missingCurrentBookingPolls = 0;
 
   bool driverReach = true;
   bool routLine = false;
@@ -163,7 +171,7 @@ class _SearchDriverScreenState extends State<SearchDriverScreen> {
         Marker(
           markerId: MarkerId("Origin"),
           position: data['origin'],
-          icon: Utils().customIcon!,
+          icon: Utils().sourceMarkerIcon ?? Utils().customIcon!,
         ),
       );
 
@@ -171,10 +179,19 @@ class _SearchDriverScreenState extends State<SearchDriverScreen> {
         Marker(
           markerId: MarkerId("Destination"),
           position: data['destination'],
-          icon: Utils().customIcon!,
+          icon: Utils().destinationMarkerIcon ?? Utils().customIcon!,
         ),
       );
     }
+
+    PassengerFlowDebug.send(
+      'search_driver_screen_opened',
+      bookingId: _activeBookingId(),
+      data: <String, dynamic>{
+        'has_arguments': Get.arguments != null,
+        'trip_type': homeController.tripType.value,
+      },
+    );
 
     drawPoliLine();
     _preloadDriverMarkerIcon();
@@ -182,6 +199,8 @@ class _SearchDriverScreenState extends State<SearchDriverScreen> {
     _rideModelWorker = ever(riderBookingModel, (_) {
       _showDriverMarkerIfAvailable();
     });
+
+    _startBookingStatusPolling();
 
     _sub = SocketChannelService().onSocketDataListen.listen((event) async {
       final datas = jsonDecode(event);
@@ -201,6 +220,14 @@ class _SearchDriverScreenState extends State<SearchDriverScreen> {
             LatLng newPos = LatLng(data.latitude, data.longitude);
 
             await setDriverMarker(newPos);
+            PassengerFlowDebug.send(
+              'driver_location_socket_received',
+              bookingId: _activeBookingId(),
+              data: <String, dynamic>{
+                'latitude': PassengerFlowDebug.coordinate(newPos.latitude),
+                'longitude': PassengerFlowDebug.coordinate(newPos.longitude),
+              },
+            );
 
             final riderModel = riderBookingModel.value?.data;
 
@@ -226,7 +253,9 @@ class _SearchDriverScreenState extends State<SearchDriverScreen> {
             _marker.value.add(
               Marker(
                 markerId: MarkerId("destination"),
-                icon: Utils().customIcon ?? BitmapDescriptor.defaultMarker,
+                icon: Utils().destinationMarkerIcon ??
+                    Utils().customIcon ??
+                    BitmapDescriptor.defaultMarker,
                 position: destinationLatLng,
               ),
             );
@@ -257,6 +286,100 @@ class _SearchDriverScreenState extends State<SearchDriverScreen> {
         }
       }
     });
+  }
+
+  void _startBookingStatusPolling() {
+    _bookingStatusPollingTimer?.cancel();
+    unawaited(_pollBookingStatus());
+    _bookingStatusPollingTimer = Timer.periodic(
+      const Duration(seconds: 3),
+      (_) => unawaited(_pollBookingStatus()),
+    );
+  }
+
+  Future<void> _pollBookingStatus() async {
+    if (_bookingStatusPollInProgress || !mounted) return;
+
+    final activeBookingId = _activeBookingId().trim();
+    if (activeBookingId.isEmpty || activeBookingId == 'null') return;
+
+    _bookingStatusPollInProgress = true;
+    try {
+      final profile = await ProfileService.getUserProfileSilent();
+      final currentBooking = profile.currentBooking;
+
+      if (currentBooking == null) {
+        _missingCurrentBookingPolls++;
+        PassengerFlowDebug.send(
+          'booking_status_poll_missing_current_booking',
+          bookingId: activeBookingId,
+          data: <String, dynamic>{
+            'missing_poll_count': _missingCurrentBookingPolls,
+          },
+        );
+        if (_missingCurrentBookingPolls >= 2 && mounted) {
+          _bookingStatusPollingTimer?.cancel();
+          AppConstant().bookingId = '';
+          clearSavedBookingFare();
+          riderBookingModel.value = null;
+          AppSnackBar.showErrorSnackBar(
+            message: 'A rendelés megszűnt vagy törlésre került.',
+            isError: true,
+          );
+          Navigation.popupUtil(Routes.dashboardScreen);
+        }
+        return;
+      }
+
+      final polledModel = NewRideModel.fromJson({
+        'data': jsonEncode(currentBooking.toJson()),
+      });
+      final polledBookingId =
+          '${polledModel.data?.booking?.id ?? polledModel.data?.bookingId ?? ''}'
+              .trim();
+      if (polledBookingId != activeBookingId) return;
+
+      _missingCurrentBookingPolls = 0;
+      final status =
+          (polledModel.data?.booking?.status ?? '').toLowerCase().trim();
+      if (status.isEmpty) return;
+
+      final stateKey = '$polledBookingId:$status';
+      if (stateKey == _lastAppliedBookingState) return;
+      PassengerFlowDebug.send(
+        'booking_status_poll_changed',
+        bookingId: polledBookingId,
+        data: <String, dynamic>{
+          'status': status,
+          'previous_state': _lastAppliedBookingState,
+        },
+      );
+      _lastAppliedBookingState = stateKey;
+
+      riderBookingModel.value = polledModel;
+      persistBookingFareFromModel(polledModel.data);
+      homeController.socketData();
+      await _showDriverMarkerIfAvailable();
+
+      if (status == 'completed' || status == 'cancelled' || status == 'expired') {
+        _bookingStatusPollingTimer?.cancel();
+        PassengerFlowDebug.send(
+          'booking_status_poll_terminal',
+          bookingId: polledBookingId,
+          data: <String, dynamic>{'status': status},
+        );
+      }
+    } catch (error, stack) {
+      // A háttérpolling nem zavarhatja felugró hibával az utast.
+      PassengerFlowDebug.send(
+        'booking_status_poll_error',
+        bookingId: activeBookingId,
+        data: <String, dynamic>{'error': '$error'},
+      );
+      LogUtils.printError('PASSENGER BOOKING STATUS POLL ERROR: $error, $stack');
+    } finally {
+      _bookingStatusPollInProgress = false;
+    }
   }
 
   Future<List<LatLng>> _getRoutePoints(
@@ -354,6 +477,15 @@ class _SearchDriverScreenState extends State<SearchDriverScreen> {
 
   @override
   void dispose() {
+    PassengerFlowDebug.send(
+      'search_driver_screen_closed',
+      bookingId: _activeBookingId(),
+      data: <String, dynamic>{
+        'last_state': _lastAppliedBookingState,
+        'trip_type': homeController.tripType.value,
+      },
+    );
+    _bookingStatusPollingTimer?.cancel();
     _rideModelWorker?.dispose();
     _subscription?.cancel();
     _sub?.cancel();
@@ -723,11 +855,15 @@ class _SearchDriverScreenState extends State<SearchDriverScreen> {
                                         fontSize: 16.sp,
                                       ),
                                       CommonText(
-                                        string:
-                                        "Enjoy ${riderBookingModel.value?.data?.booking?.rideType?.waitingTimeLimit ?? 0} Min of free waiting time.",
+                                        string: homeController
+                                                .isDriverCome
+                                                .value
+                                            ? 'A sofőr megérkezett. A felvételhez add meg neki az alábbi kódot.'
+                                            : 'A sofőr a felvételi ponthoz tart. Kövesd a térképen!',
                                         fontWeight: FontWeight.w500,
                                         fontSize: 14.sp,
                                         color: AppColors.textCaptionColor,
+                                        softWrap: true,
                                       ),
                                     ],
                                   ),
@@ -777,8 +913,9 @@ class _SearchDriverScreenState extends State<SearchDriverScreen> {
                             children: [
                               Expanded(
                                 child: CommonText(
-                                  string:
-                                  AppString.sharePinWithCaptain.tr,
+                                  string: homeController.isDriverCome.value
+                                      ? 'Utazási kód a sofőrnek'
+                                      : 'A fuvar azonosító kódja',
                                   softWrap: true,
                                   fontWeight: FontWeight.w500,
                                   fontSize: 14.sp,

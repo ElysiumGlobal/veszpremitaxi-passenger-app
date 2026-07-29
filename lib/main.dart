@@ -52,6 +52,7 @@ Future<void> main() async {
 
   try {
     await Utils().setCurrentMarker();
+    await Utils().setRouteMarkers();
     await Utils().setCarMarker();
   } catch (error, stack) {
     debugPrint('Map marker initialization failed: $error\n$stack');

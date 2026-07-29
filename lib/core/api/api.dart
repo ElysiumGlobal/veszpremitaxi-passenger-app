@@ -44,8 +44,7 @@ class Api {
     Map<String, dynamic>? bodyData = const <String, dynamic>{},
     Map<String, String>? header,
   }) async {
-    LogUtils.showLogs(message: "post ${await headers()}}");
-    LogUtils.showLogs(message: "post bodydata $bodyData");
+    LogUtils.showLogs(message: "POST $url");
     final response = await dio.post(
       getUrl(url, queryParameters: queryData),
       body: jsonEncode(bodyData),
@@ -123,7 +122,7 @@ class Api {
     Map<String, dynamic>? queryData,
     Map<String, String>? getHeaders,
   }) async {
-    LogUtils.showLogs(message: "get ${await headers()}}");
+    LogUtils.showLogs(message: "GET $url");
     final response = await dio.get(
       getUrl(url, queryParameters: queryData),
       headers: getHeaders ?? await headers(),

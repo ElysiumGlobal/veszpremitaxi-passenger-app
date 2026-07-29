@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:e_taxi/core/debug/passenger_flow_debug.dart';
 import 'package:e_taxi/feature/home/page/home_screen.dart';
 import 'package:e_taxi/feature/home/widget/dialog.dart';
 import 'package:e_taxi/feature/profile/controller/profile_controller.dart';
@@ -62,9 +63,13 @@ class _DashboardScreenState extends State<DashboardScreen>
         });
       }
     });
+    PassengerFlowDebug.send(
+      'dashboard_initialized',
+      data: <String, dynamic>{'selected_tab': dashBoardController.selectedIndex.value},
+    );
     profileController.getUserData(isRedirect: true);
 
-    Future.delayed(Duration(seconds: 2), () {
+    Future.delayed(const Duration(seconds: 2), () {
       FireBaseNotification().notificationPermission();
     });
   }
@@ -96,6 +101,11 @@ class _DashboardScreenState extends State<DashboardScreen>
     LogUtils.printAction("------ $state _______");
 
     if (state == AppLifecycleState.resumed) {
+      PassengerFlowDebug.send(
+        'passenger_app_resumed',
+        data: <String, dynamic>{'selected_tab': dashBoardController.selectedIndex.value},
+      );
+      profileController.getUserData(isRedirect: true);
       if (isOpen == false) {
         LocationService().initialize(
           isopenSetting: false,
@@ -192,104 +202,87 @@ class _DashboardScreenState extends State<DashboardScreen>
                   ],
                 ),
               ),
-              bottomNavigationBar: Container(
-                decoration: BoxDecoration(
-                  color: AppColors.whiteColor,
-                  boxShadow: [
-                    BoxShadow(
-                      color: AppColors.blackColor.withValues(alpha: .4),
-                      offset: Offset(0, -1),
-                      spreadRadius: 0,
-                      blurRadius: 5,
+              bottomNavigationBar: Obx(
+                () => Container(
+                  decoration: BoxDecoration(
+                    color: AppColors.brandNavy,
+                    borderRadius: BorderRadius.vertical(
+                      top: Radius.circular(22.r),
                     ),
-                  ],
-                ),
-                padding: EdgeInsets.only(top: 5.w),
-                child: Obx(
-                  () => Theme(
-                    data: ThemeData(
-                      splashColor: AppColors.transparent,
-                      highlightColor: AppColors.transparent,
+                    boxShadow: [
+                      BoxShadow(
+                        color: AppColors.blackColor.withValues(alpha: 0.18),
+                        offset: const Offset(0, -3),
+                        blurRadius: 14,
+                      ),
+                    ],
+                  ),
+                  clipBehavior: Clip.antiAlias,
+                  child: NavigationBarTheme(
+                    data: NavigationBarThemeData(
+                      backgroundColor: AppColors.brandNavy,
+                      indicatorColor: AppColors.mainPrimaryColor,
+                      height: 72.h,
+                      labelTextStyle: WidgetStateProperty.resolveWith<TextStyle>(
+                        (states) => TextStyle(
+                          color: states.contains(WidgetState.selected)
+                              ? AppColors.mainPrimaryColor
+                              : AppColors.whiteColor.withValues(alpha: 0.72),
+                          fontWeight: states.contains(WidgetState.selected)
+                              ? FontWeight.w700
+                              : FontWeight.w500,
+                          fontSize: 12.sp,
+                        ),
+                      ),
                     ),
-                    child: BottomNavigationBar(
-                      backgroundColor: AppColors.whiteColor,
-                      currentIndex: dashBoardController.selectedIndex.value,
-                      onTap: (value) {
-                        if (dashBoardController.selectedIndex.value != value) {
-                          dashBoardController.selectedIndex.value = value;
-                          tapToCallAPi(value);
+                    child: NavigationBar(
+                      selectedIndex: dashBoardController.selectedIndex.value,
+                      onDestinationSelected: (value) {
+                        if (dashBoardController.selectedIndex.value == value) {
+                          return;
                         }
+                        dashBoardController.selectedIndex.value = value;
+                        PassengerFlowDebug.send(
+                          'bottom_navigation_changed',
+                          data: <String, dynamic>{'selected_tab': value},
+                        );
+                        tapToCallAPi(value);
                       },
-                      elevation: 0,
-                      selectedItemColor: AppColors.mainPrimaryColor,
-                      unselectedItemColor: AppColors.titleTextColor,
-                      type: BottomNavigationBarType.fixed,
-
-                      selectedLabelStyle: TextStyle(
-                        color: AppColors.mainPrimaryColor,
-                        fontSize: 14.sp,
-                        fontWeight: FontWeight.w500,
-                      ),
-                      unselectedLabelStyle: TextStyle(
-                        color: AppColors.titleTextColor,
-                        fontWeight: FontWeight.w400,
-                        fontSize: 12.sp,
-                      ),
-
-                      items: [
-                        BottomNavigationBarItem(
-                          icon: CustomImage(
-                            image: IconAsset.bHomeUnelected,
-                            ht: 24.h,
-                            wt: 24.h,
+                      destinations: const [
+                        NavigationDestination(
+                          icon: Icon(Icons.map_outlined, color: Colors.white70),
+                          selectedIcon: Icon(
+                            Icons.map_rounded,
+                            color: AppColors.brandNavy,
                           ),
-                          activeIcon: CustomImage(
-                            image: IconAsset.bHome,
-                            ht: 24.h,
-                            wt: 24.h,
-                          ),
-                          label: "Home",
+                          label: 'Főoldal',
                         ),
-                        BottomNavigationBarItem(
-                          icon: CustomImage(
-                            image: IconAsset.bTripUnelected,
-                            ht: 24.h,
-                            wt: 24.h,
+                        NavigationDestination(
+                          icon: Icon(Icons.route_outlined, color: Colors.white70),
+                          selectedIcon: Icon(
+                            Icons.route_rounded,
+                            color: AppColors.brandNavy,
                           ),
-                          activeIcon: CustomImage(
-                            image: IconAsset.bTrip,
-                            ht: 24.h,
-                            wt: 24.h,
-                          ),
-                          label: "Trip",
+                          label: 'Utazások',
                         ),
-                        BottomNavigationBarItem(
-                          icon: CustomImage(
-                            image: IconAsset.bWalletUnelected,
-                            ht: 24.h,
-                            wt: 24.h,
+                        NavigationDestination(
+                          icon: Icon(
+                            Icons.account_balance_wallet_outlined,
+                            color: Colors.white70,
                           ),
-                          activeIcon: CustomImage(
-                            image: IconAsset.bWallet,
-                            ht: 24.h,
-                            wt: 24.h,
+                          selectedIcon: Icon(
+                            Icons.account_balance_wallet_rounded,
+                            color: AppColors.brandNavy,
                           ),
-
-                          label: "Wallet",
+                          label: 'Tárca',
                         ),
-                        BottomNavigationBarItem(
-                          icon: CustomImage(
-                            image: IconAsset.bProfileUnelected,
-                            ht: 24.h,
-                            wt: 24.h,
+                        NavigationDestination(
+                          icon: Icon(Icons.person_outline_rounded, color: Colors.white70),
+                          selectedIcon: Icon(
+                            Icons.person_rounded,
+                            color: AppColors.brandNavy,
                           ),
-                          activeIcon: CustomImage(
-                            image: IconAsset.bProfile,
-                            ht: 24.h,
-                            wt: 24.h,
-                          ),
-
-                          label: "Profile",
+                          label: 'Profil',
                         ),
                       ],
                     ),

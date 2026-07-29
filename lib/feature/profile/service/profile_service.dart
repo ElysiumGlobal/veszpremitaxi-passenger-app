@@ -22,6 +22,20 @@ class ProfileService {
     }
   }
 
+  static Future<UserProfileModel> getUserProfileSilent() async {
+    try {
+      final response = await Api().get(ApiConstants.userProfile);
+      await ResponseHandler.checkResponseError(
+        response,
+        showException: false,
+      );
+      return UserProfileModel.fromJson(jsonDecode(response.body));
+    } catch (e, st) {
+      LogUtils.printError("SILENT USER PROFILE POLL ERROR:::$e, $st");
+      rethrow;
+    }
+  }
+
   static Future updateProfile({
     required Map<String, String> body,
     required List<String> imageList,

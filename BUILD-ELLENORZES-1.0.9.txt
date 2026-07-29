@@ -1,0 +1,11 @@
+Ellenorzott:
+- pubspec version: 1.0.9+18
+- osszes Dart fajl zarojel/string szerkezeti ellenorzese: OK
+- helyi package:e_taxi importok: OK
+- codemagic.yaml YAML ellenorzes: OK
+- PHP flow collector php -l: OK
+
+Nem futott:
+- flutter analyze
+- flutter build apk
+Oka: ebben a kornyezetben nincs Flutter SDK.
