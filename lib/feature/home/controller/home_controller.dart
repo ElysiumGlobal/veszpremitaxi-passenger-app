@@ -1022,8 +1022,14 @@ class HomeController extends GetxController with LoadingMixin, LoadingApiMixin {
           'booking_estimate_success',
           data: <String, dynamic>{
             'ride_option_count': (data.data?.rideOptions ?? []).length,
-            'estimated_distance': data.data?.booking?.estimatedDistance ?? '',
-            'estimated_duration': data.data?.booking?.estimatedDuration ?? '',
+            'estimated_distance':
+                data.data?.booking?.distance ??
+                data.data?.rideTypeEstimate?.distance ??
+                '',
+            'estimated_duration':
+                data.data?.booking?.duration ??
+                data.data?.rideTypeEstimate?.duration ??
+                '',
           },
         );
         if ((data.data?.rideOptions ?? []).isEmpty) {
