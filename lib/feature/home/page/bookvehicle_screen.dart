@@ -118,18 +118,36 @@ class _BookVehicleScreenState extends State<BookVehicleScreen> {
           .map((point) => LatLng(point.latitude, point.longitude))
           .toList();
 
-      _polyLines.add(
-        Polyline(
-          geodesic: false,
-          visible: true,
-          polylineId: PolylineId('poly'),
-          width: 3,
-          color: AppColors.textCaptionColor,
-          points: polylineCoordinates,
-          endCap: Cap.roundCap,
-          startCap: Cap.roundCap,
-        ),
-      );
+      _polyLines
+        ..clear()
+        ..add(
+          Polyline(
+            geodesic: false,
+            visible: true,
+            polylineId: const PolylineId('route_outline'),
+            width: 9,
+            zIndex: 1,
+            color: AppColors.routeOutline,
+            points: polylineCoordinates,
+            endCap: Cap.roundCap,
+            startCap: Cap.roundCap,
+            jointType: JointType.round,
+          ),
+        )
+        ..add(
+          Polyline(
+            geodesic: false,
+            visible: true,
+            polylineId: const PolylineId('route_main'),
+            width: 5,
+            zIndex: 2,
+            color: AppColors.routeGreen,
+            points: polylineCoordinates,
+            endCap: Cap.roundCap,
+            startCap: Cap.roundCap,
+            jointType: JointType.round,
+          ),
+        );
     }
 
     setState(() {});

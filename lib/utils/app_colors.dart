@@ -27,6 +27,8 @@ class AppColors {
   static const Color redColor = Colors.red;
   static const Color transparent = Colors.transparent;
   static const Color greenColor = Colors.green;
+  static const Color routeGreen = Color(0xFF12A150);
+  static const Color routeOutline = Color(0xFFFFFFFF);
   static const Color whiteColor = Color(0xFFFFFFFF);
   static const Color blackColor = Color(0xFF000000);
   static const Color whiteGrey = Color(0xFFF7F7F7);

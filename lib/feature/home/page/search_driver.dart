@@ -405,12 +405,26 @@ class _SearchDriverScreenState extends State<SearchDriverScreen> {
             Polyline(
               geodesic: false,
               visible: true,
-              width: 3,
-              polylineId: const PolylineId('poly'),
-              color: AppColors.textCaptionColor,
+              width: 9,
+              zIndex: 1,
+              polylineId: const PolylineId('route_outline'),
+              color: AppColors.routeOutline,
               points: polylineCoordinates,
               endCap: Cap.roundCap,
               startCap: Cap.roundCap,
+              jointType: JointType.round,
+            ),
+            Polyline(
+              geodesic: false,
+              visible: true,
+              width: 5,
+              zIndex: 2,
+              polylineId: const PolylineId('route_main'),
+              color: AppColors.routeGreen,
+              points: polylineCoordinates,
+              endCap: Cap.roundCap,
+              startCap: Cap.roundCap,
+              jointType: JointType.round,
             ),
           };
           isDrawPoliLine = true;
@@ -450,35 +464,33 @@ class _SearchDriverScreenState extends State<SearchDriverScreen> {
       final String responseBookingId =
           '${currentBooking?.booking?.id ?? currentBooking?.bookingId ?? ''}'
               .trim();
-      final bool currentBookingAuthoritative = currentBooking != null &&
-          serverCurrentBookingId.isNotEmpty &&
-          serverCurrentBookingId == responseBookingId;
+      // A current_booking objektum a mérvadó. A backend jelenleg
+      // előfordul, hogy a data.current_booking_id mezőt üresen küldi vissza
+      // egy frissen létrehozott, searching állapotú rendelés mellett.
+      // Emiatt csak a segédmező hiánya alapján tilos megszüntetni a rendelést.
+      final bool currentBookingMatches = currentBooking != null &&
+          responseBookingId.isNotEmpty &&
+          responseBookingId == activeBookingId;
 
-      if (!currentBookingAuthoritative) {
+      if (!currentBookingMatches) {
         _missingCurrentBookingPolls++;
         PassengerFlowDebug.send(
-          'booking_status_poll_missing_current_booking',
+          'booking_status_poll_profile_inconsistent',
           bookingId: activeBookingId,
           data: <String, dynamic>{
             'missing_poll_count': _missingCurrentBookingPolls,
             'server_current_booking_id': serverCurrentBookingId,
             'response_booking_id': responseBookingId,
+            'current_booking_present': currentBooking != null,
           },
         );
-        if (_missingCurrentBookingPolls >= 2 && mounted) {
-          _bookingStatusPollingTimer?.cancel();
-          AppConstant().bookingId = '';
-          clearSavedBookingFare();
-          riderBookingModel.value = null;
-          AppSnackBar.showErrorSnackBar(
-            message: 'A rendelés megszűnt vagy törlésre került.',
-            isError: true,
-          );
-          Navigation.popupUtil(Routes.dashboardScreen);
-        }
+        // Nem dobjuk vissza az utast a főképernyőre egy átmeneti vagy
+        // inkonzisztens profilválasz miatt. A socket és a következő polling
+        // továbbra is frissítheti a valódi booking állapotát.
         return;
       }
 
+      _missingCurrentBookingPolls = 0;
       final authoritativeBooking = currentBooking!;
       final polledModel = NewRideModel.fromJson({
         'data': jsonEncode(authoritativeBooking.toJson()),
@@ -488,7 +500,6 @@ class _SearchDriverScreenState extends State<SearchDriverScreen> {
               .trim();
       if (polledBookingId != activeBookingId) return;
 
-      _missingCurrentBookingPolls = 0;
       final status =
           (polledModel.data?.booking?.status ?? '').toLowerCase().trim();
       if (status.isEmpty) return;
@@ -588,12 +599,26 @@ class _SearchDriverScreenState extends State<SearchDriverScreen> {
         Polyline(
           geodesic: false,
           visible: true,
-          polylineId: PolylineId('poly'),
-          width: 3,
-          color: AppColors.textCaptionColor,
+          polylineId: const PolylineId('route_outline'),
+          width: 9,
+          zIndex: 1,
+          color: AppColors.routeOutline,
           points: polylineCoordinates,
           endCap: Cap.roundCap,
           startCap: Cap.roundCap,
+          jointType: JointType.round,
+        ),
+        Polyline(
+          geodesic: false,
+          visible: true,
+          polylineId: const PolylineId('route_main'),
+          width: 5,
+          zIndex: 2,
+          color: AppColors.routeGreen,
+          points: polylineCoordinates,
+          endCap: Cap.roundCap,
+          startCap: Cap.roundCap,
+          jointType: JointType.round,
         ),
       };
     }

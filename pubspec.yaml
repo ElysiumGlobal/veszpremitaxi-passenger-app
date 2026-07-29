@@ -2,7 +2,7 @@ name: e_taxi
 description: "A new Flutter project."
 publish_to: 'none'
 
-version: 1.0.14+23
+version: 1.0.15+24
 
 environment:
   sdk: ^3.9.0

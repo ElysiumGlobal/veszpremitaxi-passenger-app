@@ -55,9 +55,13 @@ class ProfileController extends GetxController
           'arrived',
           'started',
         };
+        // A backend jelenleg több válaszban üresen hagyja a
+        // data.current_booking_id mezőt, miközben a current_booking objektum
+        // friss és érvényes. Az üres segédmező önmagában nem teheti semmissé
+        // a tényleges booking objektumot.
         final bool bookingIdIsAuthoritative = bookingId.isNotEmpty &&
-            serverCurrentBookingId.isNotEmpty &&
-            bookingId == serverCurrentBookingId;
+            (serverCurrentBookingId.isEmpty ||
+                bookingId == serverCurrentBookingId);
         final bool bookingTooOld = bookingAge != null &&
             ((status == 'searching' && bookingAge > const Duration(minutes: 30)) ||
                 ((status == 'accepted' || status == 'arrived') &&
