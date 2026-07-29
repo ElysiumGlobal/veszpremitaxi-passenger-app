@@ -1,0 +1,11 @@
+VESZPRÉMI TAXI UTAS 1.0.14+23 - FORRÁS ELLENŐRZÉS
+
+Alap: VeszpremiTaxi-Passenger-1.0.13-P0-stale-icons-zoom-animated-chat-full-source.zip
+Javítás: a nem létező `showToast` paraméter eltávolítása a cancelRide API-hívásból.
+
+Ellenőrizve:
+- pubspec verzió: 1.0.14+23
+- `showToast:` név szerinti argumentum: 0 találat a lib könyvtárban
+- ZIP integritás: ellenőrizendő a csomagolás után
+
+Megjegyzés: ebben a környezetben nincs Flutter SDK, ezért a tényleges `flutter build apk --debug` ellenőrzést a Codemagic végzi.

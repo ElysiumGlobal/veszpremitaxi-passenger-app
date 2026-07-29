@@ -194,7 +194,6 @@ class HomeService {
       final response = await Api().post(
         ApiConstants.cancelRide,
         bodyData: {"booking_id": bookingId, "reason": reason},
-        showToast: false,
       );
       dynamic decoded;
       try {
