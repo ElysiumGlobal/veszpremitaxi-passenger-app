@@ -2,6 +2,8 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:developer';
 import 'dart:io' show Platform;
+
+import 'package:e_taxi/core/debug/passenger_flow_debug.dart';
 import 'package:country_pickers/country.dart';
 import 'package:country_pickers/utils/utils.dart';
 import 'package:e_taxi/feature/auth/model/uer_login_model.dart';
@@ -545,8 +547,24 @@ class AuthController extends GetxController with LoadingMixin, LoadingApiMixin {
     print(">>>>>>redirect    asdasd${data.toJson()}");
     clearTextField();
     this.loginType = loginType;
-    AppPreference.setString(AppPreference.userToken, data.token ?? "");
-    AppPreference.setString(AppPreference.userId, data.user?.id ?? "");
+    await AppPreference.setString(
+      AppPreference.userToken,
+      data.token ?? "",
+    );
+    await AppPreference.setString(
+      AppPreference.userId,
+      data.user?.id ?? "",
+    );
+    PassengerFlowDebug.send(
+      'passenger_auth_token_saved',
+      data: <String, dynamic>{
+        'token_present': (data.token ?? '').trim().isNotEmpty,
+        'expected_collector_version':
+            PassengerFlowDebug.expectedCollectorVersion,
+        'login_type': loginType,
+      },
+    );
+    PassengerFlowDebug.kick();
     if (data.user?.isRegister == "1") {
       AppPreference.setBoolean(AppPreference.userLogin, value: true);
       Navigation.replaceAll(Routes.dashboardScreen);

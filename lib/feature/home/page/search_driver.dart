@@ -159,6 +159,36 @@ class _SearchDriverScreenState extends State<SearchDriverScreen> {
   bool routLine = false;
   DateTime _lastApiCall = DateTime.now().subtract(Duration(seconds: 6));
 
+
+  Map<String, dynamic>? _decodeSocketMap(dynamic raw) {
+    try {
+      if (raw is Map<String, dynamic>) return raw;
+      if (raw is Map) {
+        return raw.map<String, dynamic>(
+          (dynamic key, dynamic value) =>
+              MapEntry<String, dynamic>(key.toString(), value),
+        );
+      }
+      if (raw is String && raw.trim().isNotEmpty) {
+        final dynamic decoded = jsonDecode(raw);
+        if (decoded is Map<String, dynamic>) return decoded;
+        if (decoded is Map) {
+          return decoded.map<String, dynamic>(
+            (dynamic key, dynamic value) =>
+                MapEntry<String, dynamic>(key.toString(), value),
+          );
+        }
+      }
+    } catch (error, stack) {
+      PassengerFlowDebug.runtimeError(
+        'search_driver_socket_decode',
+        error,
+        stack,
+      );
+    }
+    return null;
+  }
+
   @override
   void initState() {
     // TODO: implement initState
@@ -203,87 +233,139 @@ class _SearchDriverScreenState extends State<SearchDriverScreen> {
     _startBookingStatusPolling();
 
     _sub = SocketChannelService().onSocketDataListen.listen((event) async {
-      final datas = jsonDecode(event);
-      if (datas is Map && datas.containsKey('event')) {
-        var eventData = jsonDecode(datas['data']);
-        log(
-          "driver.location.updated:::A:D::D::::${eventData['booking_id']}::::${_activeBookingId()}",
-        );
-        if (datas['event'] == "driver.location.updated" &&
-            "${eventData['booking_id'] ?? 0}" == _activeBookingId()) {
-          try {
-            LatLng data = LatLng(
-              double.parse("${eventData['latitude'] ?? 0}"),
-              double.parse("${eventData['longitude'] ?? "0"}"),
-            );
-
-            LatLng newPos = LatLng(data.latitude, data.longitude);
-
-            await setDriverMarker(newPos);
-            PassengerFlowDebug.send(
-              'driver_location_socket_received',
-              bookingId: _activeBookingId(),
-              data: <String, dynamic>{
-                'latitude': PassengerFlowDebug.coordinate(newPos.latitude),
-                'longitude': PassengerFlowDebug.coordinate(newPos.longitude),
-              },
-            );
-
-            final riderModel = riderBookingModel.value?.data;
-
-            final originLatLng = homeController.changePolyLine
-                ? data
-                : LatLng(
-              double.parse(riderModel?.pickup?.latitude ?? "0.0"),
-              double.parse(riderModel?.pickup?.longitude ?? "0.0"),
-            );
-            final destinationLatLng = homeController.changePolyLine
-                ? LatLng(
-              double.parse(riderModel?.pickup?.latitude ?? "0.0"),
-              double.parse(riderModel?.pickup?.longitude ?? "0.0"),
-            )
-                : LatLng(
-              double.parse(riderModel?.dropoff?.latitude ?? "0.0"),
-              double.parse(riderModel?.dropoff?.longitude ?? "0.0"),
-            );
-
-            DateTime now = DateTime.now();
-            log(">>>>>difreeent:::${now.difference(_lastApiCall).inSeconds}");
-
-            _marker.value.add(
-              Marker(
-                markerId: MarkerId("destination"),
-                icon: Utils().destinationMarkerIcon ??
-                    Utils().customIcon ??
-                    BitmapDescriptor.defaultMarker,
-                position: destinationLatLng,
-              ),
-            );
-
-            final polylineCoordinates = await _getRoutePoints(
-              originLatLng,
-              destinationLatLng,
-            );
-
-            if (polylineCoordinates.isNotEmpty) {
-              _polylines.value = {
-                Polyline(
-                  geodesic: false,
-                  visible: true,
-                  width: 3,
-                  polylineId: PolylineId('poly'),
-                  color: AppColors.textCaptionColor,
-                  points: polylineCoordinates,
-                  endCap: Cap.roundCap,
-                  startCap: Cap.roundCap,
-                ),
-              };
-              isDrawPoliLine = true;
-            }
-          } catch (e, st) {
-            LogUtils.printAction("MARKER ERROR :$e ,$st ");
-          }
+      try {
+        final Map<String, dynamic>? datas = _decodeSocketMap(event);
+        if (datas == null) {
+          PassengerFlowDebug.send(
+            'search_driver_socket_outer_invalid',
+            bookingId: _activeBookingId(),
+            data: <String, dynamic>{
+              'runtime_type': event.runtimeType.toString(),
+            },
+          );
+          return;
         }
+
+        final String eventName = '${datas['event'] ?? ''}'.trim();
+        final Map<String, dynamic>? eventData =
+            _decodeSocketMap(datas['data']);
+        final String eventBookingId =
+            '${eventData?['booking_id'] ?? ''}'.trim();
+
+        PassengerFlowDebug.send(
+          'search_driver_socket_event',
+          bookingId: eventBookingId.isNotEmpty
+              ? eventBookingId
+              : _activeBookingId(),
+          data: <String, dynamic>{
+            'event_name': eventName,
+            'payload_keys': eventData?.keys.toList() ?? const <String>[],
+            'booking_matches':
+                eventBookingId.isNotEmpty && eventBookingId == _activeBookingId(),
+          },
+        );
+
+        if (eventName != 'driver.location.updated' ||
+            eventData == null ||
+            eventBookingId != _activeBookingId()) {
+          return;
+        }
+
+        final double? latitude =
+            double.tryParse('${eventData['latitude'] ?? ''}');
+        final double? longitude =
+            double.tryParse('${eventData['longitude'] ?? ''}');
+        if (latitude == null || longitude == null) {
+          PassengerFlowDebug.send(
+            'driver_location_socket_invalid_coordinates',
+            bookingId: _activeBookingId(),
+            data: <String, dynamic>{
+              'has_latitude': eventData.containsKey('latitude'),
+              'has_longitude': eventData.containsKey('longitude'),
+            },
+          );
+          return;
+        }
+
+        final LatLng newPos = LatLng(latitude, longitude);
+        await setDriverMarker(newPos);
+        PassengerFlowDebug.send(
+          'driver_location_socket_received',
+          bookingId: _activeBookingId(),
+          data: <String, dynamic>{
+            'latitude': PassengerFlowDebug.coordinate(newPos.latitude),
+            'longitude': PassengerFlowDebug.coordinate(newPos.longitude),
+          },
+        );
+
+        final riderModel = riderBookingModel.value?.data;
+        final LatLng originLatLng = homeController.changePolyLine
+            ? newPos
+            : LatLng(
+                double.tryParse(riderModel?.pickup?.latitude ?? '') ?? 0,
+                double.tryParse(riderModel?.pickup?.longitude ?? '') ?? 0,
+              );
+        final LatLng destinationLatLng = homeController.changePolyLine
+            ? LatLng(
+                double.tryParse(riderModel?.pickup?.latitude ?? '') ?? 0,
+                double.tryParse(riderModel?.pickup?.longitude ?? '') ?? 0,
+              )
+            : LatLng(
+                double.tryParse(riderModel?.dropoff?.latitude ?? '') ?? 0,
+                double.tryParse(riderModel?.dropoff?.longitude ?? '') ?? 0,
+              );
+
+        final Set<Marker> markers = Set<Marker>.from(_marker.value);
+        markers.removeWhere(
+          (Marker marker) => marker.markerId.value == 'destination',
+        );
+        markers.add(
+          Marker(
+            markerId: const MarkerId('destination'),
+            icon: Utils().destinationMarkerIcon ??
+                Utils().customIcon ??
+                BitmapDescriptor.defaultMarker,
+            position: destinationLatLng,
+          ),
+        );
+        _marker.value = markers;
+
+        final List<LatLng> polylineCoordinates = await _getRoutePoints(
+          originLatLng,
+          destinationLatLng,
+        );
+
+        PassengerFlowDebug.send(
+          'driver_route_points_updated',
+          bookingId: _activeBookingId(),
+          data: <String, dynamic>{
+            'point_count': polylineCoordinates.length,
+            'change_polyline': homeController.changePolyLine,
+          },
+        );
+
+        if (polylineCoordinates.isNotEmpty) {
+          _polylines.value = <Polyline>{
+            Polyline(
+              geodesic: false,
+              visible: true,
+              width: 3,
+              polylineId: const PolylineId('poly'),
+              color: AppColors.textCaptionColor,
+              points: polylineCoordinates,
+              endCap: Cap.roundCap,
+              startCap: Cap.roundCap,
+            ),
+          };
+          isDrawPoliLine = true;
+        }
+      } catch (error, stack) {
+        PassengerFlowDebug.runtimeError(
+          'search_driver_socket_listener',
+          error,
+          stack,
+        );
+        LogUtils.printAction('MARKER OR SOCKET ERROR: $error, $stack');
       }
     });
   }

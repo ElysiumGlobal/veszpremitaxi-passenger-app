@@ -216,47 +216,126 @@ class HomeController extends GetxController with LoadingMixin, LoadingApiMixin {
 
   StreamSubscription? _socketSubscription;
 
+  Map<String, dynamic>? _decodeSocketMap(dynamic raw) {
+    try {
+      if (raw is Map<String, dynamic>) return raw;
+      if (raw is Map) {
+        return raw.map<String, dynamic>(
+          (dynamic key, dynamic value) =>
+              MapEntry<String, dynamic>(key.toString(), value),
+        );
+      }
+      if (raw is String && raw.trim().isNotEmpty) {
+        final dynamic decoded = jsonDecode(raw);
+        if (decoded is Map<String, dynamic>) return decoded;
+        if (decoded is Map) {
+          return decoded.map<String, dynamic>(
+            (dynamic key, dynamic value) =>
+                MapEntry<String, dynamic>(key.toString(), value),
+          );
+        }
+      }
+    } catch (error, stack) {
+      PassengerFlowDebug.runtimeError(
+        'home_socket_decode',
+        error,
+        stack,
+      );
+    }
+    return null;
+  }
+
   /// Listen to socket data stream
   void _listenToSocket() {
     _socketSubscription?.cancel();
     _socketSubscription = _socketService.onSocketDataListen.listen((event) {
       try {
-        final data = jsonDecode(event);
+        final Map<String, dynamic>? data = _decodeSocketMap(event);
+        if (data == null) {
+          PassengerFlowDebug.send(
+            'socket_outer_payload_invalid',
+            data: <String, dynamic>{
+              'runtime_type': event.runtimeType.toString(),
+            },
+          );
+          return;
+        }
 
-        if (data is Map && data.containsKey('event')) {
-          if (data['event'] == "connection_established") {
-            LogUtils.printAction(">>>>${(data['data'])}");
-            AppConstant().socketId = jsonDecode(data['data'])['socket_id'];
+        final String eventName = '${data['event'] ?? ''}'.trim();
+        final Map<String, dynamic>? eventData = _decodeSocketMap(data['data']);
+        final dynamic bookingRaw = eventData?['booking'];
+        final Map<String, dynamic>? booking = _decodeSocketMap(bookingRaw);
+        final String bookingId =
+            '${booking?['id'] ?? eventData?['booking_id'] ?? AppConstant().bookingId}'
+                .trim();
+
+        PassengerFlowDebug.send(
+          'socket_event_received',
+          bookingId: bookingId,
+          data: <String, dynamic>{
+            'event_name': eventName,
+            'outer_keys': data.keys.toList(),
+            'payload_keys': eventData?.keys.toList() ?? const <String>[],
+            'booking_status': booking?['status'] ?? eventData?['status'],
+          },
+        );
+
+        if (eventName == 'connection_established') {
+          final String socketId = '${eventData?['socket_id'] ?? ''}'.trim();
+          if (socketId.isNotEmpty) {
+            AppConstant().socketId = socketId;
           }
-          if (data['event'] == "new.ride.request") {
-            log(
-              "SOCKET USER ID :::${(jsonDecode(data['data']))['booking']['user']['id']}:::${((jsonDecode(data['data']))['booking']['user']['id']).runtimeType}>:::${AppPreference.getString(AppPreference.userId)}:::::>${((jsonDecode(data['data']))['booking']['id'])}:${((jsonDecode(data['data']))['booking']['id']).runtimeType}}:::${AppConstant().bookingId}",
-            );
-            log("SOCKET USER ID :::${data['data']}>>");
-            if (((jsonDecode(
-                      data['data'],
-                    ))['booking']['user']['id']).toString() ==
-                    AppPreference.getString(AppPreference.userId) &&
-                ((jsonDecode(data['data']))['booking']['id']).toString() ==
-                    AppConstant().bookingId) {
-              riderBookingModel.value = NewRideModel.fromJson(
-                data as Map<String, dynamic>,
-              );
-              persistBookingFareFromModel(riderBookingModel.value?.data);
-              socketData();
-            }
-          } else if (data['event'] == "issue.reported" &&
-              (jsonDecode(data['data']))['booking']['user_id'] ==
-                  AppPreference.getString(AppPreference.userId) &&
-              (jsonDecode(data['data']))['booking_id'] ==
-                  AppConstant().bookingId) {
+          return;
+        }
+
+        if (eventName == 'new.ride.request') {
+          final String socketUserId = '${booking?['user'] is Map
+                  ? (booking?['user'] as Map)['id']
+                  : booking?['user_id'] ?? ''}'
+              .trim();
+          final String currentUserId =
+              AppPreference.getString(AppPreference.userId).trim();
+          final String currentBookingId = AppConstant().bookingId.trim();
+
+          final bool userMatches = socketUserId == currentUserId;
+          final bool bookingMatches = bookingId == currentBookingId;
+          PassengerFlowDebug.send(
+            'socket_ride_match_evaluated',
+            bookingId: bookingId,
+            data: <String, dynamic>{
+              'user_matches': userMatches,
+              'booking_matches': bookingMatches,
+              'has_booking': booking != null,
+            },
+          );
+
+          if (userMatches && bookingMatches) {
+            riderBookingModel.value = NewRideModel.fromJson(data);
+            persistBookingFareFromModel(riderBookingModel.value?.data);
+            socketData();
+          }
+          return;
+        }
+
+        if (eventName == 'issue.reported') {
+          final String issueUserId = '${booking?['user_id'] ?? ''}'.trim();
+          final String currentUserId =
+              AppPreference.getString(AppPreference.userId).trim();
+          if (issueUserId == currentUserId &&
+              bookingId == AppConstant().bookingId.trim()) {
+            final Map<String, dynamic>? issue =
+                _decodeSocketMap(eventData?['issue_report']);
             AppConstant().reportString.value =
-                (jsonDecode(data['data']))['issue_report']['issue_type_label'] +
-                "@@${(jsonDecode(data['data']))['issue_report']['custom_issue']}";
+                '${issue?['issue_type_label'] ?? ''}@@${issue?['custom_issue'] ?? ''}';
           }
         }
-      } catch (e, st) {
-        log(">>>>>>>----------------__$e, $st");
+      } catch (error, stack) {
+        PassengerFlowDebug.runtimeError(
+          'home_socket_listener',
+          error,
+          stack,
+        );
+        log('PASSENGER SOCKET LISTENER ERROR: $error, $stack');
       }
     });
   }
@@ -266,6 +345,11 @@ class HomeController extends GetxController with LoadingMixin, LoadingApiMixin {
     _socketService.connectionStream.listen((connected) {
       log("CONNECTION :::::::${connected}");
       isConnected.value = connected;
+      PassengerFlowDebug.send(
+        'socket_connection_changed',
+        bookingId: AppConstant().bookingId,
+        data: <String, dynamic>{'connected': connected},
+      );
     });
   }
 
@@ -295,6 +379,9 @@ class HomeController extends GetxController with LoadingMixin, LoadingApiMixin {
         'status': status,
         'is_first_time': isFirstTime,
         'route': Get.currentRoute,
+        'trip_auth_present': (booking?.otp ?? '').trim().isNotEmpty,
+        'trip_auth_length': (booking?.otp ?? '').trim().length,
+        'driver_present': riderBookingModel.value?.data?.driver != null,
       },
     );
 
@@ -346,6 +433,14 @@ class HomeController extends GetxController with LoadingMixin, LoadingApiMixin {
         changePolyLine = false;
         tripType.value = 1;
         isDriverCome.value = true;
+        PassengerFlowDebug.send(
+          'trip_auth_display_ready',
+          bookingId: bookingId,
+          data: <String, dynamic>{
+            'trip_auth_present': (booking?.otp ?? '').trim().isNotEmpty,
+            'trip_auth_length': (booking?.otp ?? '').trim().length,
+          },
+        );
         final waitingLimit = int.tryParse(
               booking?.rideType?.waitingTimeLimit ?? '0',
             ) ??
@@ -613,6 +708,16 @@ class HomeController extends GetxController with LoadingMixin, LoadingApiMixin {
         );
       }
 
+      final Stopwatch placesStopwatch = Stopwatch()..start();
+      PassengerFlowDebug.send(
+        'places_autocomplete_request',
+        bookingId: AppConstant().bookingId,
+        data: <String, dynamic>{
+          'input_length': value.trim().length,
+          'for_destination': forDestination,
+          'has_location_bias': currentLocation != null,
+        },
+      );
       final response = await http.post(
         Uri.parse('https://places.googleapis.com/v1/places:autocomplete'),
         headers: {
@@ -626,6 +731,17 @@ class HomeController extends GetxController with LoadingMixin, LoadingApiMixin {
               'suggestions.placePrediction.types',
         },
         body: jsonEncode(body),
+      );
+
+      placesStopwatch.stop();
+      PassengerFlowDebug.send(
+        'places_autocomplete_response',
+        bookingId: AppConstant().bookingId,
+        data: <String, dynamic>{
+          'status_code': response.statusCode,
+          'duration_ms': placesStopwatch.elapsedMilliseconds,
+          'for_destination': forDestination,
+        },
       );
 
       if (forDestination) {
@@ -674,11 +790,29 @@ class HomeController extends GetxController with LoadingMixin, LoadingApiMixin {
           .whereType<Prediction>()
           .toList();
 
+      PassengerFlowDebug.send(
+        'places_autocomplete_parsed',
+        bookingId: AppConstant().bookingId,
+        data: <String, dynamic>{
+          'suggestion_count': searchList.length,
+          'for_destination': forDestination,
+        },
+      );
       if (forDestination) {
         log('[DESTINATION_API] Autocomplete suggestions: ${searchList.length}');
       }
     } catch (e, st) {
       searchList.clear();
+      PassengerFlowDebug.runtimeError('places_autocomplete', e, st);
+      PassengerFlowDebug.send(
+        'places_autocomplete_error',
+        bookingId: AppConstant().bookingId,
+        data: <String, dynamic>{
+          'for_destination': forDestination,
+          'error_type': e.runtimeType.toString(),
+          'error': e.toString(),
+        },
+      );
       LogUtils.printError('Places autocomplete error: $e, $st');
       if (forDestination) {
         log('[DESTINATION_API] Autocomplete error: $e');
@@ -702,6 +836,15 @@ class HomeController extends GetxController with LoadingMixin, LoadingApiMixin {
         throw Exception('Google Maps API key is missing');
       }
 
+      final Stopwatch detailsStopwatch = Stopwatch()..start();
+      PassengerFlowDebug.send(
+        'place_details_request',
+        bookingId: AppConstant().bookingId,
+        data: <String, dynamic>{
+          'place_id_present': placeId.trim().isNotEmpty,
+          'place_id_length': placeId.trim().length,
+        },
+      );
       final response = await http.get(
         Uri.parse(
           'https://places.googleapis.com/v1/places/'
@@ -714,6 +857,15 @@ class HomeController extends GetxController with LoadingMixin, LoadingApiMixin {
         },
       );
 
+      detailsStopwatch.stop();
+      PassengerFlowDebug.send(
+        'place_details_response',
+        bookingId: AppConstant().bookingId,
+        data: <String, dynamic>{
+          'status_code': response.statusCode,
+          'duration_ms': detailsStopwatch.elapsedMilliseconds,
+        },
+      );
       if (response.statusCode < 200 || response.statusCode >= 300) {
         throw Exception(
           'Place details failed (${response.statusCode}): ${response.body}',
@@ -740,6 +892,15 @@ class HomeController extends GetxController with LoadingMixin, LoadingApiMixin {
         },
       };
     } catch (e, st) {
+      PassengerFlowDebug.runtimeError('place_details', e, st);
+      PassengerFlowDebug.send(
+        'place_details_error',
+        bookingId: AppConstant().bookingId,
+        data: <String, dynamic>{
+          'error_type': e.runtimeType.toString(),
+          'error': e.toString(),
+        },
+      );
       LogUtils.printError('Get place details error: $e, $st');
       rethrow;
     } finally {
@@ -1441,11 +1602,29 @@ class HomeController extends GetxController with LoadingMixin, LoadingApiMixin {
 
     if ((placeApi ?? "").isNotEmpty) {
       try {
+        final Stopwatch geocodeStopwatch = Stopwatch()..start();
+        PassengerFlowDebug.send(
+          'reverse_geocode_request',
+          bookingId: AppConstant().bookingId,
+          data: <String, dynamic>{
+            'latitude': PassengerFlowDebug.coordinate(lat),
+            'longitude': PassengerFlowDebug.coordinate(lng),
+          },
+        );
         final response = await http.get(
           Uri.parse(
             "https://maps.googleapis.com/maps/api/geocode/json"
             "?latlng=$lat,$lng&key=$placeApi",
           ),
+        );
+        geocodeStopwatch.stop();
+        PassengerFlowDebug.send(
+          'reverse_geocode_response',
+          bookingId: AppConstant().bookingId,
+          data: <String, dynamic>{
+            'status_code': response.statusCode,
+            'duration_ms': geocodeStopwatch.elapsedMilliseconds,
+          },
         );
         if (response.statusCode == 200) {
           final decoded = jsonDecode(response.body) as Map<String, dynamic>;
@@ -1475,7 +1654,8 @@ class HomeController extends GetxController with LoadingMixin, LoadingApiMixin {
             }
           }
         }
-      } catch (e) {
+      } catch (e, st) {
+        PassengerFlowDebug.runtimeError('reverse_geocode', e, st);
         LogUtils.printAction("Google geocode error: $e");
       }
     }

@@ -1,3 +1,5 @@
+import 'dart:ui';
+
 import 'package:e_taxi/utils/app_colors.dart';
 import 'package:e_taxi/utils/app_preferences.dart';
 import 'package:e_taxi/utils/build_config.dart';
@@ -12,6 +14,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
 
+import 'core/debug/passenger_flow_debug.dart';
 import 'core/helper/language_provider/localization/language/english.dart';
 import 'core/helper/notification_service/firebase_notification_service.dart';
 import 'firebase_options.dart';
@@ -39,6 +42,29 @@ Future<void> main() async {
   }
 
   await AppPreference.initMySharedPreferences();
+
+  FlutterError.onError = (FlutterErrorDetails details) {
+    FlutterError.presentError(details);
+    PassengerFlowDebug.runtimeError(
+      'flutter',
+      details.exception,
+      details.stack,
+    );
+  };
+  PlatformDispatcher.instance.onError = (Object error, StackTrace stack) {
+    PassengerFlowDebug.runtimeError('platform', error, stack);
+    return false;
+  };
+  WidgetsBinding.instance.addObserver(PassengerDebugLifecycleObserver());
+  PassengerFlowDebug.send(
+    'app_started',
+    data: <String, dynamic>{
+      'firebase_enabled': BuildConfig.firebaseEnabled,
+      'push_enabled': BuildConfig.pushNotificationsEnabled,
+      'expected_collector_version':
+          PassengerFlowDebug.expectedCollectorVersion,
+    },
+  );
 
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(
@@ -78,6 +104,9 @@ class MyApp extends StatelessWidget {
       builder: (_, child) {
         return GetMaterialApp(
           debugShowCheckedModeBanner: false,
+          navigatorObservers: <NavigatorObserver>[
+            PassengerDebugNavigatorObserver(),
+          ],
           translations: AppTranslations(),
           locale: initialLocale,
           fallbackLocale: const Locale('hu', 'HU'),

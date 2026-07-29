@@ -6,6 +6,7 @@ import "package:http/http.dart" as http;
 import "package:http_interceptor/http/intercepted_client.dart";
 
 import "../../utils/api_constants.dart";
+import "../debug/passenger_flow_debug.dart";
 import "../../utils/app_preferences.dart";
 import "logger_interceptor.dart";
 
@@ -45,12 +46,46 @@ class Api {
     Map<String, String>? header,
   }) async {
     LogUtils.showLogs(message: "POST $url");
-    final response = await dio.post(
-      getUrl(url, queryParameters: queryData),
-      body: jsonEncode(bodyData),
-      headers: header ?? await headers(),
+    final String bookingId = PassengerFlowDebug.bookingIdFrom(
+      query: queryData,
+      body: bodyData,
     );
-    return response;
+    final Stopwatch stopwatch = Stopwatch()..start();
+    PassengerFlowDebug.apiRequest(
+      method: 'POST',
+      endpoint: url,
+      bookingId: bookingId,
+      query: queryData,
+      body: bodyData,
+    );
+
+    try {
+      final http.Response response = await dio.post(
+        getUrl(url, queryParameters: queryData),
+        body: jsonEncode(bodyData),
+        headers: header ?? await headers(),
+      );
+      stopwatch.stop();
+      PassengerFlowDebug.apiResponse(
+        method: 'POST',
+        endpoint: url,
+        statusCode: response.statusCode,
+        durationMs: stopwatch.elapsedMilliseconds,
+        responseBody: response.body,
+        bookingId: bookingId,
+      );
+      return response;
+    } catch (error) {
+      stopwatch.stop();
+      PassengerFlowDebug.apiError(
+        method: 'POST',
+        endpoint: url,
+        error: error,
+        durationMs: stopwatch.elapsedMilliseconds,
+        bookingId: bookingId,
+      );
+      rethrow;
+    }
   }
 
   Future<dynamic> sendMultipartRequestPost1(
@@ -109,12 +144,46 @@ class Api {
     Map<String, dynamic>? bodyData = const <String, dynamic>{},
     Map<String, String>? header,
   }) async {
-    final response = await dio.delete(
-      getUrl(url, queryParameters: queryData),
-      body: jsonEncode(bodyData),
-      headers: header ?? await headers(),
+    final String bookingId = PassengerFlowDebug.bookingIdFrom(
+      query: queryData,
+      body: bodyData,
     );
-    return response;
+    final Stopwatch stopwatch = Stopwatch()..start();
+    PassengerFlowDebug.apiRequest(
+      method: 'DELETE',
+      endpoint: url,
+      bookingId: bookingId,
+      query: queryData,
+      body: bodyData,
+    );
+
+    try {
+      final http.Response response = await dio.delete(
+        getUrl(url, queryParameters: queryData),
+        body: jsonEncode(bodyData),
+        headers: header ?? await headers(),
+      );
+      stopwatch.stop();
+      PassengerFlowDebug.apiResponse(
+        method: 'DELETE',
+        endpoint: url,
+        statusCode: response.statusCode,
+        durationMs: stopwatch.elapsedMilliseconds,
+        responseBody: response.body,
+        bookingId: bookingId,
+      );
+      return response;
+    } catch (error) {
+      stopwatch.stop();
+      PassengerFlowDebug.apiError(
+        method: 'DELETE',
+        endpoint: url,
+        error: error,
+        durationMs: stopwatch.elapsedMilliseconds,
+        bookingId: bookingId,
+      );
+      rethrow;
+    }
   }
 
   Future<http.Response> get(
@@ -123,12 +192,41 @@ class Api {
     Map<String, String>? getHeaders,
   }) async {
     LogUtils.showLogs(message: "GET $url");
-    final response = await dio.get(
-      getUrl(url, queryParameters: queryData),
-      headers: getHeaders ?? await headers(),
+    final String bookingId = PassengerFlowDebug.bookingIdFrom(query: queryData);
+    final Stopwatch stopwatch = Stopwatch()..start();
+    PassengerFlowDebug.apiRequest(
+      method: 'GET',
+      endpoint: url,
+      bookingId: bookingId,
+      query: queryData,
     );
 
-    return response;
+    try {
+      final http.Response response = await dio.get(
+        getUrl(url, queryParameters: queryData),
+        headers: getHeaders ?? await headers(),
+      );
+      stopwatch.stop();
+      PassengerFlowDebug.apiResponse(
+        method: 'GET',
+        endpoint: url,
+        statusCode: response.statusCode,
+        durationMs: stopwatch.elapsedMilliseconds,
+        responseBody: response.body,
+        bookingId: bookingId,
+      );
+      return response;
+    } catch (error) {
+      stopwatch.stop();
+      PassengerFlowDebug.apiError(
+        method: 'GET',
+        endpoint: url,
+        error: error,
+        durationMs: stopwatch.elapsedMilliseconds,
+        bookingId: bookingId,
+      );
+      rethrow;
+    }
   }
 }
 

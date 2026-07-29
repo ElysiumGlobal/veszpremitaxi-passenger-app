@@ -14,7 +14,6 @@ class LoggerInterceptor extends InterceptorContract {
   Future<BaseRequest> interceptRequest({required BaseRequest request}) async {
     log('----- Request -----');
     log(request.toString());
-    log(request.headers.toString());
     return request;
   }
 
