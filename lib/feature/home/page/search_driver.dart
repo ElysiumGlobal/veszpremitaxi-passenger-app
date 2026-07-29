@@ -49,6 +49,82 @@ class _SearchDriverScreenState extends State<SearchDriverScreen> {
   double _driverMarkerRotation = 0;
   Timer? _driverMarkerAnimationTimer;
 
+  String _displayTripOtp() {
+    final raw =
+        riderBookingModel.value?.data?.booking?.otp?.toString() ?? '';
+    final digits = raw.replaceAll(RegExp(r'[^0-9]'), '');
+    if (digits.isEmpty) return '000000';
+    if (digits.length >= 6) return digits.substring(digits.length - 6);
+    return digits.padLeft(6, '0');
+  }
+
+  Widget _buildSearchingVisual() {
+    return Container(
+      width: 184.w,
+      height: 128.w,
+      decoration: BoxDecoration(
+        color: AppColors.primaryContainer,
+        borderRadius: BorderRadius.circular(28.r),
+        border: Border.all(
+          color: AppColors.mainPrimaryColor.withValues(alpha: .45),
+        ),
+      ),
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          SizedBox(
+            width: 94.w,
+            height: 94.w,
+            child: CircularProgressIndicator(
+              strokeWidth: 5.w,
+              color: AppColors.mainPrimaryColor,
+              backgroundColor:
+                  AppColors.mainPrimaryColor.withValues(alpha: .15),
+            ),
+          ),
+          Container(
+            width: 68.w,
+            height: 68.w,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: AppColors.whiteColor,
+              boxShadow: [
+                BoxShadow(
+                  color: AppColors.blackColor.withValues(alpha: .12),
+                  blurRadius: 16,
+                  offset: const Offset(0, 6),
+                ),
+              ],
+            ),
+            child: Icon(
+              Icons.local_taxi_rounded,
+              color: AppColors.mainPrimaryColor,
+              size: 38.w,
+            ),
+          ),
+          Positioned(
+            left: 24.w,
+            bottom: 18.w,
+            child: Icon(
+              Icons.location_on_rounded,
+              color: AppColors.successColor,
+              size: 26.w,
+            ),
+          ),
+          Positioned(
+            right: 24.w,
+            top: 18.w,
+            child: Icon(
+              Icons.my_location_rounded,
+              color: AppColors.titleTextColor,
+              size: 22.w,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   double _bearingBetween(LatLng from, LatLng to) {
     final double fromLat = from.latitude * 0.017453292519943295;
     final double fromLng = from.longitude * 0.017453292519943295;
@@ -983,11 +1059,7 @@ class _SearchDriverScreenState extends State<SearchDriverScreen> {
                                   vertical: 24.h,
                                 ),
                                 child: Center(
-                                  child: CustomImage(
-                                    image: IconAsset.searchDriver,
-                                    ht: 150.w,
-                                    wt: 150.w,
-                                  ),
+                                  child: _buildSearchingVisual(),
                                 ),
                               ),
                             ],
@@ -1096,7 +1168,8 @@ class _SearchDriverScreenState extends State<SearchDriverScreen> {
                                 ),
                               ),
 
-                              ...List.generate(4, (index) {
+                              ...List.generate(6, (index) {
+                                final otp = _displayTripOtp();
                                 return Container(
                                   margin: EdgeInsets.only(left: 5.w),
                                   padding: EdgeInsets.symmetric(
@@ -1104,14 +1177,12 @@ class _SearchDriverScreenState extends State<SearchDriverScreen> {
                                     vertical: 4.w,
                                   ),
                                   decoration: BoxDecoration(
-                                    borderRadius: BorderRadius.circular(
-                                      4.r,
-                                    ),
+                                    borderRadius: BorderRadius.circular(4.r),
                                     color: AppColors.textFieldBorderColor,
                                   ),
                                   child: CommonText(
-                                    string:
-                                    "${(riderBookingModel.value?.data?.booking?.otp ?? "0000").split("").toList()[index]}",
+                                    string: otp[index],
+                                    fontWeight: FontWeight.w700,
                                   ),
                                 );
                               }),
