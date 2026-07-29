@@ -127,4 +127,7 @@ class IconAsset {
   static const String paymentDone = '$_icons/payment_done.svg';
   static const String share1 = '$_icons/share1.svg';
   static const String placeHolder = '$_icons/place_holder.png';
+  static const String driverMarker = '$_icons/driver_marker.png';
+  static const String pickupMarker = '$_icons/pickup_marker.png';
+  static const String destinationMarker = '$_icons/destination_marker.png';
 }

@@ -1449,6 +1449,21 @@ class HomeController extends GetxController with LoadingMixin, LoadingApiMixin {
 
   bool dialogOpen = false;
 
+  void _clearCancelledRideLocalState(String bookingId) {
+    AppConstant().bookingId = '';
+    clearSavedBookingFare();
+    riderBookingModel.value = null;
+    bookingCreateModel.value = null;
+    tripType.value = 0;
+    isDriverCome.value = false;
+    changePolyLine = false;
+    dialogOpen = false;
+    PassengerFlowDebug.send(
+      'passenger_cancel_local_state_cleared',
+      bookingId: bookingId,
+    );
+  }
+
   Future<void> cancelRide({
     required String bookingId,
     required String reason,
@@ -1456,7 +1471,15 @@ class HomeController extends GetxController with LoadingMixin, LoadingApiMixin {
     processApi(
       () => HomeService.cancelRide(bookingId, reason),
       result: (data) {
+        _clearCancelledRideLocalState(bookingId);
         Navigation.popupUtil(Routes.dashboardScreen);
+      },
+      error: (error, stack) {
+        PassengerFlowDebug.send(
+          'passenger_cancel_failed',
+          bookingId: bookingId,
+          data: <String, dynamic>{'error': error.toString()},
+        );
       },
       loading: handleLoading,
     );

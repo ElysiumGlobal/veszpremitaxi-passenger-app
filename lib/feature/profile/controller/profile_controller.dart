@@ -41,12 +41,29 @@ class ProfileController extends GetxController
         final bookingId =
             '${currentBooking?.booking?.id ?? currentBooking?.bookingId ?? ''}'
                 .trim();
+        final serverCurrentBookingId =
+            (data.data?.currentBookingId ?? '').trim();
+        final String updatedAt =
+            (currentBooking?.booking?.updatedAt ?? '').trim();
+        final DateTime? parsedUpdatedAt = DateTime.tryParse(updatedAt);
+        final Duration? bookingAge = parsedUpdatedAt == null
+            ? null
+            : DateTime.now().difference(parsedUpdatedAt.toLocal()).abs();
         const activeStatuses = <String>{
           'searching',
           'accepted',
           'arrived',
           'started',
         };
+        final bool bookingIdIsAuthoritative = bookingId.isNotEmpty &&
+            serverCurrentBookingId.isNotEmpty &&
+            bookingId == serverCurrentBookingId;
+        final bool bookingTooOld = bookingAge != null &&
+            ((status == 'searching' && bookingAge > const Duration(minutes: 30)) ||
+                ((status == 'accepted' || status == 'arrived') &&
+                    bookingAge > const Duration(minutes: 90)) ||
+                (status == 'started' &&
+                    bookingAge > const Duration(hours: 12)));
 
         PassengerFlowDebug.send(
           'passenger_profile_loaded',
@@ -56,14 +73,25 @@ class ProfileController extends GetxController
             'current_booking_present': currentBooking != null,
             'status': status,
             'is_cash': data.isCash ?? 0,
+            'server_current_booking_id': serverCurrentBookingId,
+            'booking_id_authoritative': bookingIdIsAuthoritative,
+            'booking_too_old': bookingTooOld,
+            'updated_at': updatedAt,
           },
         );
 
-        if (currentBooking == null) {
-          if (AppConstant().bookingId.isNotEmpty ||
-              riderBookingModel.value != null) {
-            _clearLocalBookingState(reason: 'profile_has_no_current_booking');
-          }
+        if (currentBooking == null ||
+            !bookingIdIsAuthoritative ||
+            bookingTooOld) {
+          _clearLocalBookingState(
+            reason: currentBooking == null
+                ? 'profile_has_no_current_booking'
+                : (!bookingIdIsAuthoritative
+                    ? 'profile_current_booking_id_mismatch'
+                    : 'profile_current_booking_too_old'),
+            bookingId: bookingId,
+            status: status,
+          );
           return;
         }
 

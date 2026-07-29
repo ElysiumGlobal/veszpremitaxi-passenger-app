@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:developer';
+import 'dart:math' as Math;
 import 'package:dotted_line/dotted_line.dart';
 import 'package:e_taxi/core/debug/passenger_flow_debug.dart';
 import 'package:e_taxi/core/location_utils.dart';
@@ -17,6 +18,7 @@ import 'package:e_taxi/widgets/custome_img.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_polyline_points/flutter_polyline_points.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:get/get.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:share_plus/share_plus.dart';
@@ -43,6 +45,41 @@ class _SearchDriverScreenState extends State<SearchDriverScreen> {
   Rx<Set<Polyline>> _polylines = Rx<Set<Polyline>>({});
   Rx<Set<Marker>> _marker = Rx<Set<Marker>>({});
   BitmapDescriptor? _driverMarkerIcon;
+  LatLng? _driverMarkerPosition;
+  double _driverMarkerRotation = 0;
+  Timer? _driverMarkerAnimationTimer;
+
+  double _bearingBetween(LatLng from, LatLng to) {
+    final double fromLat = from.latitude * 0.017453292519943295;
+    final double fromLng = from.longitude * 0.017453292519943295;
+    final double toLat = to.latitude * 0.017453292519943295;
+    final double toLng = to.longitude * 0.017453292519943295;
+    final double y = Math.sin(toLng - fromLng) * Math.cos(toLat);
+    final double x = Math.cos(fromLat) * Math.sin(toLat) -
+        Math.sin(fromLat) * Math.cos(toLat) * Math.cos(toLng - fromLng);
+    return (Math.atan2(y, x) * 57.29577951308232 + 360) % 360;
+  }
+
+  void _setDriverMarkerFrame(
+    LatLng position,
+    BitmapDescriptor icon,
+    double rotation,
+  ) {
+    final markers = Set<Marker>.from(_marker.value);
+    markers.removeWhere((element) => element.markerId.value == 'driver');
+    markers.add(
+      Marker(
+        markerId: const MarkerId('driver'),
+        position: position,
+        icon: icon,
+        anchor: const Offset(0.5, 0.5),
+        flat: true,
+        rotation: rotation,
+        zIndexInt: 3,
+      ),
+    );
+    _marker.value = markers;
+  }
 
   String _activeBookingId() {
     return "${riderBookingModel.value?.data?.booking?.id ?? riderBookingModel.value?.data?.bookingId ?? homeController.bookingCreateModel.value?.data?.booking?.id ?? AppConstant().bookingId}";
@@ -50,38 +87,57 @@ class _SearchDriverScreenState extends State<SearchDriverScreen> {
 
   Future<void> setDriverMarker(LatLng latLong) async {
     try {
-      final markers = Set<Marker>.from(_marker.value);
-      markers.removeWhere((element) => element.markerId.value == "driver");
+      final BitmapDescriptor icon = await _resolveDriverMarkerIcon();
+      final LatLng? previous = _driverMarkerPosition;
+      _driverMarkerAnimationTimer?.cancel();
 
-      final icon = await _resolveDriverMarkerIcon();
+      if (previous == null ||
+          Geolocator.distanceBetween(
+                previous.latitude,
+                previous.longitude,
+                latLong.latitude,
+                latLong.longitude,
+              ) >
+              1500) {
+        _driverMarkerPosition = latLong;
+        _setDriverMarkerFrame(latLong, icon, _driverMarkerRotation);
+        return;
+      }
 
-      markers.add(
-        Marker(
-          markerId: const MarkerId("driver"),
-          position: latLong,
-          icon: icon,
-          anchor: const Offset(0.5, 0.5),
-          flat: true,
-          zIndexInt: 2,
-        ),
+      final double targetRotation = _bearingBetween(previous, latLong);
+      const int steps = 12;
+      int step = 0;
+      _driverMarkerAnimationTimer = Timer.periodic(
+        const Duration(milliseconds: 75),
+        (Timer timer) {
+          step++;
+          final double progress = step / steps;
+          final double eased = 1 - Math.pow(1 - progress, 3).toDouble();
+          final LatLng frame = LatLng(
+            previous.latitude +
+                (latLong.latitude - previous.latitude) * eased,
+            previous.longitude +
+                (latLong.longitude - previous.longitude) * eased,
+          );
+          double rotationDelta =
+              ((targetRotation - _driverMarkerRotation + 540) % 360) - 180;
+          final double frameRotation =
+              (_driverMarkerRotation + rotationDelta * eased + 360) % 360;
+          _setDriverMarkerFrame(frame, icon, frameRotation);
+          if (step >= steps) {
+            timer.cancel();
+            _driverMarkerPosition = latLong;
+            _driverMarkerRotation = targetRotation;
+            _setDriverMarkerFrame(latLong, icon, targetRotation);
+          }
+        },
       );
-      _marker.value = markers;
     } catch (e, st) {
       LogUtils.printAction("setDriverMarker error: $e , $st");
       try {
-        final markers = Set<Marker>.from(_marker.value);
-        markers.removeWhere((element) => element.markerId.value == "driver");
-        markers.add(
-          Marker(
-            markerId: const MarkerId("driver"),
-            position: latLong,
-            icon: await Utils().ensureCarIcon(),
-            anchor: const Offset(0.5, 0.5),
-            flat: true,
-            zIndexInt: 2,
-          ),
-        );
-        _marker.value = markers;
+        final icon = await Utils().ensureCarIcon();
+        _driverMarkerPosition = latLong;
+        _setDriverMarkerFrame(latLong, icon, _driverMarkerRotation);
       } catch (_) {}
     }
   }
@@ -389,14 +445,24 @@ class _SearchDriverScreenState extends State<SearchDriverScreen> {
     try {
       final profile = await ProfileService.getUserProfileSilent();
       final currentBooking = profile.currentBooking;
+      final String serverCurrentBookingId =
+          (profile.data?.currentBookingId ?? '').trim();
+      final String responseBookingId =
+          '${currentBooking?.booking?.id ?? currentBooking?.bookingId ?? ''}'
+              .trim();
+      final bool currentBookingAuthoritative = currentBooking != null &&
+          serverCurrentBookingId.isNotEmpty &&
+          serverCurrentBookingId == responseBookingId;
 
-      if (currentBooking == null) {
+      if (!currentBookingAuthoritative) {
         _missingCurrentBookingPolls++;
         PassengerFlowDebug.send(
           'booking_status_poll_missing_current_booking',
           bookingId: activeBookingId,
           data: <String, dynamic>{
             'missing_poll_count': _missingCurrentBookingPolls,
+            'server_current_booking_id': serverCurrentBookingId,
+            'response_booking_id': responseBookingId,
           },
         );
         if (_missingCurrentBookingPolls >= 2 && mounted) {
@@ -413,8 +479,9 @@ class _SearchDriverScreenState extends State<SearchDriverScreen> {
         return;
       }
 
+      final authoritativeBooking = currentBooking!;
       final polledModel = NewRideModel.fromJson({
-        'data': jsonEncode(currentBooking.toJson()),
+        'data': jsonEncode(authoritativeBooking.toJson()),
       });
       final polledBookingId =
           '${polledModel.data?.booking?.id ?? polledModel.data?.bookingId ?? ''}'
@@ -568,6 +635,7 @@ class _SearchDriverScreenState extends State<SearchDriverScreen> {
       },
     );
     _bookingStatusPollingTimer?.cancel();
+    _driverMarkerAnimationTimer?.cancel();
     _rideModelWorker?.dispose();
     _subscription?.cancel();
     _sub?.cancel();
@@ -598,7 +666,6 @@ class _SearchDriverScreenState extends State<SearchDriverScreen> {
                           target: userOrigin.value != null
                               ? userOrigin.value!
                               : const LatLng(47.0933, 17.9115),
-                          // Bhuj coordinates
                           zoom: 14,
                         ),
                         onMapCreated: (controller) {

@@ -62,22 +62,22 @@ class Utils with LoadingMixin {
 
   Future<void> setRouteMarkers() async {
     sourceMarkerIcon = await getMarkerIcon(
-      ImagesAsset.sourceIcon,
-      96,
-      displaySize: 46,
+      IconAsset.pickupMarker,
+      128,
+      displaySize: 52,
     );
     destinationMarkerIcon = await getMarkerIcon(
-      ImagesAsset.destinationIcon,
-      96,
-      displaySize: 46,
+      IconAsset.destinationMarker,
+      128,
+      displaySize: 52,
     );
   }
 
   Future<void> setCarMarker() async {
     carIcon = await getMarkerIcon(
-      IconAsset.car,
-      vehicleMarkerAssetTargetWidth,
-      displaySize: vehicleMarkerSize,
+      IconAsset.driverMarker,
+      128,
+      displaySize: 54,
     );
   }
 

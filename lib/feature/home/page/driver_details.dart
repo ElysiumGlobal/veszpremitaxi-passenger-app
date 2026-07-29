@@ -49,7 +49,7 @@ class _DriverDetailsScreenState extends State<DriverDetailsScreen> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   CommonText(
-                    string: "E-Taxi",
+                    string: "Veszprémi Taxi",
                     fontWeight: FontWeight.w600,
                     fontSize: 26.sp,
                   ),

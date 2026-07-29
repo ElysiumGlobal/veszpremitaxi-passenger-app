@@ -3,6 +3,7 @@ import 'dart:developer';
 
 import 'package:e_taxi/core/api/api.dart';
 import 'package:e_taxi/core/api/responce_handler.dart';
+import 'package:e_taxi/core/debug/passenger_flow_debug.dart';
 import 'package:e_taxi/feature/home/model/address_model.dart';
 import 'package:e_taxi/utils/api_constants.dart';
 import 'package:e_taxi/utils/constants.dart';
@@ -193,9 +194,48 @@ class HomeService {
       final response = await Api().post(
         ApiConstants.cancelRide,
         bodyData: {"booking_id": bookingId, "reason": reason},
+        showToast: false,
       );
-      await ResponseHandler.checkResponseError(response);
-      return jsonDecode(response.body);
+      dynamic decoded;
+      try {
+        decoded = jsonDecode(response.body);
+      } catch (_) {
+        decoded = <String, dynamic>{};
+      }
+      final String message = decoded is Map
+          ? (decoded['message'] ?? '').toString().toLowerCase()
+          : '';
+      final String bodyLower = response.body.toLowerCase();
+      final bool alreadyCancelled = response.statusCode == 400 &&
+          (message.contains('already canceled') ||
+              message.contains('already cancelled') ||
+              message.contains('már törölve') ||
+              message.contains('már lemondva'));
+      final bool knownPartialBackendCancel = response.statusCode == 500 &&
+          bodyLower.contains('is_available') &&
+          bodyLower.contains('mass assignment');
+
+      PassengerFlowDebug.send(
+        'passenger_cancel_http_response',
+        bookingId: bookingId,
+        data: <String, dynamic>{
+          'http_status': response.statusCode,
+          'already_cancelled': alreadyCancelled,
+          'known_partial_backend_cancel': knownPartialBackendCancel,
+          'message': message,
+        },
+      );
+
+      if (alreadyCancelled || knownPartialBackendCancel) {
+        return <String, dynamic>{
+          'success': true,
+          'already_cancelled': alreadyCancelled,
+          'partial_backend_cleanup': knownPartialBackendCancel,
+        };
+      }
+
+      await ResponseHandler.checkResponseError(response, showException: false);
+      return decoded;
     } catch (e, st) {
       LogUtils.printError("Cancel Ride Error :$e, $st");
       rethrow;

@@ -202,7 +202,7 @@ class TripCardWidgetShimmer extends StatelessWidget {
                 ),
                 10.verticalSpace,
                 CommonText(
-                  string: "Shree Swaminarayan mandir-Bhuj kutch-370001",
+                  string: "8200 Veszprém, Kossuth Lajos utca 1.",
                   fontSize: 14.sp,
                   color: AppColors.textCaptionColor,
                   softWrap: true,

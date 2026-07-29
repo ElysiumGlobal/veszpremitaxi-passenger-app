@@ -4,6 +4,7 @@ import 'package:e_taxi/widgets/cachenetworkimage.dart';
 import 'package:e_taxi/widgets/common_text.dart';
 import 'package:e_taxi/widgets/custome_img.dart';
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 
 import '../../../utils/utils.dart';
@@ -25,6 +26,15 @@ class SelectVehicleWidget extends StatelessWidget {
 
   final String newAmount;
 
+  String _vehicleName() {
+    final String raw = (rideOption?.type ?? '').trim();
+    final String withoutCity = raw.replaceFirst(
+      RegExp(r'\s*Veszpr[eé]m$', caseSensitive: false),
+      '',
+    ).trim();
+    return withoutCity.isEmpty ? (raw.isEmpty ? 'Normál taxi' : raw) : withoutCity;
+  }
+
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
@@ -42,10 +52,24 @@ class SelectVehicleWidget extends StatelessWidget {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            NetworkImageWidget(
-              image: rideOption?.icon ?? "",
-              ht: 34.w,
-              wt: 34.w,
+            Container(
+              width: 48.w,
+              height: 48.w,
+              padding: EdgeInsets.all(5.w),
+              decoration: BoxDecoration(
+                color: AppColors.mainPrimaryColor.withValues(alpha: 0.18),
+                borderRadius: BorderRadius.circular(12.r),
+              ),
+              child: NetworkImageWidget(
+                image: rideOption?.icon ?? "",
+                ht: 38.w,
+                wt: 38.w,
+                boxFit: BoxFit.contain,
+                errorWidget: Image.asset(
+                  IconAsset.driverMarker,
+                  fit: BoxFit.contain,
+                ),
+              ),
             ),
             8.horizontalSpace,
             Expanded(
@@ -55,7 +79,7 @@ class SelectVehicleWidget extends StatelessWidget {
                   Row(
                     children: [
                       CommonText(
-                        string: rideOption?.type ?? "",
+                        string: _vehicleName(),
                         fontSize: 14.sp,
                       ),
                       CustomImage(

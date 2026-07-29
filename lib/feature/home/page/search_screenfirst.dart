@@ -379,7 +379,7 @@ class _SearchFirstScreenState extends State<SearchFirstScreen> {
             CustomTextField(
               title: AppString.location.tr,
               controller: locationController,
-              hintText: "Eg. Basement, City centre complex, Bhuj, Gujrat370001",
+              hintText: "Például: 8200 Veszprém, Kossuth Lajos utca 1.",
               onChanged: (value) {
                 if (value.isNotEmpty) {
                   homeController.userSearchPlace(value);

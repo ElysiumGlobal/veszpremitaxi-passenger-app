@@ -135,6 +135,11 @@ class _ChatScreenState extends State<ChatScreen> {
 
       final model = ChatListModel.fromJson(jsonDecode(response.body));
       chatList.assignAll(model.chats ?? <Chat>[]);
+      PassengerFlowDebug.send(
+        'passenger_chat_history_parsed',
+        bookingId: widget.bookingId,
+        data: <String, dynamic>{'message_count': chatList.length},
+      );
       unawaited(_markMessagesRead());
     } catch (error, stack) {
       LogUtils.printError('PASSENGER CHAT HISTORY ERROR: $error, $stack');
@@ -374,7 +379,7 @@ class _ChatScreenState extends State<ChatScreen> {
                                   reverse: true,
                                   itemBuilder: (context, index) {
                                     final data = chatList[index];
-                                    final bool mine = data.sender?.id == userId;
+                                    final bool mine = data.isFromMe == true || data.sender?.id == userId;
                                     final bool deleted =
                                         data.messageType == 'deleted';
                                     return GestureDetector(

@@ -75,7 +75,7 @@ class _PickupPointScreenState extends State<PickupPointScreen> {
 
     CameraPosition cameraPosition = CameraPosition(
       target: pickUpLatLng.value,
-      zoom: 13,
+      zoom: 17.5,
     );
 
     await controller.animateCamera(
@@ -135,15 +135,16 @@ class _PickupPointScreenState extends State<PickupPointScreen> {
                         padding: EdgeInsets.only(top: 40.h),
                         initialCameraPosition: CameraPosition(
                           target: pickUpLatLng.value,
-                          zoom: 14,
+                          zoom: 17.5,
                         ),
                         mapToolbarEnabled: false,
                         zoomControlsEnabled: false,
                         mapType: MapType.normal,
                         onMapCreated: (controller) {
-                          Future.delayed(Duration(milliseconds: 500), () {
+                          if (!_controller.isCompleted) {
                             _controller.complete(controller);
-                          });
+                          }
+                          unawaited(updateCameraPosition());
                         },
                         myLocationEnabled: true,
                         myLocationButtonEnabled: true,
@@ -193,7 +194,11 @@ class _PickupPointScreenState extends State<PickupPointScreen> {
                       ),
                     ),
                   ),
-                  Icon(Icons.location_on_sharp, color: AppColors.successColor),
+                  Image.asset(
+                    IconAsset.pickupMarker,
+                    width: 54.w,
+                    height: 54.w,
+                  ),
                 ],
               ),
               Container(
@@ -291,7 +296,7 @@ class _PickupPointScreenState extends State<PickupPointScreen> {
                                               "${title.value} ${subTitle.value}",
                                         ),
                                         hintText:
-                                            "Eg. Basement, City centre complex, Bhuj, Gujrat370001",
+                                            "Például: 8200 Veszprém, Kossuth Lajos utca 1.",
                                         onChanged: (value) {
                                           if (value.isNotEmpty) {}
                                         },
