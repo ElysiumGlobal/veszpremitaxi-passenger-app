@@ -1,6 +1,7 @@
 import 'package:e_taxi/feature/auth/page/location_screen.dart';
 import 'package:e_taxi/feature/auth/page/login_screen.dart';
 import 'package:e_taxi/feature/auth/page/otpverify_screen.dart';
+import 'package:e_taxi/feature/auth/page/phone_required_screen.dart';
 import 'package:e_taxi/feature/auth/page/register_screen.dart';
 import 'package:e_taxi/feature/auth/page/term_service_screen.dart';
 import 'package:e_taxi/feature/dashboard/page/dashboard_screen.dart';
@@ -41,6 +42,7 @@ mixin Routes {
   static const String onboarding = '/OnboardingScrreen';
   static const String loginScreen = '/LoginScreen';
   static const String otpVerifyScreen = '/OtpverifyScreen';
+  static const String phoneRequiredScreen = '/PhoneRequiredScreen';
   static const String locationScreen = '/LocationScreen';
   static const String registerScreen = '/RegisterScreen';
   static const String termServiceScreen = '/TermServiceScreen';
@@ -91,6 +93,11 @@ mixin Routes {
     GetPage<dynamic>(
       name: otpVerifyScreen,
       page: () => OtpverifyScreen(),
+      transition: Transition.rightToLeft,
+    ),
+    GetPage<dynamic>(
+      name: phoneRequiredScreen,
+      page: () => const PhoneRequiredScreen(),
       transition: Transition.rightToLeft,
     ),
     GetPage<dynamic>(

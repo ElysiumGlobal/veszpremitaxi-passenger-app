@@ -104,6 +104,14 @@ class _SplaceScreenState extends State<SplaceScreen> {
       return;
     }
 
+    final bool phoneRequired = AppPreference.getBoolean(
+      AppPreference.profileCompletionPending,
+    );
+    if (phoneRequired) {
+      Navigation.replaceAll(Routes.phoneRequiredScreen);
+      return;
+    }
+
     Navigation.replaceAll(Routes.dashboardScreen);
   }
 

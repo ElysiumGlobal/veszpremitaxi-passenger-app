@@ -97,7 +97,7 @@ class AuthService {
   }) async {
     try {
       final res = await Api().post(
-        ApiConstants.emailLogin,
+        ApiConstants.firebaseSession,
         bodyData: {
           "email": email,
           "password": pass,
@@ -128,7 +128,7 @@ class AuthService {
   }) async {
     try {
       final res = await Api().post(
-        ApiConstants.emailLogin,
+        ApiConstants.firebaseSession,
         bodyData: {
           "email": email,
           "device_token": fcmToken,
@@ -144,6 +144,28 @@ class AuthService {
       return UserLoginModel.fromJson(jsonDecode(res.body));
     } catch (e, st) {
       LogUtils.printError("error :$e, $st");
+      rethrow;
+    }
+  }
+
+  static Future<Map<String, dynamic>> completePhone({
+    required String countryCode,
+    required String phone,
+  }) async {
+    try {
+      final res = await Api().post(
+        ApiConstants.completePhone,
+        bodyData: {
+          "country_code": countryCode,
+          "phone": phone,
+        },
+      );
+      await ResponseHandler.checkResponseError(res);
+      final decoded = jsonDecode(res.body.trim());
+      if (decoded is Map<String, dynamic>) return decoded;
+      return Map<String, dynamic>.from(decoded as Map);
+    } catch (e, st) {
+      LogUtils.printError("Complete phone error::$e, $st");
       rethrow;
     }
   }

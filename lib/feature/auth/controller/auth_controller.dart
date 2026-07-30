@@ -255,6 +255,7 @@ class AuthController extends GetxController with LoadingMixin, LoadingApiMixin {
       'old': true,
       'done': false,
       'verification_sent': false,
+      'requires_verification': false,
     };
 
     if (!BuildConfig.firebaseEnabled) return result;
@@ -266,8 +267,8 @@ class AuthController extends GetxController with LoadingMixin, LoadingApiMixin {
         password: password,
       );
 
-      result['done'] = true;
       result['old'] = false;
+      result['requires_verification'] = true;
 
       try {
         await credential.user?.sendEmailVerification();
@@ -276,6 +277,7 @@ class AuthController extends GetxController with LoadingMixin, LoadingApiMixin {
         LogUtils.printAction('Verification email warning::$error');
       }
 
+      await _auth.signOut();
       return result;
     } on firebase_auth.FirebaseAuthException catch (error) {
       if (error.code != 'email-already-in-use') {
@@ -287,10 +289,29 @@ class AuthController extends GetxController with LoadingMixin, LoadingApiMixin {
       }
 
       try {
-        await _auth.signInWithEmailAndPassword(
+        final firebase_auth.UserCredential credential =
+            await _auth.signInWithEmailAndPassword(
           email: email,
           password: password,
         );
+
+        await credential.user?.reload();
+        final firebase_auth.User? currentUser = _auth.currentUser;
+
+        if (currentUser?.emailVerified != true) {
+          result['requires_verification'] = true;
+          try {
+            await currentUser?.sendEmailVerification();
+            result['verification_sent'] = true;
+          } catch (verificationError) {
+            LogUtils.printAction(
+              'Verification email resend warning::$verificationError',
+            );
+          }
+          await _auth.signOut();
+          return result;
+        }
+
         result['done'] = true;
         result['old'] = true;
         return result;
@@ -310,28 +331,6 @@ class AuthController extends GetxController with LoadingMixin, LoadingApiMixin {
     final String email = emailController.text.trim();
     final String password = passwordController.text.trim();
 
-    dynamic emailState;
-    try {
-      emailState = await AuthService.emailCheck(email: email);
-    } catch (error) {
-      LogUtils.printAction('Email check warning::$error');
-    }
-
-    final dynamic data = emailState is Map ? emailState['data'] : null;
-    final String loginDevice = data is Map
-        ? (data['login_device'] ?? '').toString().toLowerCase()
-        : '';
-    final bool backendAccountExists = data is Map && loginDevice.isNotEmpty;
-
-    if (backendAccountExists && loginDevice != 'email') {
-      AppSnackBar.showErrorSnackBar(
-        message:
-            'Ez az e-mail-cím korábban más belépési móddal lett regisztrálva.',
-        isError: true,
-      );
-      return;
-    }
-
     if (!BuildConfig.firebaseEnabled) {
       AppSnackBar.showErrorSnackBar(
         message: 'A biztonságos belépési szolgáltatás nem érhető el.',
@@ -342,22 +341,20 @@ class AuthController extends GetxController with LoadingMixin, LoadingApiMixin {
 
     handleLoading(true);
     try {
-      // A már létező Laravel-fiókokat előbb a régi jelszóval ellenőrizzük.
-      // Így hibás jelszóval nem jöhet létre külön Firebase-fiók.
-      if (backendAccountExists) {
-        await AuthService.emailLogin(
-          email: email,
-          pass: password,
-          fcmToken: '',
-          loginType: 'email',
-          fUid: '',
-        );
-      }
-
       final Map<String, dynamic> firebaseResult = await firbaseEmailLogin(
         email: email,
         password: password,
       );
+
+      if (firebaseResult['requires_verification'] == true) {
+        AppSnackBar.showErrorSnackBar(
+          message: firebaseResult['verification_sent'] == true
+              ? 'Küldtünk egy megerősítő levelet. Nyisd meg a linket, majd lépj be újra.'
+              : 'Az e-mail-cím még nincs megerősítve. Nyisd meg a korábban kiküldött levelet, majd lépj be újra.',
+          dismisDuration: 7,
+        );
+        return;
+      }
 
       if (firebaseResult['done'] != true) return;
 
@@ -376,16 +373,6 @@ class AuthController extends GetxController with LoadingMixin, LoadingApiMixin {
         value: true,
       );
       AppConstant().userLoginType = LoginType.email.name;
-      phoneController.clear();
-
-      if (firebaseResult['verification_sent'] == true) {
-        AppSnackBar.showErrorSnackBar(
-          message:
-              'A fiók létrejött. Küldtünk egy e-mailes megerősítő linket is.',
-          dismisDuration: 5,
-        );
-      }
-
       await redirectUser(result, loginType: 'email');
     } on firebase_auth.FirebaseAuthException catch (error) {
       AppSnackBar.showErrorSnackBar(
@@ -393,8 +380,7 @@ class AuthController extends GetxController with LoadingMixin, LoadingApiMixin {
         isError: true,
       );
     } on AppException catch (error, stack) {
-      LogUtils.printError('Laravel email login error::$error\n$stack');
-      // A ResponseHandler már megjelenítette a szerver pontos üzenetét.
+      LogUtils.printError('Laravel Firebase email login error::$error\n$stack');
     } catch (error, stack) {
       LogUtils.printError('Firebase email login error::$error\n$stack');
       AppSnackBar.showErrorSnackBar(
@@ -499,6 +485,66 @@ class AuthController extends GetxController with LoadingMixin, LoadingApiMixin {
     }
   }
 
+  Future<void> completeRequiredPhone() async {
+    final String phone = phoneController.text.replaceAll(RegExp(r'\D'), '');
+    if (phone.length < 8 || phone.length > 15) {
+      AppSnackBar.showErrorSnackBar(
+        message: 'Adj meg egy érvényes telefonszámot.',
+        isError: true,
+      );
+      return;
+    }
+
+    handleLoading(true);
+    try {
+      final Map<String, dynamic> response = await AuthService.completePhone(
+        countryCode: countryCode.value,
+        phone: phone,
+      );
+
+      await AppPreference.setBoolean(
+        AppPreference.profileCompletionPending,
+        value: false,
+      );
+      await AppPreference.setBoolean(AppPreference.userLogin, value: true);
+      phoneController.clear();
+
+      AppSnackBar.showErrorSnackBar(
+        message: response['message']?.toString() ??
+            'A telefonszám sikeresen elmentve.',
+      );
+      Navigation.replaceAll(Routes.dashboardScreen);
+    } on AppException catch (error, stack) {
+      LogUtils.printError('Complete required phone error::$error\n$stack');
+    } catch (error, stack) {
+      LogUtils.printError('Complete required phone error::$error\n$stack');
+      AppSnackBar.showErrorSnackBar(
+        message: 'A telefonszám mentése nem sikerült. Próbáld újra.',
+        isError: true,
+      );
+    } finally {
+      handleLoading(false);
+    }
+  }
+
+  Future<void> logoutFromPhoneGate() async {
+    try {
+      await _auth.signOut();
+    } catch (_) {}
+    try {
+      await _googleSignIn.signOut();
+    } catch (_) {}
+
+    await AppPreference.setString(AppPreference.userToken, '');
+    await AppPreference.setString(AppPreference.userId, '');
+    await AppPreference.setBoolean(AppPreference.userLogin, value: false);
+    await AppPreference.setBoolean(
+      AppPreference.profileCompletionPending,
+      value: false,
+    );
+    Navigation.replaceAll(Routes.loginScreen);
+  }
+
   Future<UserLoginModel> _appleUserLogin() async {
     final appleCredential = await SignInWithApple.getAppleIDCredential(
       scopes: [
@@ -577,7 +623,13 @@ class AuthController extends GetxController with LoadingMixin, LoadingApiMixin {
       data.user?.id ?? '',
     );
 
-    final bool profilePending = data.user?.isRegister != '1';
+    final bool firebaseLogin = loginType == 'email' || loginType == 'google';
+    final bool phoneMissing =
+        firebaseLogin && (data.user?.phone ?? '').trim().isEmpty;
+    final bool profilePending = data.phoneRequired == true ||
+        data.user?.phoneRequired == true ||
+        phoneMissing ||
+        (firebaseLogin && data.user?.isRegister != '1');
     await AppPreference.setBoolean(
       AppPreference.profileCompletionPending,
       value: profilePending,
@@ -598,10 +650,11 @@ class AuthController extends GetxController with LoadingMixin, LoadingApiMixin {
 
     if (profilePending) {
       AppSnackBar.showErrorSnackBar(
-        message:
-            'Sikeres belépés. A telefonszámot és a fizetési adatokat az első fizetés előtt kérjük el.',
+        message: 'Sikeres belépés. A folytatáshoz add meg a telefonszámodat.',
         dismisDuration: 5,
       );
+      Navigation.replaceAll(Routes.phoneRequiredScreen);
+      return;
     }
 
     Navigation.replaceAll(Routes.dashboardScreen);

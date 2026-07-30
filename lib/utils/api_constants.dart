@@ -8,6 +8,8 @@ class ApiConstants {
   static const String verifyOtp = "user/login/otp";
   static const String registerUser = "user/register";
   static const String emailLogin = "user/login/password";
+  static const String firebaseSession = "user/firebase-session";
+  static const String completePhone = "user/complete-phone";
 
   static const String userProfile = "user/profile";
   static const String addAddress = "locations/save";

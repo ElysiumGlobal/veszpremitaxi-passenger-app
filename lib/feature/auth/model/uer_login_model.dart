@@ -14,19 +14,37 @@ class UserLoginModel {
   String? message;
   String? token;
   User? user;
+  bool? phoneRequired;
+  bool? emailVerified;
+  bool? firebaseAccountCreated;
 
-  UserLoginModel({this.success, this.message, this.token, this.user});
+  UserLoginModel({
+    this.success,
+    this.message,
+    this.token,
+    this.user,
+    this.phoneRequired,
+    this.emailVerified,
+    this.firebaseAccountCreated,
+  });
 
   UserLoginModel copyWith({
     bool? success,
     String? message,
     String? token,
     User? user,
+    bool? phoneRequired,
+    bool? emailVerified,
+    bool? firebaseAccountCreated,
   }) => UserLoginModel(
     success: success ?? this.success,
     message: message ?? this.message,
     token: token ?? this.token,
     user: user ?? this.user,
+    phoneRequired: phoneRequired ?? this.phoneRequired,
+    emailVerified: emailVerified ?? this.emailVerified,
+    firebaseAccountCreated:
+        firebaseAccountCreated ?? this.firebaseAccountCreated,
   );
 
   factory UserLoginModel.fromJson(Map<String, dynamic> json) => UserLoginModel(
@@ -34,6 +52,9 @@ class UserLoginModel {
     message: json["message"],
     token: json["token"],
     user: json["user"] == null ? null : User.fromJson(json["user"]),
+    phoneRequired: _asBool(json["phone_required"]),
+    emailVerified: _asBool(json["email_verified"]),
+    firebaseAccountCreated: _asBool(json["firebase_account_created"]),
   );
 
   Map<String, dynamic> toJson() => {
@@ -41,7 +62,23 @@ class UserLoginModel {
     "message": message,
     "token": token,
     "user": user?.toJson(),
+    "phone_required": phoneRequired,
+    "email_verified": emailVerified,
+    "firebase_account_created": firebaseAccountCreated,
   };
+}
+
+bool? _asBool(dynamic value) {
+  if (value == null) return null;
+  if (value is bool) return value;
+  final normalized = value.toString().trim().toLowerCase();
+  if (normalized == '1' || normalized == 'true' || normalized == 'yes') {
+    return true;
+  }
+  if (normalized == '0' || normalized == 'false' || normalized == 'no') {
+    return false;
+  }
+  return null;
 }
 
 class User {
@@ -62,6 +99,7 @@ class User {
   String? step1;
   String? step2;
   String? step3;
+  bool? phoneRequired;
   List<dynamic>? savedLocations;
   Driver? driver;
 
@@ -83,6 +121,7 @@ class User {
     this.step1,
     this.step2,
     this.step3,
+    this.phoneRequired,
     this.savedLocations,
     this.driver,
   });
@@ -105,6 +144,7 @@ class User {
     String? step1,
     String? step2,
     String? step3,
+    bool? phoneRequired,
     List<dynamic>? savedLocations,
     Driver? driver,
   }) => User(
@@ -125,6 +165,7 @@ class User {
     step1: step1 ?? this.step1,
     step2: step2 ?? this.step2,
     step3: step3 ?? this.step3,
+    phoneRequired: phoneRequired ?? this.phoneRequired,
     savedLocations: savedLocations ?? this.savedLocations,
     driver: driver ?? this.driver,
   );
@@ -147,6 +188,7 @@ class User {
     step1: json["step_1"],
     step2: json["step_2"],
     step3: json["step_3"],
+    phoneRequired: _asBool(json["phone_required"]),
     savedLocations: json["saved_locations"] == null
         ? []
         : List<dynamic>.from(json["saved_locations"]!.map((x) => x)),
@@ -171,6 +213,7 @@ class User {
     "step_1": step1,
     "step_2": step2,
     "step_3": step3,
+    "phone_required": phoneRequired,
     "saved_locations": savedLocations == null
         ? []
         : List<dynamic>.from(savedLocations!.map((x) => x)),
