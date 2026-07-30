@@ -129,13 +129,27 @@ class ProfileService {
     }
   }
 
-  static Future logOutAccount() async {
+  static Future<Map<String, dynamic>> logOutAccount() async {
     try {
       final response = await Api().post(ApiConstants.logOutAccount);
-      await ResponseHandler.checkResponseError(response);
-      return jsonDecode(response.body);
-    } catch (e) {
-      rethrow;
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        final String body = response.body.trim();
+        if (body.isEmpty) {
+          return <String, dynamic>{'success': true};
+        }
+        final dynamic decoded = jsonDecode(body);
+        if (decoded is Map<String, dynamic>) return decoded;
+        return <String, dynamic>{'success': true};
+      }
+
+      LogUtils.printAction(
+        'Logout backend warning: HTTP ${response.statusCode} ${response.body}',
+      );
+    } catch (error, stack) {
+      LogUtils.printAction('Logout backend warning::$error\n$stack');
     }
+
+    // A szerveres kijelentkezés hibája nem tarthatja bent a felhasználót az appban.
+    return <String, dynamic>{'success': true, 'local_logout': true};
   }
 }

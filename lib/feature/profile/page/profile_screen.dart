@@ -368,14 +368,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             borderColor: AppColors.titleTextColor,
                             onTap: () async {
                               Navigation.pop();
-                              final res = await profileController
-                                  .logOutAccount();
-                              if (res.isNotEmpty) {
-                                await FirebaseSession.signOut();
-                                await AppPreference.clearSharedPreferences();
-                                Get.delete<HomeController>(force: true);
-                                Navigation.replaceAll(Routes.loginScreen);
-                              }
+                              await profileController.logOutAccount();
+                              await FirebaseSession.signOut();
+                              await AppPreference.clearSharedPreferences();
+                              Get.delete<HomeController>(force: true);
+                              Navigation.replaceAll(Routes.loginScreen);
                             },
                           ),
                         ],

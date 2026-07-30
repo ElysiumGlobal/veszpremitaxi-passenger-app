@@ -1,0 +1,30 @@
+VESZPREMI TAXI UTASAPP 1.0.23+32 - TESZT
+
+1. Regisztracio ful
+- uj e-mail-cim
+- legalabb 6 karakteres jelszo
+- jelszo ujra
+- Firebase megerosito level megjon
+- megerosites nelkul ne engedjen be
+
+2. Belepes ful
+- megerositett e-mail + jelszo
+- Laravel Customers listaban megjelenik
+- telefonszam kapu megjelenik, ha meg nincs szam
+- elso sikeres Laravel-fiok letrejottekor HTML udvozlo level megerkezik
+
+3. Google
+- Google belepes mukodik az allando alairassal
+- uj Google-fioknal Laravel utasfiok letrejon
+- HTML udvozlo level megerkezik
+- telefonszam kapu megjelenik
+
+4. Profil / Kijelentkezes
+- Kijelentkezes megerositese
+- ne jelenjen meg failed
+- Firebase es helyi munkamenet torlodjon
+- visszakeruljon a belepesi kepernyore
+
+5. Bejelentkezo kep
+- a soforszoglalat.png jelenjen meg
+- halozati hiba eseten a regi helyi kep legyen fallback

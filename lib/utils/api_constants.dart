@@ -62,7 +62,7 @@ class ApiConstants {
   static const String setting = "settings";
 
   static const String deleteAccount = "user/delete-account";
-  static const String logOutAccount = "user/logout";
+  static const String logOutAccount = "user/logout-safe";
 
   static const String forMeGetList = "booking-contacts";
   static const String forMeAdd = "booking-contacts/create";

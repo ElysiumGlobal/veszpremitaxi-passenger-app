@@ -42,6 +42,7 @@ class AuthController extends GetxController with LoadingMixin, LoadingApiMixin {
   TextEditingController emailController = TextEditingController();
   TextEditingController rEmailController = TextEditingController();
   TextEditingController passwordController = TextEditingController();
+  TextEditingController confirmPasswordController = TextEditingController();
 
   Future<void> listenForCode() async {
     await SmsAutoFill().unregisterListener(); // avoid duplicates
@@ -221,6 +222,7 @@ class AuthController extends GetxController with LoadingMixin, LoadingApiMixin {
     phoneController.clear();
     referralController.clear();
     passwordController.clear();
+    confirmPasswordController.clear();
   }
 
   Future<void> verifyOtp(String otp) async {
@@ -247,85 +249,50 @@ class AuthController extends GetxController with LoadingMixin, LoadingApiMixin {
     );
   }
 
-  Future<Map<String, dynamic>> firbaseEmailLogin({
-    required String email,
-    required String password,
-  }) async {
-    final Map<String, dynamic> result = <String, dynamic>{
-      'old': true,
-      'done': false,
-      'verification_sent': false,
-      'requires_verification': false,
-    };
+  Future<void> emailRegister() async {
+    final String email = emailController.text.trim();
+    final String password = passwordController.text.trim();
 
-    if (!BuildConfig.firebaseEnabled) return result;
+    if (!BuildConfig.firebaseEnabled) {
+      AppSnackBar.showErrorSnackBar(
+        message: 'A biztonságos regisztrációs szolgáltatás nem érhető el.',
+        isError: true,
+      );
+      return;
+    }
 
+    handleLoading(true);
     try {
+      await _auth.setLanguageCode('hu');
       final firebase_auth.UserCredential credential =
           await _auth.createUserWithEmailAndPassword(
         email: email,
         password: password,
       );
 
-      result['old'] = false;
-      result['requires_verification'] = true;
-
-      try {
-        await credential.user?.sendEmailVerification();
-        result['verification_sent'] = true;
-      } catch (error) {
-        LogUtils.printAction('Verification email warning::$error');
-      }
-
+      await credential.user?.sendEmailVerification();
       await _auth.signOut();
-      return result;
+
+      AppSnackBar.showErrorSnackBar(
+        message:
+            'A regisztráció sikerült. Küldtünk egy megerősítő levelet. Nyisd meg a linket, majd lépj be.',
+        dismisDuration: 8,
+      );
     } on firebase_auth.FirebaseAuthException catch (error) {
-      if (error.code != 'email-already-in-use') {
-        AppSnackBar.showErrorSnackBar(
-          message: _firebaseErrorMessage(error),
-          isError: true,
-        );
-        return result;
-      }
-
-      try {
-        final firebase_auth.UserCredential credential =
-            await _auth.signInWithEmailAndPassword(
-          email: email,
-          password: password,
-        );
-
-        await credential.user?.reload();
-        final firebase_auth.User? currentUser = _auth.currentUser;
-
-        if (currentUser?.emailVerified != true) {
-          result['requires_verification'] = true;
-          try {
-            await currentUser?.sendEmailVerification();
-            result['verification_sent'] = true;
-          } catch (verificationError) {
-            LogUtils.printAction(
-              'Verification email resend warning::$verificationError',
-            );
-          }
-          await _auth.signOut();
-          return result;
-        }
-
-        result['done'] = true;
-        result['old'] = true;
-        return result;
-      } on firebase_auth.FirebaseAuthException catch (signInError) {
-        AppSnackBar.showErrorSnackBar(
-          message: _firebaseErrorMessage(signInError),
-          isError: true,
-        );
-        return result;
-      }
+      final String message = error.code == 'email-already-in-use'
+          ? 'Ezzel az e-mail-címmel már létezik fiók. Válaszd a Belépés fület.'
+          : _firebaseErrorMessage(error);
+      AppSnackBar.showErrorSnackBar(message: message, isError: true);
+    } catch (error, stack) {
+      LogUtils.printError('Firebase email registration error::$error\n$stack');
+      AppSnackBar.showErrorSnackBar(
+        message: 'A regisztráció nem sikerült. Próbáld újra.',
+        isError: true,
+      );
+    } finally {
+      handleLoading(false);
     }
   }
-
-  String profileImage = "";
 
   Future<void> emailLogin() async {
     final String email = emailController.text.trim();
@@ -341,22 +308,32 @@ class AuthController extends GetxController with LoadingMixin, LoadingApiMixin {
 
     handleLoading(true);
     try {
-      final Map<String, dynamic> firebaseResult = await firbaseEmailLogin(
+      await _auth.setLanguageCode('hu');
+      final firebase_auth.UserCredential credential =
+          await _auth.signInWithEmailAndPassword(
         email: email,
         password: password,
       );
 
-      if (firebaseResult['requires_verification'] == true) {
+      await credential.user?.reload();
+      final firebase_auth.User? currentUser = _auth.currentUser;
+
+      if (currentUser?.emailVerified != true) {
+        try {
+          await currentUser?.sendEmailVerification();
+        } catch (verificationError) {
+          LogUtils.printAction(
+            'Verification email resend warning::$verificationError',
+          );
+        }
+        await _auth.signOut();
         AppSnackBar.showErrorSnackBar(
-          message: firebaseResult['verification_sent'] == true
-              ? 'Küldtünk egy megerősítő levelet. Nyisd meg a linket, majd lépj be újra.'
-              : 'Az e-mail-cím még nincs megerősítve. Nyisd meg a korábban kiküldött levelet, majd lépj be újra.',
-          dismisDuration: 7,
+          message:
+              'Az e-mail-cím még nincs megerősítve. Újra elküldtük a levelet; nyisd meg a linket, majd lépj be.',
+          dismisDuration: 8,
         );
         return;
       }
-
-      if (firebaseResult['done'] != true) return;
 
       await _ensureFcmToken();
       final UserLoginModel result = await AuthService.emailLogin(
@@ -391,6 +368,8 @@ class AuthController extends GetxController with LoadingMixin, LoadingApiMixin {
       handleLoading(false);
     }
   }
+
+  String profileImage = "";
 
   static const String _googleWebClientId =
       '938558243123-61g4sf2rcuju7dp7bjht413k57phq916.apps.googleusercontent.com';
