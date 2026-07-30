@@ -1,213 +1,42 @@
 {
   "project_info": {
-    "project_number": "59887336692",
-    "project_id": "e-taxi-649bb",
-    "storage_bucket": "e-taxi-649bb.firebasestorage.app"
+    "project_number": "938558243123",
+    "project_id": "vtaxi-503221",
+    "storage_bucket": "vtaxi-503221.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:59887336692:android:8bc6dfe0f607e98eccf2a1",
+        "mobilesdk_app_id": "1:938558243123:android:113dc1a612779946207e46",
         "android_client_info": {
-          "package_name": "com.netsofters.etaxicustomer"
+          "package_name": "hu.veszpremitaxi.passenger"
         }
       },
       "oauth_client": [
         {
-          "client_id": "59887336692-34t1jd4h4o83k6u1pn8dc57qfbpgmnbj.apps.googleusercontent.com",
+          "client_id": "938558243123-co2rcoidtgbrcaontumrltdgubm2rt72.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {
-            "package_name": "com.netsofters.etaxicustomer",
-            "certificate_hash": "9f4a0b3abb6d0285eaac6601f5aa2c73e5ba71e2"
+            "package_name": "hu.veszpremitaxi.passenger",
+            "certificate_hash": "82185befb71b893776fe18db27b65f1e3a78a73f"
           }
         },
         {
-          "client_id": "59887336692-ff1q150aguu1tueuoc1m91sgja9auuls.apps.googleusercontent.com",
-          "client_type": 1,
-          "android_info": {
-            "package_name": "com.netsofters.etaxicustomer",
-            "certificate_hash": "e56ec8d9febe68af94a29dc9a3371d6e328f1999"
-          }
-        },
-        {
-          "client_id": "59887336692-g2csgf2rham3kluflh0tvn5743nmfi0d.apps.googleusercontent.com",
-          "client_type": 1,
-          "android_info": {
-            "package_name": "com.netsofters.etaxicustomer",
-            "certificate_hash": "76c9d93a37885b22b529785ec90312f207aba66b"
-          }
-        },
-        {
-          "client_id": "59887336692-hfan71564egp6lhdmv5chlqo7ku9lr84.apps.googleusercontent.com",
-          "client_type": 1,
-          "android_info": {
-            "package_name": "com.netsofters.etaxicustomer",
-            "certificate_hash": "04bbb3548c4c0d7ccd52f119e2207d8c10d21c93"
-          }
-        },
-        {
-          "client_id": "59887336692-jugg4g961pkuutbinjto05bvh7hpilnn.apps.googleusercontent.com",
-          "client_type": 1,
-          "android_info": {
-            "package_name": "com.netsofters.etaxicustomer",
-            "certificate_hash": "d0571a1cf691c8c9b832ba89a215d04136789357"
-          }
-        },
-        {
-          "client_id": "59887336692-ntbvgunh1ihvu81pupkd2eshrn8nmfl4.apps.googleusercontent.com",
-          "client_type": 1,
-          "android_info": {
-            "package_name": "com.netsofters.etaxicustomer",
-            "certificate_hash": "48b5d2d06674132d0872845de4832e7d38be55c3"
-          }
-        },
-        {
-          "client_id": "59887336692-ps1nt7i0jls47nfr2492e4j04tfn18km.apps.googleusercontent.com",
-          "client_type": 1,
-          "android_info": {
-            "package_name": "com.netsofters.etaxicustomer",
-            "certificate_hash": "fa97eee3083973afd09661bb9a915315386eb567"
-          }
-        },
-        {
-          "client_id": "59887336692-qvtk1mk8s43qll8b67310n6cai24i72r.apps.googleusercontent.com",
-          "client_type": 1,
-          "android_info": {
-            "package_name": "com.netsofters.etaxicustomer",
-            "certificate_hash": "9028c3a86eb15ed97219cf86868ec29ebd3f8a90"
-          }
-        },
-        {
-          "client_id": "59887336692-uhbut6fa4v556p6bqppld0g72flhnmvb.apps.googleusercontent.com",
-          "client_type": 1,
-          "android_info": {
-            "package_name": "com.netsofters.etaxicustomer",
-            "certificate_hash": "ec14a39c01829bbcd809116a7c9db70eb3a5d5bc"
-          }
-        },
-        {
-          "client_id": "59887336692-hlpf5ohel9i5misjild4ahb42hjt5c9c.apps.googleusercontent.com",
+          "client_id": "938558243123-61g4sf2rcuju7dp7bjht413k57phq916.apps.googleusercontent.com",
           "client_type": 3
         }
       ],
       "api_key": [
         {
-          "current_key": "AIzaSyAXlQszBfDnu5LgNPvYQAJtF2-NXlXf8tk"
+          "current_key": "AIzaSyAjKZRL3iQpPqqH0qVU_nOISoFkqmpxbjc"
         }
       ],
       "services": {
         "appinvite_service": {
           "other_platform_oauth_client": [
             {
-              "client_id": "59887336692-hlpf5ohel9i5misjild4ahb42hjt5c9c.apps.googleusercontent.com",
+              "client_id": "938558243123-61g4sf2rcuju7dp7bjht413k57phq916.apps.googleusercontent.com",
               "client_type": 3
-            },
-            {
-              "client_id": "59887336692-aeq9adjidn8c3emrr9uqu7f5mc8mnnkt.apps.googleusercontent.com",
-              "client_type": 2,
-              "ios_info": {
-                "bundle_id": "com.netsofters.etaxidriver"
-              }
-            }
-          ]
-        }
-      }
-    },
-    {
-      "client_info": {
-        "mobilesdk_app_id": "1:59887336692:android:154356566626dfc8ccf2a1",
-        "android_client_info": {
-          "package_name": "com.netsofters.etaxidriver"
-        }
-      },
-      "oauth_client": [
-        {
-          "client_id": "59887336692-0ltrmarstk7nvnu1a5udhnji9kr6g77s.apps.googleusercontent.com",
-          "client_type": 1,
-          "android_info": {
-            "package_name": "com.netsofters.etaxidriver",
-            "certificate_hash": "e56ec8d9febe68af94a29dc9a3371d6e328f1999"
-          }
-        },
-        {
-          "client_id": "59887336692-27s531pulcu69g3vnjphpdqhgvu379ns.apps.googleusercontent.com",
-          "client_type": 1,
-          "android_info": {
-            "package_name": "com.netsofters.etaxidriver",
-            "certificate_hash": "76c9d93a37885b22b529785ec90312f207aba66b"
-          }
-        },
-        {
-          "client_id": "59887336692-4e5ubrtf3kqf37umnmki4r3g6cp0vuuf.apps.googleusercontent.com",
-          "client_type": 1,
-          "android_info": {
-            "package_name": "com.netsofters.etaxidriver",
-            "certificate_hash": "d0571a1cf691c8c9b832ba89a215d04136789357"
-          }
-        },
-        {
-          "client_id": "59887336692-7e8unkf620m4d8ftf7d6r6shoidcjdlp.apps.googleusercontent.com",
-          "client_type": 1,
-          "android_info": {
-            "package_name": "com.netsofters.etaxidriver",
-            "certificate_hash": "9028c3a86eb15ed97219cf86868ec29ebd3f8a90"
-          }
-        },
-        {
-          "client_id": "59887336692-7hhsllrj8dteolu29m2rjr4c5r0cia6q.apps.googleusercontent.com",
-          "client_type": 1,
-          "android_info": {
-            "package_name": "com.netsofters.etaxidriver",
-            "certificate_hash": "48b5d2d06674132d0872845de4832e7d38be55c3"
-          }
-        },
-        {
-          "client_id": "59887336692-8akflk0uv1e81acpjot1nkmd1go062q9.apps.googleusercontent.com",
-          "client_type": 1,
-          "android_info": {
-            "package_name": "com.netsofters.etaxidriver",
-            "certificate_hash": "fa97eee3083973afd09661bb9a915315386eb567"
-          }
-        },
-        {
-          "client_id": "59887336692-c1qcugn6pkmhl3qm1oubq2sohjgkkpgb.apps.googleusercontent.com",
-          "client_type": 1,
-          "android_info": {
-            "package_name": "com.netsofters.etaxidriver",
-            "certificate_hash": "ec14a39c01829bbcd809116a7c9db70eb3a5d5bc"
-          }
-        },
-        {
-          "client_id": "59887336692-sp3d7l47lcf9293j77h0aj7jp66gipct.apps.googleusercontent.com",
-          "client_type": 1,
-          "android_info": {
-            "package_name": "com.netsofters.etaxidriver",
-            "certificate_hash": "85b8167a9e967660f1d5e9697170cf56a0d27ea4"
-          }
-        },
-        {
-          "client_id": "59887336692-hlpf5ohel9i5misjild4ahb42hjt5c9c.apps.googleusercontent.com",
-          "client_type": 3
-        }
-      ],
-      "api_key": [
-        {
-          "current_key": "AIzaSyAXlQszBfDnu5LgNPvYQAJtF2-NXlXf8tk"
-        }
-      ],
-      "services": {
-        "appinvite_service": {
-          "other_platform_oauth_client": [
-            {
-              "client_id": "59887336692-hlpf5ohel9i5misjild4ahb42hjt5c9c.apps.googleusercontent.com",
-              "client_type": 3
-            },
-            {
-              "client_id": "59887336692-aeq9adjidn8c3emrr9uqu7f5mc8mnnkt.apps.googleusercontent.com",
-              "client_type": 2,
-              "ios_info": {
-                "bundle_id": "com.netsofters.etaxidriver"
-              }
             }
           ]
         }

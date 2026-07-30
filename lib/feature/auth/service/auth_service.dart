@@ -73,6 +73,7 @@ class AuthService {
           "device_token": fcm,
           "country_code": countryCode,
           "firebase_uid": fUid,
+          "firebase_id_token": firebaseIdToken,
         },
       );
 
@@ -91,6 +92,7 @@ class AuthService {
     required String fcmToken,
     required String loginType,
     required String fUid,
+    String firebaseIdToken = '',
   }) async {
     try {
       final res = await Api().post(
@@ -101,6 +103,7 @@ class AuthService {
           "device_token": fcmToken,
           "auth_provider": loginType,
           "firebase_uid": fUid,
+          "firebase_id_token": firebaseIdToken,
         },
       );
       await ResponseHandler.checkResponseError(res);
@@ -120,6 +123,7 @@ class AuthService {
     String name = "",
     String id = "",
     String profileImage = "",
+    String firebaseIdToken = '',
   }) async {
     try {
       final res = await Api().post(
@@ -132,6 +136,7 @@ class AuthService {
           "id": id,
           "profile_image": profileImage,
           "firebase_uid": fUid,
+          "firebase_id_token": firebaseIdToken,
         },
       );
       await ResponseHandler.checkResponseError(res);

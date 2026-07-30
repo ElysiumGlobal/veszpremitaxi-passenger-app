@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:e_taxi/core/auth/firebase_session.dart';
 import 'package:e_taxi/feature/home/widget/dialog.dart';
 import 'package:e_taxi/feature/profile/controller/profile_controller.dart';
 import 'package:e_taxi/utils/app_colors.dart';
@@ -301,6 +302,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               final res = await profileController
                                   .deleteAccount();
                               if (res.isNotEmpty) {
+                                await FirebaseSession.signOut();
                                 await AppPreference.clearSharedPreferences();
                                 Get.delete<HomeController>(force: true);
                                 Navigation.replaceAll(Routes.loginScreen);
@@ -369,6 +371,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               final res = await profileController
                                   .logOutAccount();
                               if (res.isNotEmpty) {
+                                await FirebaseSession.signOut();
                                 await AppPreference.clearSharedPreferences();
                                 Get.delete<HomeController>(force: true);
                                 Navigation.replaceAll(Routes.loginScreen);

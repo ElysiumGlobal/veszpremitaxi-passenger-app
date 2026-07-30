@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:e_taxi/core/auth/firebase_session.dart';
 import 'package:e_taxi/utils/api_constants.dart';
 import 'package:e_taxi/utils/app_colors.dart';
 import 'package:e_taxi/utils/app_preferences.dart';
@@ -63,7 +64,7 @@ class _SplaceScreenState extends State<SplaceScreen> {
     ]);
 
     if (!mounted) return;
-    redirect();
+    await redirect();
   }
 
   Future<void> getSetting() async {
@@ -83,7 +84,7 @@ class _SplaceScreenState extends State<SplaceScreen> {
     }
   }
 
-  void redirect() {
+  Future<void> redirect() async {
     final onboarding = AppPreference.getBoolean(AppPreference.onboardingDone);
 
     if (!onboarding) {
@@ -94,7 +95,11 @@ class _SplaceScreenState extends State<SplaceScreen> {
     final userToken = AppPreference.getString(AppPreference.userToken);
     final userLogin = AppPreference.getBoolean(AppPreference.userLogin);
 
-    if (userToken.isEmpty || !userLogin) {
+    if (userToken.isEmpty ||
+        !userLogin ||
+        !FirebaseSession.hasSignedInUser) {
+      await AppPreference.setString(AppPreference.userToken, '');
+      await AppPreference.setBoolean(AppPreference.userLogin, value: false);
       Navigation.replaceAll(Routes.loginScreen);
       return;
     }

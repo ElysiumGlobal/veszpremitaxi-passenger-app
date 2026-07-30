@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:developer';
+import 'package:e_taxi/core/auth/firebase_session.dart';
 import 'package:e_taxi/utils/app_preferences.dart';
 import 'package:e_taxi/utils/navigation_utils/navigation.dart';
 import 'package:get/get.dart' hide Response;
@@ -31,6 +32,7 @@ class LoggerInterceptor extends InterceptorContract {
       if (response.statusCode == 401 &&
           (data['message'] == "Invalid or expired token" ||
               data['message'] == "User logged in on another device")) {
+        await FirebaseSession.signOut();
         await AppPreference.clearSharedPreferences();
         Get.delete<HomeController>(force: true);
         Navigation.replaceAll(Routes.loginScreen);

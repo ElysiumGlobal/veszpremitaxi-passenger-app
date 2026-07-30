@@ -26,7 +26,9 @@ class DefaultFirebaseOptions {
       case TargetPlatform.android:
         return android;
       case TargetPlatform.iOS:
-        return ios;
+        throw UnsupportedError(
+          'The Veszprémi Taxi iOS Firebase app has not been registered yet.',
+        );
       case TargetPlatform.macOS:
         throw UnsupportedError(
           'DefaultFirebaseOptions have not been configured for macos - '
@@ -50,23 +52,11 @@ class DefaultFirebaseOptions {
   }
 
   static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'AIzaSyAXlQszBfDnu5LgNPvYQAJtF2-NXlXf8tk',
-    appId: '1:59887336692:android:8bc6dfe0f607e98eccf2a1',
-    messagingSenderId: '59887336692',
-    projectId: 'e-taxi-649bb',
-    storageBucket: 'e-taxi-649bb.firebasestorage.app',
+    apiKey: 'AIzaSyAjKZRL3iQpPqqH0qVU_nOISoFkqmpxbjc',
+    appId: '1:938558243123:android:113dc1a612779946207e46',
+    messagingSenderId: '938558243123',
+    projectId: 'vtaxi-503221',
+    storageBucket: 'vtaxi-503221.firebasestorage.app',
   );
 
-  static const FirebaseOptions ios = FirebaseOptions(
-    apiKey: 'AIzaSyDYWm4r3kh3fnOJGT0guI8BfPBdmaY0OAo',
-    appId: '1:59887336692:ios:d784ba0909c50f05ccf2a1',
-    messagingSenderId: '59887336692',
-    projectId: 'e-taxi-649bb',
-    storageBucket: 'e-taxi-649bb.firebasestorage.app',
-    androidClientId:
-        '59887336692-27s531pulcu69g3vnjphpdqhgvu379ns.apps.googleusercontent.com',
-    iosClientId:
-        '59887336692-i66540aloq7807nl2s734amtr1c4lrnl.apps.googleusercontent.com',
-    iosBundleId: 'com.netsofters.etaxicustomer',
-  );
 }

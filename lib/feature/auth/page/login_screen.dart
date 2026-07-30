@@ -15,7 +15,6 @@ import 'package:e_taxi/widgets/custome_img.dart';
 import 'package:e_taxi/widgets/custom_button.dart';
 import 'package:e_taxi/widgets/custom_textfeild.dart';
 import 'package:e_taxi/widgets/webview_screen.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -31,21 +30,6 @@ class LoginScreen extends StatefulWidget {
 
 class _LoginScreenState extends State<LoginScreen> {
   final AuthController _authController = Get.put(AuthController());
-
-  @override
-  void initState() {
-    super.initState();
-
-    // Presentation convenience only. Release builds never receive demo values.
-    if (kDebugMode) {
-      if (_authController.emailController.text.trim().isEmpty) {
-        _authController.emailController.text = 'utas@veszpremitaxi.hu';
-      }
-      if (_authController.passwordController.text.isEmpty) {
-        _authController.passwordController.text = 'Vap12345';
-      }
-    }
-  }
 
   Future<void> _continueWithEmail() async {
     final email = _authController.emailController.text.trim();
@@ -187,7 +171,7 @@ class _LoginScreenState extends State<LoginScreen> {
             ),
             8.verticalSpace,
             Text(
-              'Add meg az e-mail-címedet és a jelszavadat. Új utasként a következő lépésben létrehozhatod a profilodat.',
+              'Lépj be Google-fiókkal, vagy add meg az e-mail-címedet és a jelszavadat. Új e-mail-címnél a fiók automatikusan létrejön.',
               style: TextStyle(
                 color: AppColors.textCaptionColor,
                 fontSize: 14.sp,
@@ -292,7 +276,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   10.horizontalSpace,
                   Expanded(
                     child: Text(
-                      'A telefonszámodat később, a profilodban kérjük el. Ehhez nem küldünk SMS-kódot.',
+                      'A telefonszámodat az első fizetés előtt kérjük el. Ehhez nem küldünk SMS-kódot.',
                       style: TextStyle(
                         color: AppColors.brandNavy,
                         fontSize: 13.sp,

@@ -13,6 +13,8 @@ class AppPreference {
   static const String userToken = "userToken1";
   static const String userLogin = "userLogin1";
 
+  static const String profileCompletionPending = "profileCompletionPending1";
+
   static const String userModel = "userModel1";
   static const String languageIndex = "languageIndex";
   static const String userLoginDetailsModel = "userLoginDetailsModel1";

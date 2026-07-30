@@ -44,7 +44,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
           30.verticalSpace,
           CustomTextField(
             controller: emailController,
-            hintText: "John@gmail.com",
+            hintText: "pelda@email.hu",
           ),
         ],
       ).paddingAll(16.w),
@@ -72,10 +72,16 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                 Get.back();
                 AppSnackBar.showErrorSnackBar(
                   message:
-                      "We have sent you a email on ${emailController.text.trim()}",
+                      "Elküldtük a jelszó-visszaállító levelet: ${emailController.text.trim()}",
                 );
-              } catch (e) {
-                LogUtils.printAction("Send forgot email error::$e");
+              } on FirebaseAuthException catch (error) {
+                LogUtils.printAction("Send forgot email error::$error");
+                AppSnackBar.showErrorSnackBar(
+                  message: error.code == 'user-not-found'
+                      ? 'Ehhez az e-mail-címhez nem tartozik fiók.'
+                      : 'A jelszó-visszaállítás nem sikerült.',
+                  isError: true,
+                );
               }
             },
           ),

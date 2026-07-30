@@ -1,8 +1,9 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:developer';
-import 'dart:io' show Platform;
 
+import 'package:e_taxi/core/api/exception/app_exception.dart';
+import 'package:e_taxi/core/auth/firebase_session.dart';
 import 'package:e_taxi/core/debug/passenger_flow_debug.dart';
 import 'package:country_pickers/country.dart';
 import 'package:country_pickers/utils/utils.dart';
@@ -111,6 +112,34 @@ class AuthController extends GetxController with LoadingMixin, LoadingApiMixin {
     return _auth.currentUser?.uid ?? "";
   }
 
+  Future<String> _firebaseIdToken() async {
+    return FirebaseSession.idToken();
+  }
+
+  String _firebaseErrorMessage(FirebaseAuthException error) {
+    switch (error.code) {
+      case 'invalid-email':
+        return 'Az e-mail-cím formátuma hibás.';
+      case 'weak-password':
+        return 'A jelszó legalább 6 karakter legyen.';
+      case 'wrong-password':
+      case 'invalid-credential':
+        return 'Hibás e-mail-cím vagy jelszó.';
+      case 'user-disabled':
+        return 'Ez a felhasználói fiók le van tiltva.';
+      case 'too-many-requests':
+        return 'Túl sok sikertelen próbálkozás történt. Próbáld újra később.';
+      case 'network-request-failed':
+        return 'Nincs megfelelő internetkapcsolat.';
+      case 'operation-not-allowed':
+        return 'Ez a belépési mód még nincs engedélyezve.';
+      case 'account-exists-with-different-credential':
+        return 'Ehhez az e-mail-címhez már más belépési mód tartozik.';
+      default:
+        return error.message ?? 'A belépés nem sikerült. Próbáld újra.';
+    }
+  }
+
   String? _verificationId;
 
   Future<void> firebaseOtpSend({bool isResend = false}) async {
@@ -215,73 +244,59 @@ class AuthController extends GetxController with LoadingMixin, LoadingApiMixin {
     );
   }
 
-  Future<Map> firbaseEmailLogin({
+  Future<Map<String, dynamic>> firbaseEmailLogin({
     required String email,
     required String password,
   }) async {
-    Map res = {'old': true, "done": false};
-    if (!BuildConfig.firebaseEnabled) return res;
+    final Map<String, dynamic> result = <String, dynamic>{
+      'old': true,
+      'done': false,
+      'verification_sent': false,
+    };
 
-    final FirebaseAuth auth = _auth;
+    if (!BuildConfig.firebaseEnabled) return result;
+
     try {
-      // 🔹 Try signing in first
-      UserCredential userCredential = await auth.createUserWithEmailAndPassword(
+      final UserCredential credential =
+          await _auth.createUserWithEmailAndPassword(
         email: email,
         password: password,
       );
-      LogUtils.printWhite("✅ Logged in as ${userCredential.user!.email}");
-      AppSnackBar.showErrorSnackBar(
-        message: "${AppString.emailVeriflinkSend} $email",
-        dismisDuration: 10,
-        isError: true,
-      );
-      res['done'] = true;
-      res['old'] = false;
-      _auth.currentUser?.sendEmailVerification();
-      return res;
-    } on FirebaseAuthException catch (e) {
-      LogUtils.printWhite("ECODE::::::${e.code}");
-      if (e.code == 'email-already-in-use') {
-        // 🔹 No user found → create new account
-        LogUtils.printWhite("👤 User already register Sign in ...");
-        try {
-          UserCredential newUser = await auth.signInWithEmailAndPassword(
-            email: email,
-            password: password,
-          );
-          LogUtils.printWhite(
-            "✅ New account created for ${newUser.user!.email}",
-          );
 
-          res['done'] = true;
-          return res;
-        } on FirebaseAuthException catch (createError) {
-          LogUtils.printWhite(
-            "❌ sign  in  user: ${createError.code}::${createError.message}",
-          );
-          handleLoading(false);
-          AppSnackBar.showErrorSnackBar(
-            message: createError.code,
-            isError: true,
-          );
+      result['done'] = true;
+      result['old'] = false;
 
-          return res;
-        }
-      } else if (e.code == 'wrong-password') {
-        LogUtils.printWhite("❌ Wrong password for this account");
-        handleLoading(false);
+      try {
+        await credential.user?.sendEmailVerification();
+        result['verification_sent'] = true;
+      } catch (error) {
+        LogUtils.printAction('Verification email warning::$error');
+      }
+
+      return result;
+    } on FirebaseAuthException catch (error) {
+      if (error.code != 'email-already-in-use') {
         AppSnackBar.showErrorSnackBar(
-          message: AppString.wrongPassword.tr,
+          message: _firebaseErrorMessage(error),
           isError: true,
         );
-        return res;
-      } else {
-        LogUtils.printWhite(
-          "❌ Auth error: ${e.message}:: email:$email >>password::  $password",
+        return result;
+      }
+
+      try {
+        await _auth.signInWithEmailAndPassword(
+          email: email,
+          password: password,
         );
-        handleLoading(false);
-        AppSnackBar.showErrorSnackBar(message: "Try Again", isError: true);
-        return res;
+        result['done'] = true;
+        result['old'] = true;
+        return result;
+      } on FirebaseAuthException catch (signInError) {
+        AppSnackBar.showErrorSnackBar(
+          message: _firebaseErrorMessage(signInError),
+          isError: true,
+        );
+        return result;
       }
     }
   }
@@ -289,23 +304,23 @@ class AuthController extends GetxController with LoadingMixin, LoadingApiMixin {
   String profileImage = "";
 
   Future<void> emailLogin() async {
-    final email = emailController.text.trim();
-    final password = passwordController.text.trim();
+    final String email = emailController.text.trim();
+    final String password = passwordController.text.trim();
 
     dynamic emailState;
     try {
       emailState = await AuthService.emailCheck(email: email);
-    } catch (e) {
-      LogUtils.printAction('Email check error::$e');
+    } catch (error) {
+      LogUtils.printAction('Email check warning::$error');
     }
 
-    final data = emailState is Map ? emailState['data'] : null;
-    final isRegistered = data is Map && data['is_register'].toString() == '1';
-    final loginDevice = data is Map
+    final dynamic data = emailState is Map ? emailState['data'] : null;
+    final String loginDevice = data is Map
         ? (data['login_device'] ?? '').toString().toLowerCase()
         : '';
+    final bool backendAccountExists = data is Map && loginDevice.isNotEmpty;
 
-    if (isRegistered && loginDevice.isNotEmpty && loginDevice != 'email') {
+    if (backendAccountExists && loginDevice != 'email') {
       AppSnackBar.showErrorSnackBar(
         message:
             'Ez az e-mail-cím korábban más belépési móddal lett regisztrálva.',
@@ -314,175 +329,170 @@ class AuthController extends GetxController with LoadingMixin, LoadingApiMixin {
       return;
     }
 
-    // Until the Veszprémi Taxi Firebase project is connected, email/password
-    // authentication goes directly to the Laravel backend. This keeps the
-    // passenger app independent from the vendor Firebase project.
     if (!BuildConfig.firebaseEnabled) {
-      await processApi(
-        () => AuthService.emailLogin(
-          email: email,
-          pass: password,
-          fcmToken: '',
-          loginType: 'email',
-          fUid: '',
-        ),
-        result: (result) {
-          AppPreference.setBoolean(AppPreference.onboardingDone, value: true);
-          AppConstant().userLoginType = LoginType.email.name;
-          phoneController.clear();
-          redirectUser(result, loginType: 'email');
-        },
-        error: (error, stack) {
-          LogUtils.printError('Direct email login error::$error\n$stack');
-        },
-        loading: handleLoading,
+      AppSnackBar.showErrorSnackBar(
+        message: 'A biztonságos belépési szolgáltatás nem érhető el.',
+        isError: true,
       );
       return;
     }
 
     handleLoading(true);
     try {
-      final firebaseResult = await firbaseEmailLogin(
+      // A már létező Laravel-fiókokat előbb a régi jelszóval ellenőrizzük.
+      // Így hibás jelszóval nem jöhet létre külön Firebase-fiók.
+      if (backendAccountExists) {
+        await AuthService.emailLogin(
+          email: email,
+          pass: password,
+          fcmToken: '',
+          loginType: 'email',
+          fUid: '',
+        );
+      }
+
+      final Map<String, dynamic> firebaseResult = await firbaseEmailLogin(
         email: email,
         password: password,
       );
 
       if (firebaseResult['done'] != true) return;
 
-      await _auth.currentUser?.reload();
-      if (_auth.currentUser?.emailVerified == false) {
-        if (firebaseResult['old'] == true) {
-          await _auth.currentUser?.sendEmailVerification();
-          AppSnackBar.showErrorSnackBar(
-            message: AppString.emailnotVerified,
-            dismisDuration: 10,
-            isError: true,
-          );
-        }
-        return;
-      }
-
       await _ensureFcmToken();
-      final result = await AuthService.emailLogin(
+      final UserLoginModel result = await AuthService.emailLogin(
         email: email,
         pass: password,
         fcmToken: FireBaseNotification().fcmToken,
         loginType: 'email',
         fUid: _firebaseUid,
+        firebaseIdToken: await _firebaseIdToken(),
       );
 
-      AppPreference.setBoolean(AppPreference.onboardingDone, value: true);
+      await AppPreference.setBoolean(
+        AppPreference.onboardingDone,
+        value: true,
+      );
       AppConstant().userLoginType = LoginType.email.name;
       phoneController.clear();
-      redirectUser(result, loginType: 'email');
-    } catch (e, st) {
-      LogUtils.printError('Firebase email login error::$e\n$st');
+
+      if (firebaseResult['verification_sent'] == true) {
+        AppSnackBar.showErrorSnackBar(
+          message:
+              'A fiók létrejött. Küldtünk egy e-mailes megerősítő linket is.',
+          dismisDuration: 5,
+        );
+      }
+
+      await redirectUser(result, loginType: 'email');
+    } on FirebaseAuthException catch (error) {
+      AppSnackBar.showErrorSnackBar(
+        message: _firebaseErrorMessage(error),
+        isError: true,
+      );
+    } on AppException catch (error, stack) {
+      LogUtils.printError('Laravel email login error::$error\n$stack');
+      // A ResponseHandler már megjelenítette a szerver pontos üzenetét.
+    } catch (error, stack) {
+      LogUtils.printError('Firebase email login error::$error\n$stack');
+      AppSnackBar.showErrorSnackBar(
+        message: 'A belépés nem sikerült. Próbáld újra.',
+        isError: true,
+      );
     } finally {
       handleLoading(false);
     }
   }
 
-  static const _googleWebClientId =
-      '59887336692-hlpf5ohel9i5misjild4ahb42hjt5c9c.apps.googleusercontent.com';
+  static const String _googleWebClientId =
+      '938558243123-61g4sf2rcuju7dp7bjht413k57phq916.apps.googleusercontent.com';
 
-  GoogleSignIn _createGoogleSignIn() => GoogleSignIn(
-    scopes: ['email'],
-    serverClientId: Platform.isIOS ? _googleWebClientId : null,
-  );
-
-  GoogleSignIn _googleSignIn = GoogleSignIn(
-    scopes: ['email'],
-    serverClientId: Platform.isIOS ? _googleWebClientId : null,
+  late final GoogleSignIn _googleSignIn = GoogleSignIn(
+    scopes: <String>['email', 'profile'],
+    serverClientId: _googleWebClientId,
   );
 
   String googleEmail = "";
 
-  Future<UserLoginModel> _googleAuthLogin() async {
-    try {
-      if (!BuildConfig.firebaseEnabled) {
-        throw StateError('Firebase Auth is disabled for this build.');
-      }
-
-      profileImage = "";
-      if (_auth.currentUser != null) {
-        try {
-          await _createGoogleSignIn().signOut();
-        } catch (_) {}
-        await _auth.signOut();
-      }
-
-      final UserCredential userCredential;
-      if (Platform.isAndroid) {
-        final GoogleAuthProvider provider = GoogleAuthProvider();
-        provider.addScope('email');
-        userCredential = await _auth.signInWithProvider(provider);
-      } else {
-        _googleSignIn = _createGoogleSignIn();
-        final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
-        if (googleUser == null) {
-          throw "User are close";
-        }
-        final GoogleSignInAuthentication googleAuth =
-            await googleUser.authentication;
-
-        final AuthCredential credential = GoogleAuthProvider.credential(
-          accessToken: googleAuth.accessToken,
-          idToken: googleAuth.idToken,
-        );
-        userCredential = await _auth.signInWithCredential(credential);
-      }
-
-      googleEmail = userCredential.user?.email ?? "";
-      profileImage = userCredential.user?.photoURL ?? "";
-      String name = userCredential.user?.displayName ?? "";
-
-      // print(">>>>>>>${userCredential.user?.photoURL??""}");
-
-      await _ensureFcmToken();
-      return await AuthService.googleLogin(
-        fUid: _firebaseUid,
-        email: userCredential.user?.email ?? "",
-        fcmToken: FireBaseNotification().fcmToken,
-        type: "google",
-        profileImage: profileImage,
-        name: name,
-      );
-    } catch (e, st) {
-      LogUtils.printWhite("ERROR:::$e\n\n$st");
-      log(">>>>>>>>>>>>>>>>$e, $st");
-      if (e == "User are close") {
-      } else if (e.toString() ==
-          "PlatformException(sign_in_failed, com.google.GIDSignIn, access_denied, null)") {
-      } else {
-        AppSnackBar.showErrorSnackBar(message: e.toString(), isError: true);
-      }
-
-      rethrow;
+  Future<UserLoginModel?> _googleAuthLogin() async {
+    if (!BuildConfig.googleLoginEnabled) {
+      throw StateError('Google login is disabled for this build.');
     }
+
+    profileImage = "";
+
+    try {
+      await _googleSignIn.signOut();
+    } catch (_) {
+      // The first login has no previous Google session.
+    }
+
+    final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
+    if (googleUser == null) return null;
+
+    final GoogleSignInAuthentication googleAuth =
+        await googleUser.authentication;
+    final AuthCredential credential = GoogleAuthProvider.credential(
+      accessToken: googleAuth.accessToken,
+      idToken: googleAuth.idToken,
+    );
+
+    final UserCredential userCredential =
+        await _auth.signInWithCredential(credential);
+    final User? firebaseUser = userCredential.user;
+
+    googleEmail = firebaseUser?.email ?? googleUser.email;
+    profileImage = firebaseUser?.photoURL ?? '';
+    final String name =
+        firebaseUser?.displayName ?? googleUser.displayName ?? '';
+
+    await _ensureFcmToken();
+    return AuthService.googleLogin(
+      fUid: firebaseUser?.uid ?? '',
+      email: googleEmail,
+      fcmToken: FireBaseNotification().fcmToken,
+      type: 'google',
+      profileImage: profileImage,
+      name: name,
+      id: googleUser.id,
+      firebaseIdToken: await _firebaseIdToken(),
+    );
   }
 
-  Future googleLogin() async {
+  Future<void> googleLogin() async {
     if (!BuildConfig.googleLoginEnabled) {
       AppSnackBar.showErrorSnackBar(
-        message: 'A Google-belépés a saját Veszprémi Taxi Firebase bekötése után aktiválódik.',
+        message: 'A Google-belépés jelenleg nem érhető el.',
         isError: true,
       );
       return;
     }
 
-    processApi(
-      () => _googleAuthLogin(),
-      result: (data) {
-        LogUtils.showLogs(message: "boddy:::$data");
-        AppPreference.setBoolean(AppPreference.onboardingDone, value: true);
-        AppConstant().userLoginType = LoginType.google.name;
+    handleLoading(true);
+    try {
+      final UserLoginModel? data = await _googleAuthLogin();
+      if (data == null) return;
 
-        phoneController.text = "";
-
-        redirectUser(data, loginType: "google");
-      },
-      loading: handleLoading,
-    );
+      await AppPreference.setBoolean(
+        AppPreference.onboardingDone,
+        value: true,
+      );
+      AppConstant().userLoginType = LoginType.google.name;
+      phoneController.clear();
+      await redirectUser(data, loginType: 'google');
+    } on FirebaseAuthException catch (error) {
+      AppSnackBar.showErrorSnackBar(
+        message: _firebaseErrorMessage(error),
+        isError: true,
+      );
+    } catch (error, stack) {
+      LogUtils.printError('Google login error::$error\n$stack');
+      AppSnackBar.showErrorSnackBar(
+        message: 'A Google-belépés nem sikerült. Próbáld újra.',
+        isError: true,
+      );
+    } finally {
+      handleLoading(false);
+    }
   }
 
   Future<UserLoginModel> _appleUserLogin() async {
@@ -512,6 +522,7 @@ class AuthController extends GetxController with LoadingMixin, LoadingApiMixin {
       name: userName,
       id: userId,
       fUid: _firebaseUid,
+      firebaseIdToken: await _firebaseIdToken(),
     );
   }
 
@@ -544,67 +555,52 @@ class AuthController extends GetxController with LoadingMixin, LoadingApiMixin {
     bool isOtp = false,
     required String loginType,
   }) async {
-    print(">>>>>>redirect    asdasd${data.toJson()}");
     clearTextField();
     this.loginType = loginType;
-    await AppPreference.setString(
-      AppPreference.userToken,
-      data.token ?? "",
-    );
+
+    final String token = (data.token ?? '').trim();
+    if (token.isEmpty) {
+      AppSnackBar.showErrorSnackBar(
+        message: 'A szerver nem adott érvényes belépési tokent.',
+        isError: true,
+      );
+      return;
+    }
+
+    await AppPreference.setString(AppPreference.userToken, token);
     await AppPreference.setString(
       AppPreference.userId,
-      data.user?.id ?? "",
+      data.user?.id ?? '',
     );
+
+    final bool profilePending = data.user?.isRegister != '1';
+    await AppPreference.setBoolean(
+      AppPreference.profileCompletionPending,
+      value: profilePending,
+    );
+    await AppPreference.setBoolean(AppPreference.userLogin, value: true);
+
     PassengerFlowDebug.send(
       'passenger_auth_token_saved',
       data: <String, dynamic>{
-        'token_present': (data.token ?? '').trim().isNotEmpty,
+        'token_present': true,
         'expected_collector_version':
             PassengerFlowDebug.expectedCollectorVersion,
         'login_type': loginType,
+        'profile_completion_pending': profilePending,
       },
     );
     PassengerFlowDebug.kick();
-    if (data.user?.isRegister == "1") {
-      AppPreference.setBoolean(AppPreference.userLogin, value: true);
-      Navigation.replaceAll(Routes.dashboardScreen);
-    } else {
-      handleLoading(false);
-      try {
-        rEmailController.text = data.user?.email ?? "";
-        phoneController.text = data.user?.phone ?? "";
-        fullNameController.text = data.user?.name ?? "";
-        String countryCodes = (data.user?.countryCode ?? "").isEmpty
-            ? "+36"
-            : data.user?.countryCode ?? "";
 
-        print(">>>>${data.user?.email}:::::${rEmailController.text}");
-        String code = countryCodes.split("+").last;
-
-        countryCode.value = countryCodes;
-        selectedDialogCountry.value = CountryPickerUtils.getCountryByPhoneCode(
-          code,
-        );
-
-        AuthPhoneEmailModel model = AuthPhoneEmailModel(
-          email: emailController.text.trim(),
-          password: passwordController.text.trim(),
-          countryCode: data.user?.countryCode ?? "+36",
-          phone: data.user?.phone ?? "",
-        );
-        if (isOtp) {
-          Navigation.replace(Routes.registerScreen, arguments: model);
-        } else {
-          Navigation.pushNamed(Routes.registerScreen, arg: model);
-        }
-        AppPreference.setString(
-          AppPreference.userLoginDetailsModel,
-          jsonEncode(model.toJson()),
-        );
-      } catch (e, st) {
-        LogUtils.printWhite("ERROR:::$e, $st");
-      }
+    if (profilePending) {
+      AppSnackBar.showErrorSnackBar(
+        message:
+            'Sikeres belépés. A telefonszámot és a fizetési adatokat az első fizetés előtt kérjük el.',
+        dismisDuration: 5,
+      );
     }
+
+    Navigation.replaceAll(Routes.dashboardScreen);
   }
 
   // todo: SinUp
