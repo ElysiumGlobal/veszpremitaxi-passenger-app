@@ -355,7 +355,7 @@ class HomeController extends GetxController with LoadingMixin, LoadingApiMixin {
 
   bool changePolyLine = false;
 
-  void socketData({bool isFirstTime = false}) {
+  Future<void> socketData({bool isFirstTime = false}) async {
     final booking = riderBookingModel.value?.data?.booking;
     final status = (booking?.status ?? '').toLowerCase().trim();
     final bookingId = '${booking?.id ?? AppConstant().bookingId}'.trim();
@@ -475,7 +475,7 @@ class HomeController extends GetxController with LoadingMixin, LoadingApiMixin {
         if (status == 'completed') {
           AppConstant().reportString.value = '';
           if (Get.isRegistered<TripController>()) {
-            await Get.find<TripController>().getTripHistory();
+            unawaited(Get.find<TripController>().getTripHistory());
           }
           Navigation.pushNamed(
             Routes.paymentSelectScreen,

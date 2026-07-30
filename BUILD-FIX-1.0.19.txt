@@ -1,0 +1,5 @@
+Veszprémi Taxi UTASAPP 1.0.19+28
+
+- A getTripHistory hívásból az await teljesen eltávolítva.
+- A hívás unawaited(...) formában fut, ezért szinkron callbackben is fordítható.
+- A debug verziószám 1.0.19+28.
