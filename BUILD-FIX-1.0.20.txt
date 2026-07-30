@@ -1,0 +1,13 @@
+UTASAPP 1.0.20+29 - Firebase build javitas
+
+Javitva:
+1. A sajat Laravel User modell es a firebase_auth.User nevutkozese.
+   A Firebase Auth import most firebase_auth alias alatt fut.
+2. Az AuthService.firebasePhone hianyzo firebaseIdToken parametere.
+3. Telefonos Firebase belepesnel az ID token tovabbitasa a Laravel backendnek.
+
+Erintett fajlok:
+- lib/feature/auth/controller/auth_controller.dart
+- lib/feature/auth/service/auth_service.dart
+
+Az alkalmazas verzioja nem valtozott, mert az elozo 1.0.20+29 build nem keszult el.

@@ -63,6 +63,7 @@ class AuthService {
     required String fcm,
     required String countryCode,
     required String fUid,
+    String firebaseIdToken = '',
   }) async {
     try {
       final res = await Api().post(

@@ -18,7 +18,7 @@ import 'package:e_taxi/utils/enum.dart';
 import 'package:e_taxi/utils/loading_mixin.dart';
 import 'package:e_taxi/utils/log_utils.dart';
 import 'package:e_taxi/widgets/app_snackbar.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:get/get.dart';
@@ -86,11 +86,11 @@ class AuthController extends GetxController with LoadingMixin, LoadingApiMixin {
     );
   }
 
-  FirebaseAuth get _auth {
+  firebase_auth.FirebaseAuth get _auth {
     if (!BuildConfig.firebaseEnabled) {
       throw StateError('Firebase Auth is disabled for this build.');
     }
-    return FirebaseAuth.instance;
+    return firebase_auth.FirebaseAuth.instance;
   }
 
   Future<void> _ensureFcmToken() async {
@@ -116,7 +116,7 @@ class AuthController extends GetxController with LoadingMixin, LoadingApiMixin {
     return FirebaseSession.idToken();
   }
 
-  String _firebaseErrorMessage(FirebaseAuthException error) {
+  String _firebaseErrorMessage(firebase_auth.FirebaseAuthException error) {
     switch (error.code) {
       case 'invalid-email':
         return 'Az e-mail-cím formátuma hibás.';
@@ -152,8 +152,9 @@ class AuthController extends GetxController with LoadingMixin, LoadingApiMixin {
       await _auth.verifyPhoneNumber(
         phoneNumber: phone,
         timeout: const Duration(seconds: 60),
-        verificationCompleted: (PhoneAuthCredential credential) async {},
-        verificationFailed: (FirebaseAuthException e) {
+        verificationCompleted:
+            (firebase_auth.PhoneAuthCredential credential) async {},
+        verificationFailed: (firebase_auth.FirebaseAuthException e) {
           handleLoading(false);
           log("VERIFICTION ERROR ::$e");
           AppSnackBar.showErrorSnackBar(message: "${e.code}", isError: true);
@@ -181,7 +182,8 @@ class AuthController extends GetxController with LoadingMixin, LoadingApiMixin {
 
     handleLoading(true);
     try {
-      PhoneAuthCredential credential = PhoneAuthProvider.credential(
+      final firebase_auth.PhoneAuthCredential credential =
+          firebase_auth.PhoneAuthProvider.credential(
         verificationId: _verificationId!,
         smsCode: otp,
       );
@@ -193,6 +195,7 @@ class AuthController extends GetxController with LoadingMixin, LoadingApiMixin {
         fcm: FireBaseNotification().fcmToken,
         countryCode: countryCode.value,
         fUid: _firebaseUid,
+        firebaseIdToken: await _firebaseIdToken(),
       );
 
       AppPreference.setBoolean(AppPreference.onboardingDone, value: true);
@@ -257,7 +260,7 @@ class AuthController extends GetxController with LoadingMixin, LoadingApiMixin {
     if (!BuildConfig.firebaseEnabled) return result;
 
     try {
-      final UserCredential credential =
+      final firebase_auth.UserCredential credential =
           await _auth.createUserWithEmailAndPassword(
         email: email,
         password: password,
@@ -274,7 +277,7 @@ class AuthController extends GetxController with LoadingMixin, LoadingApiMixin {
       }
 
       return result;
-    } on FirebaseAuthException catch (error) {
+    } on firebase_auth.FirebaseAuthException catch (error) {
       if (error.code != 'email-already-in-use') {
         AppSnackBar.showErrorSnackBar(
           message: _firebaseErrorMessage(error),
@@ -291,7 +294,7 @@ class AuthController extends GetxController with LoadingMixin, LoadingApiMixin {
         result['done'] = true;
         result['old'] = true;
         return result;
-      } on FirebaseAuthException catch (signInError) {
+      } on firebase_auth.FirebaseAuthException catch (signInError) {
         AppSnackBar.showErrorSnackBar(
           message: _firebaseErrorMessage(signInError),
           isError: true,
@@ -384,7 +387,7 @@ class AuthController extends GetxController with LoadingMixin, LoadingApiMixin {
       }
 
       await redirectUser(result, loginType: 'email');
-    } on FirebaseAuthException catch (error) {
+    } on firebase_auth.FirebaseAuthException catch (error) {
       AppSnackBar.showErrorSnackBar(
         message: _firebaseErrorMessage(error),
         isError: true,
@@ -431,14 +434,15 @@ class AuthController extends GetxController with LoadingMixin, LoadingApiMixin {
 
     final GoogleSignInAuthentication googleAuth =
         await googleUser.authentication;
-    final AuthCredential credential = GoogleAuthProvider.credential(
+    final firebase_auth.AuthCredential credential =
+        firebase_auth.GoogleAuthProvider.credential(
       accessToken: googleAuth.accessToken,
       idToken: googleAuth.idToken,
     );
 
-    final UserCredential userCredential =
+    final firebase_auth.UserCredential userCredential =
         await _auth.signInWithCredential(credential);
-    final User? firebaseUser = userCredential.user;
+    final firebase_auth.User? firebaseUser = userCredential.user;
 
     googleEmail = firebaseUser?.email ?? googleUser.email;
     profileImage = firebaseUser?.photoURL ?? '';
@@ -479,7 +483,7 @@ class AuthController extends GetxController with LoadingMixin, LoadingApiMixin {
       AppConstant().userLoginType = LoginType.google.name;
       phoneController.clear();
       await redirectUser(data, loginType: 'google');
-    } on FirebaseAuthException catch (error) {
+    } on firebase_auth.FirebaseAuthException catch (error) {
       AppSnackBar.showErrorSnackBar(
         message: _firebaseErrorMessage(error),
         isError: true,
