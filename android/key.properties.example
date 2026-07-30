@@ -1,5 +1,6 @@
-# Production release signing only. Do not commit real values.
+# Csak helyi, allando alairasos buildhez.
+# A valodi android/key.properties fajlt SOHA ne commitold.
 storePassword=
 keyPassword=
 keyAlias=
-storeFile=/absolute/path/to/upload-keystore.jks
+storeFile=/absolute/path/to/VeszpremiTaxi-Utas-release.jks

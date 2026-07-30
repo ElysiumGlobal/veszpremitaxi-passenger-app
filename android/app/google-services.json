@@ -22,11 +22,27 @@
           }
         },
         {
+          "client_id": "938558243123-b01bu7aait3a6h4hs99g670pc8iv7ruk.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "hu.veszpremitaxi.passenger",
+            "certificate_hash": "0c9c2fa51300cbcf0e9617f6e3710607c8ee9f7d"
+          }
+        },
+        {
           "client_id": "938558243123-co2rcoidtgbrcaontumrltdgubm2rt72.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {
             "package_name": "hu.veszpremitaxi.passenger",
             "certificate_hash": "82185befb71b893776fe18db27b65f1e3a78a73f"
+          }
+        },
+        {
+          "client_id": "938558243123-joj8t3pk7t7o4g58p0bd8e8olqqpuv5d.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "hu.veszpremitaxi.passenger",
+            "certificate_hash": "f3b703b99a0733eff3e1c01388987acc7d0ce2ef"
           }
         },
         {

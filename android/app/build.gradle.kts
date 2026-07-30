@@ -14,11 +14,42 @@ val localProperties = Properties().apply {
     }
 }
 
+val keystoreProperties = Properties().apply {
+    val keystorePropertiesFile = rootProject.file("key.properties")
+    if (keystorePropertiesFile.exists()) {
+        keystorePropertiesFile.inputStream().use { load(it) }
+    }
+}
+
 val googleMapsApiKey =
     localProperties.getProperty("google.maps.api.key")
         ?: providers.gradleProperty("GOOGLE_MAPS_API_KEY").orNull
         ?: System.getenv("GOOGLE_MAPS_API_KEY")
         ?: ""
+
+val cmKeystorePath = System.getenv("CM_KEYSTORE_PATH")
+val cmKeystorePassword = System.getenv("CM_KEYSTORE_PASSWORD")
+val cmKeyAlias = System.getenv("CM_KEY_ALIAS")
+val cmKeyPassword = System.getenv("CM_KEY_PASSWORD")
+
+val hasCodemagicSigning =
+    !cmKeystorePath.isNullOrBlank() &&
+        !cmKeystorePassword.isNullOrBlank() &&
+        !cmKeyAlias.isNullOrBlank() &&
+        !cmKeyPassword.isNullOrBlank()
+
+val localStoreFile = keystoreProperties.getProperty("storeFile")
+val localStorePassword = keystoreProperties.getProperty("storePassword")
+val localKeyAlias = keystoreProperties.getProperty("keyAlias")
+val localKeyPassword = keystoreProperties.getProperty("keyPassword")
+
+val hasKeyPropertiesSigning =
+    !localStoreFile.isNullOrBlank() &&
+        !localStorePassword.isNullOrBlank() &&
+        !localKeyAlias.isNullOrBlank() &&
+        !localKeyPassword.isNullOrBlank()
+
+val hasStableSigning = hasCodemagicSigning || hasKeyPropertiesSigning
 
 android {
     namespace = "hu.veszpremitaxi.passenger"
@@ -43,11 +74,43 @@ android {
         manifestPlaceholders["googleMapsApiKey"] = googleMapsApiKey
     }
 
+    signingConfigs {
+        create("stable") {
+            when {
+                hasCodemagicSigning -> {
+                    storeFile = file(cmKeystorePath!!)
+                    storePassword = cmKeystorePassword
+                    keyAlias = cmKeyAlias
+                    keyPassword = cmKeyPassword
+                }
+
+                hasKeyPropertiesSigning -> {
+                    storeFile = file(localStoreFile!!)
+                    storePassword = localStorePassword
+                    keyAlias = localKeyAlias
+                    keyPassword = localKeyPassword
+                }
+            }
+        }
+    }
+
     buildTypes {
-        release {
-            // Internal test build only. Replace this with the production upload
-            // keystore before publishing to Google Play.
-            signingConfig = signingConfigs.getByName("debug")
+        getByName("debug") {
+            // A Codemagic belso teszt-APK is ugyanazzal az allando kulccsal keszul.
+            // Ha nincs CI/local signing konfiguracio, helyi fejlesztesnel marad a normal debug kulcs.
+            if (hasStableSigning) {
+                signingConfig = signingConfigs.getByName("stable")
+            }
+        }
+
+        getByName("release") {
+            if (!hasStableSigning) {
+                throw GradleException(
+                    "Hianyzik az allando Android alairas. Allitsd be a Codemagic code signingot " +
+                        "vagy az android/key.properties fajlt."
+                )
+            }
+            signingConfig = signingConfigs.getByName("stable")
             isMinifyEnabled = false
             isShrinkResources = false
             proguardFiles(
