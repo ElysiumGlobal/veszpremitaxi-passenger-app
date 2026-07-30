@@ -14,6 +14,14 @@
       },
       "oauth_client": [
         {
+          "client_id": "938558243123-acd488vol41pn9u9vd0ish7b9k7onudm.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "hu.veszpremitaxi.passenger",
+            "certificate_hash": "92e8e5449c1b43f928ced891effd48233aa70732"
+          }
+        },
+        {
           "client_id": "938558243123-co2rcoidtgbrcaontumrltdgubm2rt72.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {
