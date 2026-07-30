@@ -120,7 +120,9 @@ class _RideDetailsScreenState extends State<RideDetailsScreen> {
                       DriverRatingShowWidget(
                         istripList: true,
                         firstSubTitle: AppString.rideFare.tr,
-                        firstTitle: "${tripHistory.pricing?.rideFare}",
+                        firstTitle: Utils.formatCurrency(
+                          tripHistory.pricing?.rideFare,
+                        ),
                         secoundSubTitle: AppString.distance.tr,
                         secoundTitle:
                             tripHistory.locations?.actualDistance ?? "",

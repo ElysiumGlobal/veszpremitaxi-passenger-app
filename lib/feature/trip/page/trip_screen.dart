@@ -24,6 +24,9 @@ class _TripScreenState extends State<TripScreen> {
   void initState() {
     // TODO: implement initState
     super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      tripController.getTripHistory();
+    });
 
     scrollController.addListener(() {
       if (scrollController.position.pixels >=

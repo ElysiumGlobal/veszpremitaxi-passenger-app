@@ -301,9 +301,12 @@ class Utils with LoadingMixin {
   }
 
   static String formatCurrency(String? amount) {
-    final normalizedAmount = (amount == null || amount.isEmpty)
+    final rawAmount = (amount == null || amount.trim().isEmpty)
         ? "0"
-        : amount.replaceAll(",", "");
+        : amount.trim();
+    final normalizedAmount = rawAmount
+        .replaceAll(RegExp(r'[^0-9,.-]'), '')
+        .replaceAll(',', '');
 
     final finalAmount = double.tryParse(normalizedAmount) ?? 0;
 

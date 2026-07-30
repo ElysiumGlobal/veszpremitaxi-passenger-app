@@ -108,7 +108,7 @@ class ProfileController extends GetxController
           return;
         }
 
-        if (isRedirect && (data.isCash ?? 0) == 0) {
+        if (isRedirect) {
           try {
             riderBookingModel.value = NewRideModel.fromJson({
               'data': jsonEncode(currentBooking.toJson()),

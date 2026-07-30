@@ -474,6 +474,9 @@ class HomeController extends GetxController with LoadingMixin, LoadingApiMixin {
 
         if (status == 'completed') {
           AppConstant().reportString.value = '';
+          if (Get.isRegistered<TripController>()) {
+            await Get.find<TripController>().getTripHistory();
+          }
           Navigation.pushNamed(
             Routes.paymentSelectScreen,
             arg: <String, dynamic>{

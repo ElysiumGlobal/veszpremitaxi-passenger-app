@@ -82,9 +82,7 @@ class _DashboardScreenState extends State<DashboardScreen>
         return;
       case 1:
         profileController.getUserData(isRedirect: true);
-        if (tripController.tripHistoryList.isNotEmpty) {
-          tripController.getTripHistory();
-        }
+        tripController.getTripHistory();
         return;
       case 2:
         // walletController.getWalletData();
@@ -106,6 +104,7 @@ class _DashboardScreenState extends State<DashboardScreen>
         data: <String, dynamic>{'selected_tab': dashBoardController.selectedIndex.value},
       );
       profileController.getUserData(isRedirect: true);
+      tripController.getTripHistory();
       if (isOpen == false) {
         LocationService().initialize(
           isopenSetting: false,
