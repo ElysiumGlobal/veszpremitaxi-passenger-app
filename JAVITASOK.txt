@@ -1,0 +1,12 @@
+Veszpremi Taxi Sofor - indulasi javitas
+
+- A hianyzo assets/.env bekerult, es explicit Flutter asset lett.
+- Az indulasi inicializalas nem zarja be az appot Firebase, ertesites vagy terkep-marker hiba eseten.
+- Az ertesitesek es markerkepek az elso kepernyo utan toltodnek be.
+- Az API-cim a sajat szerverre mutat: https://api.veszpremitaxi.hu/api
+- A hibas /apisettings cim /api/settings cimre javult.
+- Ket nem letezo Android service bejegyzes torolve.
+- Alkalmazasnev: Veszpremi Taxi Sofor.
+- Verzio: 1.0.2+8.
+
+Megjegyzes: a Google Maps kulcs erteke tovabbra sincs meg a forrasban. Ettol az app elindul, de a terkephez kesobb valos Android Maps API kulcs kell az assets/.env es az AndroidManifest.xml fajlban.

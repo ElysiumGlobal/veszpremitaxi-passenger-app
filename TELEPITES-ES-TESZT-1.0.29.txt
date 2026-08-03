@@ -1,0 +1,32 @@
+VESZPRÉMI TAXI – SOFŐRAPP 1.0.29+35
+
+KÖTELEZŐ SORREND
+
+1. Töltsd fel a vtaxi-cash-paid-backend-patch-20260730.php fájlt a Laravel public/ mappájába.
+2. Nyisd meg:
+   https://api.veszpremitaxi.hu/vtaxi-cash-paid-backend-patch-20260730.php?key=7c3819f6a8a8441fb75b48e1d1e639da&action=check
+3. Ha az ellenőrzés rendben van, kattints a JAVÍTÁS TELEPÍTÉSE gombra.
+4. A telepítés automatikusan mentést készít a DriverBookingController.php fájlról.
+5. Ezután építsd le a SOFŐRAPP 1.0.29+35 forrást Codemagicben.
+6. Sikeres fizikai teszt után töröld a public/ mappából a PHP telepítőt. A backup maradjon meg.
+
+TESZT
+
+- Új készpénzes fuvar.
+- Elfogadás → Megérkeztem → OTP.
+- Az OTP mezőben írj be 2 számot, várj 3–5 másodpercet, majd írd be a többit.
+- A mező és a billentyűzet maradjon aktív.
+- Fuvar befejezése.
+- Válassz borravalót, majd Készpénz átvéve.
+- A backend válaszában payment_status=paid legyen.
+- Az értékelő képernyőn az utas neve jelenjen meg.
+- Értékelés vagy Kihagyom után vissza a főképernyőre.
+
+VÁRT DEBUG ESEMÉNYEK
+
+otp_input_focus_lost
+otp_input_focus_recovered
+cash_payment_http_response
+cash_payment_marked_paid
+customer_review_submitted vagy customer_review_skipped
+post_ride_flow_finished

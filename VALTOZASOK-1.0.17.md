@@ -1,7 +1,5 @@
-# Veszprémi Taxi UTASAPP 1.0.17+26
+# Veszprémi Taxi Sofőr 1.0.17+23
 
-- A fuvarrészletekben a régi rúpiajel helyett minden viteldíj egységesen forintban jelenik meg.
-- A formázó a backendből érkező örökölt pénznemjeleket eltávolítja.
-- Aktív fuvarba készpénzes vagy félkész tesztfizetési állapot mellett is vissza lehet lépni.
-- A fuvar befejezésekor az utazási előzmények azonnal frissülnek.
-- Az Utazásaim fül megnyitásakor és az app előtérbe kerülésekor új lekérés indul.
+- Javítva a debug buildet megállító Dart importütközés.
+- A `dart:math` import csak a `Random` osztályt hozza be, ezért nem ütközik a `dart:developer` `log()` függvényével.
+- A flow-debug működése és a backend végpont változatlan.

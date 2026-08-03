@@ -1,0 +1,7 @@
+Codemagic hiba:
+Expected ':' before this / nullable Map indexelés a navigation_screen.dart fájlban.
+
+Javítás:
+- nincs több `(value as Map?)?[key]` kifejezés;
+- explicit `is Map` ellenőrzés után történik az indexelés;
+- verzió: 1.0.23+29.

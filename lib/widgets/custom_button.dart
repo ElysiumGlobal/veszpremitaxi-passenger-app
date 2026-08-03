@@ -1,8 +1,11 @@
+import 'package:e_taxi/widgets/common_widget.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 
 import '../utils/app_colors.dart';
+import '../utils/assets.dart';
 import 'custom_loading_widget.dart';
+import 'custome_img.dart';
 
 class CustomButton extends StatefulWidget {
   final double? height;
@@ -23,6 +26,7 @@ class CustomButton extends StatefulWidget {
   final BorderRadius? borderRadius;
   final Color? borderColor;
   final Widget? prefixIconWidget;
+  final bool? sufixIconWidget;
 
   const CustomButton({
     super.key,
@@ -44,6 +48,7 @@ class CustomButton extends StatefulWidget {
     this.disableTextColor,
     this.borderRadius,
     this.prefixIconWidget,
+    this.sufixIconWidget,
   });
 
   @override
@@ -92,6 +97,17 @@ class CustomButtonState extends State<CustomButton> {
                             : widget.textColor ?? AppColors.titleTextColor,
                       ),
                     ),
+                    if (widget.sufixIconWidget ?? false)
+                      Padding(
+                        padding: EdgeInsets.only(left: 10.w),
+                        child: CustomWidget.iconChange(
+                          child: CustomImage(
+                            image: IconAsset.arrowRight,
+                            ht: 24.w,
+                            wt: 24.w,
+                          ),
+                        ),
+                      ),
                   ],
                 ),
         ),

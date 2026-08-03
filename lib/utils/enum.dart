@@ -1,5 +1,5 @@
 enum LoginType {
-  otp("Otp"),
+  phone("Phone"),
   email("Email"),
   google("Google"),
   apple("Apple");

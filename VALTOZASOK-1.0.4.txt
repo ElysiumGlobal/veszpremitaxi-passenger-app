@@ -1,0 +1,10 @@
+Veszpremi Taxi soforapp 1.0.4+10
+
+- Teljes kepernyos, haromlapos Veszpremi Taxi onboarding.
+- A megadott harom Veszpremi Taxi kep hatterkent jelenik meg.
+- Magyar cimek es feliratok.
+- Sotet atmenet a vilagos szovegek olvashatosagaert.
+- Kisebb, beljebb igazitott Tovabb/Belepes gomb.
+- A lapozopontok bal oldalon maradtak.
+- Az onboarding az elozo tesztverzio frissitese utan is egyszer ujra megjelenik.
+- Verzioszam: 1.0.4+10.

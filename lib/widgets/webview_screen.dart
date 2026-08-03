@@ -6,8 +6,6 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
-import '../utils/utils.dart';
-
 class WebviewScreen extends StatefulWidget {
   const WebviewScreen({required this.webUrl, super.key});
 
@@ -21,20 +19,19 @@ class _WebviewScreenState extends State<WebviewScreen> {
   late WebViewController webViewController;
 
   List<String> urlList = [
-    AppConstant().aboutUs,
-    AppConstant().termsCondition,
-    AppConstant().privacyPolicy,
-    AppConstant().contactUs,
+    Constants().aboutUs,
+    Constants().termsCondition,
+    Constants().privacyPolicy,
+    Constants().contactUs,
   ];
 
   List<String> name = [
     AppString.aboutUs,
-    AppString.termCondition,
+    AppString.termOfService,
     AppString.privacyPolicy,
-    AppString.contctUs,
+    AppString.contactUS,
   ];
 
-  @override
   void initState() {
     // TODO: implement initState
     super.initState();
@@ -43,7 +40,6 @@ class _WebviewScreenState extends State<WebviewScreen> {
       ..setNavigationDelegate(
         NavigationDelegate(
           onProgress: (int progress) {
-            // Update loading bar.
           },
           onPageStarted: (String url) {},
           onPageFinished: (String url) {
@@ -76,7 +72,6 @@ class _WebviewScreenState extends State<WebviewScreen> {
       ),
 
       body: SafeArea(
-        bottom: Utils().checkPlatForm,
         child: Obx(
           () => isLoading.value
               ? Center(child: CircularProgressIndicator())

@@ -1,6 +1,11 @@
+import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 class Navigation {
+  static void push(Widget child) {
+    Get.to<dynamic>(child);
+  }
+
   static Future pushNamed(
     String routeName, {
     dynamic arg,
@@ -21,11 +26,19 @@ class Navigation {
     Get.offAndToNamed<dynamic>(routeName, arguments: arg, parameters: params);
   }
 
+  static void leftToRight(Widget child) {
+    Get.to<dynamic>(() => child, transition: Transition.leftToRight);
+  }
+
+  static void rightToLeft(Widget child) {
+    Get.to<dynamic>(() => child, transition: Transition.rightToLeft);
+  }
+
   static Future<void> replace(String routeName, {dynamic arguments}) async {
     await Get.offNamed<dynamic>(routeName, arguments: arguments);
   }
 
-  static void pop({Map<dynamic, dynamic>? data}) {
+  static void pop({Map<String, dynamic>? data}) {
     Get.back<dynamic>(result: data);
   }
 
@@ -33,6 +46,10 @@ class Navigation {
     Get
       ..back<dynamic>()
       ..back<dynamic>();
+  }
+
+  static void removeAll(Widget child) {
+    Get.offAll<dynamic>(child);
   }
 
   static void popupUtil(String routeName) {

@@ -1,0 +1,10 @@
+Veszprémi Taxi Sofőr 1.0.5+11
+
+- Új VAP DRIVER alkalmazásikon minden Android méretben.
+- Sötét, VAP DRIVER logós natív és Flutter betöltőképernyő.
+- A sofőr onboarding/regisztráció kihagyva: kijelentkezve közvetlenül a belépés nyílik.
+- A „Munkába állok” gomb biztosan lekéri a GPS-t, engedélyt kér és látható hibát jelez.
+- Az online/offline API-válasz szám vagy szöveg formában is helyesen frissíti a képernyőt.
+- Sikeres munkába állás után az első sofőrpozíció azonnal felmegy a backendnek.
+- Offline állapotban a sofőrapp nem küld 20 másodpercenként pozíciót.
+- Magyar szolgálati szövegek és gombfeliratok.

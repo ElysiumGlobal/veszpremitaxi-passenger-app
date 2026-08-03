@@ -48,7 +48,6 @@ class AppSnackBar {
       animationDuration: const Duration(milliseconds: 500),
       duration: Duration(seconds: dismisDuration),
       colorText: AppColors.whiteColor,
-      // isDismissible: false,
       padding: EdgeInsets.only(left: 12.w, right: 12.w, top: 8.h, bottom: 10.h),
     );
   }

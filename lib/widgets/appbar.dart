@@ -21,8 +21,6 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
     this.color,
     this.leadingSize,
     this.titleWidget,
-    this.onBackTap,
-    this.titleTextSize,
   });
 
   final String? title;
@@ -35,8 +33,6 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
   final Widget? leading;
   final Color? color;
   final Widget? titleWidget;
-  final VoidCallback? onBackTap;
-  final double? titleTextSize;
 
   @override
   Widget build(BuildContext context) {
@@ -48,23 +44,18 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
       surfaceTintColor: AppColors.transparent,
       leading: (automaticallyImplyLeading ?? true) && leading == null
           ? GestureDetector(
-              onTap:
-                  onBackTap ??
-                  () {
-                    Get.back();
-                  },
-              behavior: HitTestBehavior.translucent,
-              child: SizedBox(
+              onTap: () {
+                Get.back();
+              },
+              child: Container(
                 height: 48.h,
                 width: 48.h,
-                child: Align(
-                  alignment: Alignment.center,
-                  child: CustomWidget.iconChange(
-                    child: CustomImage(
-                      image: IconAsset.arrowLeftIcon,
-                      ht: 24.h,
-                      wt: 24.h,
-                    ),
+                alignment: Alignment.center,
+                child: CustomWidget.iconChange(
+                  child: CustomImage(
+                    image: IconAsset.arrowLeft,
+                    ht: 24.h,
+                    wt: 24.h,
                   ),
                 ),
               ),
@@ -79,7 +70,7 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
             string: title ?? "",
             color: AppColors.titleTextColor,
             fontWeight: FontWeight.w500,
-            fontSize: titleTextSize ?? 16.sp,
+            fontSize: 16.sp,
           ),
       centerTitle: centerTitle ?? true,
       actions: actions,

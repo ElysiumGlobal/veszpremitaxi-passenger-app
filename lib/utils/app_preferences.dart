@@ -1,33 +1,25 @@
 import 'dart:async';
-import 'dart:convert';
 
 import 'package:shared_preferences/shared_preferences.dart';
-
-import '../feature/auth/model/register_model.dart';
 
 class AppPreference {
   static late SharedPreferences _prefs;
   static bool _initialized = false;
 
   static bool get isInitialized => _initialized;
-
-  static const String _languageKey = 'languageKey1';
-  static const String onboardingDone = "VapPassengerOnboardingV3";
-  static const String userToken = "userToken1";
-  static const String userLogin = "userLogin1";
-
-  static const String profileCompletionPending = "profileCompletionPending1";
-
-  static const String userModel = "userModel1";
-  static const String languageIndex = "languageIndex";
-  static const String userLoginDetailsModel = "userLoginDetailsModel1";
-  static const String userId = "USERID";
-  static const String rideType = "rideType";
-  static const String RideTime = "RideTime";
-  static const String bookingFare = "bookingFare";
-
-  static const location = "Location0";
-  static const walletData = "walletData";
+  static const String _languageKey = 'languageKey';
+  static const String onboardingDone = 'onboardingDoneV2';
+  static const String userToken = "userToken";
+  static const String userStep = "userStepComplete";
+  static const String userInitData = "userIniData";
+  static const String userRegisterStepComplete = "userRegiStepComp";
+  static const String profileApprove = "ProfileApprove";
+  static const String userId = "UserID";
+  static const String languageIndex = "LanguageIndexave";
+  static const String location = "USER LOCATION";
+  static const String driverRideType = "driverRideType";
+  static const String driverRideTime = "driverRideTime";
+  static const String driverOnline = "driverOnline";
 
   static Future initMySharedPreferences() async {
     _prefs = await SharedPreferences.getInstance();
@@ -36,14 +28,24 @@ class AppPreference {
 
   static Future<void> clearSharedPreferences() async {
     await _prefs.clear();
+    return;
   }
 
-  static void removeKey(String key) {
-    _prefs.remove(key);
+  static String getLanguage() {
+    final String? value = _prefs.getString(_languageKey);
+    return value ?? 'en';
+  }
+
+  static Future setLanguage(String value) async {
+    await _prefs.setString(_languageKey, value);
   }
 
   static Future setString(String key, String value) async {
     await _prefs.setString(key, value);
+  }
+
+  static void removeKey(String key) {
+    _prefs.remove(key);
   }
 
   static String getString(String key) {
@@ -78,26 +80,11 @@ class AppPreference {
     return value ?? 0;
   }
 
-  static String getLanguage() {
-    final String? value = _prefs.getString(_languageKey);
-    return value ?? 'hu';
+  static setProfileModel(String data) {
+    _prefs.setString("USERPROFILEDATA", data);
   }
 
-  static Future setLanguage(String value) async {
-    await _prefs.setString(_languageKey, value);
-  }
-
-  static setUserModel(User? user) {
-    _prefs.setString(userModel, jsonEncode(user?.toJson()));
-  }
-
-  static User? getUserModel() {
-    var data = _prefs.getString(userModel) ?? "";
-
-    if (data.isEmpty) {
-      return null;
-    }
-    Map<String, dynamic> model = jsonEncode(data) as Map<String, dynamic>;
-    return User.fromJson(model);
+  static String getProfileData() {
+    return _prefs.getString("USERPROFILEDATA") ?? "";
   }
 }

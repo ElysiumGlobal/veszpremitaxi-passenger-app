@@ -1,338 +1,315 @@
 import 'dart:convert';
-import 'dart:developer';
 
 import 'package:e_taxi/core/api/api.dart';
 import 'package:e_taxi/core/api/responce_handler.dart';
-import 'package:e_taxi/core/debug/passenger_flow_debug.dart';
-import 'package:e_taxi/feature/home/model/address_model.dart';
+import 'package:e_taxi/core/debug/driver_flow_debug.dart';
 import 'package:e_taxi/utils/api_constants.dart';
-import 'package:e_taxi/utils/constants.dart';
 import 'package:e_taxi/utils/log_utils.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
-import '../../../widgets/app_snackbar.dart';
-import '../model/banner_model.dart';
-import '../model/create_booking_model.dart';
-import '../model/offer_model.dart';
-import '../model/ride_type_list_model.dart';
-import '../model/user_account_list_model.dart';
+import '../../auth/model/ride_type_list_model.dart';
 
-class HomeService {
-  static Future addAddress({
-    required String name,
-    required String address,
-    required LatLng latLng,
-  }) async {
+Map<String, dynamic> _debugResponseSummary(String body) {
+  try {
+    final dynamic decoded = jsonDecode(body);
+    if (decoded is! Map) {
+      return <String, dynamic>{'decoded_type': decoded.runtimeType.toString()};
+    }
+
+    final dynamic data = decoded['data'];
+    final dynamic booking = data is Map
+        ? (data['booking'] ?? data)
+        : decoded['booking'];
+    final dynamic rawErrors = decoded['errors'];
+    final Map<String, dynamic> errors = <String, dynamic>{};
+    if (rawErrors is Map) {
+      for (final dynamic key in rawErrors.keys) {
+        final dynamic value = rawErrors[key];
+        errors[key.toString()] = value is Iterable
+            ? value.map((dynamic item) => item.toString()).toList()
+            : value?.toString() ?? '';
+      }
+    }
+
+    return <String, dynamic>{
+      'success': decoded['success'],
+      'message': decoded['message']?.toString() ?? '',
+      'errors': errors,
+      'top_level_keys': decoded.keys.map((dynamic key) => key.toString()).toList(),
+      'booking_id': booking is Map
+          ? (booking['id'] ?? booking['booking_id'] ?? '').toString()
+          : '',
+      'booking_status': booking is Map
+          ? (booking['status'] ?? '').toString()
+          : '',
+      'driver_id': booking is Map
+          ? (booking['driver_id'] ?? '').toString()
+          : '',
+    };
+  } catch (_) {
+    return <String, dynamic>{'decoded': false, 'body_length': body.length};
+  }
+}
+
+class HomeServices {
+  static Future userOnlineOffline(LatLng latLng, int online) async {
     try {
       final response = await Api().post(
-        ApiConstants.addAddress,
+        ApiConstants.onlineOffline,
         bodyData: {
-          "name": name,
-          "address": address,
           "latitude": latLng.latitude,
           "longitude": latLng.longitude,
+          "online": online,
         },
       );
       await ResponseHandler.checkResponseError(response);
       return jsonDecode(response.body);
     } catch (e, st) {
-      LogUtils.printError("add Address Error ==>$e, $st");
+      LogUtils.printError("ONLINE OFFLINE ERROR ---$e, $st");
       rethrow;
     }
   }
 
-  static Future<UserAddressModel> getAddress() async {
+  static Future updateDriverLocation(LatLng latLng) async {
     try {
-      final res = await Api().get(ApiConstants.getAddress);
-      await ResponseHandler.checkResponseError(res);
-      return UserAddressModel.fromJson(jsonDecode(res.body));
+      final response = await Api().post(
+        ApiConstants.driverLocationUpdate,
+        bodyData: {"latitude": latLng.latitude, "longitude": latLng.longitude},
+      );
+      await ResponseHandler.checkResponseError(response);
+      return jsonDecode(response.body);
     } catch (e, st) {
-      LogUtils.printError("Get Address Error:::$e, $st");
+      LogUtils.printError("Driver Location Update Error ---$e, $st");
+
       rethrow;
     }
   }
 
-  static Future<BookingCreateModel> bookingEstimate({
-    required LatLng originLatLng,
-    required LatLng destinationLatLng,
-    String? rideTypeId,
+
+  static Future pendingRideOffer({
+    required bool onlineHeartbeat,
+    LatLng? currentLocation,
   }) async {
-    const apiTag =
-        'POST ${ApiConstants.baseUrl}${ApiConstants.bookingEstimate}';
     try {
-      final body = <String, dynamic>{
-        "pickup_latitude": originLatLng.latitude,
-        "pickup_longitude": originLatLng.longitude,
-        "dropoff_latitude": destinationLatLng.latitude,
-        "dropoff_longitude": destinationLatLng.longitude,
+      final Map<String, dynamic> query = <String, dynamic>{
+        'online': onlineHeartbeat ? 1 : 0,
       };
-
-      if (rideTypeId != null && rideTypeId.trim().isNotEmpty) {
-        body['ride_type_id'] = rideTypeId.trim();
+      if (currentLocation != null) {
+        query['latitude'] = currentLocation.latitude;
+        query['longitude'] = currentLocation.longitude;
       }
-
-      final response = await Api().post(
-        ApiConstants.bookingEstimate,
-        bodyData: body,
+      final response = await Api().get(
+        ApiConstants.pendingRideOffer,
+        queryData: query,
       );
-      await ResponseHandler.checkResponseError(
-        response,
-        showException: false,
-        apiTag: apiTag,
-      );
-      return BookingCreateModel.fromJson(jsonDecode(response.body));
-    } catch (e, st) {
-      LogUtils.printError("BOOKING ESTIMATE ERROR ==> $e, $st");
-      rethrow;
-    }
-  }
-
-  static Future<BookingCreateModel> bookingCreate({
-    required int bookingContactId,
-    required String originAddress,
-    required String destinationAddress,
-    required LatLng originLatLng,
-    required LatLng destinationLatLng,
-    required String rideTypeId,
-    required String paymentMethod,
-  }) async {
-    const apiTag = 'POST ${ApiConstants.baseUrl}${ApiConstants.bookingCreate}';
-    try {
-      log('[ERROR_TRACE] HomeService.bookingCreate → calling $apiTag');
-      final response = await Api().post(
-        ApiConstants.bookingCreate,
-        bodyData: {
-          "pickup_latitude": originLatLng.latitude,
-          "pickup_longitude": originLatLng.longitude,
-          "pickup_address": originAddress,
-          "dropoff_latitude": destinationLatLng.latitude,
-          "dropoff_longitude": destinationLatLng.longitude,
-          "dropoff_address": destinationAddress,
-          "booking_contact_id": bookingContactId,
-          "ride_type_id": rideTypeId,
-          "payment_method": paymentMethod,
+      DriverFlowDebug.send(
+        'pending_offer_http_response',
+        data: <String, dynamic>{
+          'http_status': response.statusCode,
+          'body_length': response.body.length,
+          'response_summary': _debugResponseSummary(response.body),
         },
       );
-
-      log('[ERROR_TRACE] HomeService.bookingCreate ← status: ${response.statusCode}');
       await ResponseHandler.checkResponseError(
         response,
         showException: false,
-        apiTag: apiTag,
       );
-      return BookingCreateModel.fromJson(jsonDecode(response.body));
+      return jsonDecode(response.body);
     } catch (e, st) {
-      log('[ERROR_TRACE] HomeService.bookingCreate FAILED at $apiTag');
-      LogUtils.printError("BOOKING CREATE ERROR ==> $e, $st");
+      LogUtils.printError("PENDING RIDE OFFER ERROR ---$e, $st");
       rethrow;
     }
   }
 
-  static Future updatePickUpLocation({
+  static Future updateBookingRideStatus({
+    required double totalDistance,
     required String bookingId,
+    required int status,
     required String address,
     required LatLng latLng,
+    required String otp,
+    required String cancelReason,
+    int? etaMinutes,
   }) async {
+
     try {
+      final Map<String, dynamic> body = <String, dynamic>{
+        "status": status,
+        "dropoff_latitude": latLng.latitude,
+        "dropoff_longitude": latLng.longitude,
+        "dropoff_address": address,
+        "reason": cancelReason,
+        "total_distance": totalDistance * (0.001),
+      };
+      if (otp.trim().isNotEmpty) {
+        body["otp"] = otp.trim();
+      }
+      if (status == 1 && etaMinutes != null) {
+        body["eta_minutes"] = etaMinutes;
+      }
+
       final response = await Api().post(
-        "${ApiConstants.bookingPrefix}$bookingId/update-pickup",
-        bodyData: {
-          "pickup_latitude": latLng.latitude,
-          "pickup_longitude": latLng.longitude,
-          "pickup_address": address,
+        "${ApiConstants.updateBookingRideStatus}$bookingId/update-status",
+        bodyData: body,
+      );
+      DriverFlowDebug.send(
+        'status_http_response',
+        bookingId: bookingId,
+        data: <String, dynamic>{
+          'status_no': status,
+          'http_status': response.statusCode,
+          'body_length': response.body.length,
+          'response_summary': _debugResponseSummary(response.body),
         },
       );
-
       await ResponseHandler.checkResponseError(response);
-
       return jsonDecode(response.body);
     } catch (e, st) {
-      LogUtils.printError("Update Pick up Error ; $e, $st");
+      DriverFlowDebug.send(
+        'status_http_exception',
+        bookingId: bookingId,
+        data: <String, dynamic>{
+          'status_no': status,
+          'error': e.toString(),
+          'stack': st.toString(),
+        },
+      );
+      LogUtils.printError("ERROR IN RIDE UPDATE :$e, $st");
       rethrow;
     }
   }
 
-  static Future vehicleBook({
+  static Future customerOtpVerify({
+    required String otp,
     required String bookingId,
-    required String vehicleId,
-    required String paymentType,
+  }) async {
+    final digits = otp.replaceAll(RegExp(r'[^0-9]'), '');
+    final candidates = <String>[];
+
+    void addCandidate(String value) {
+      if (value.isNotEmpty && !candidates.contains(value)) {
+        candidates.add(value);
+      }
+    }
+
+    if (digits.length >= 6) {
+      addCandidate(digits.substring(digits.length - 6));
+      addCandidate(digits.substring(digits.length - 4));
+    } else {
+      addCandidate(digits.padLeft(6, '0'));
+      addCandidate(digits);
+    }
+
+    dynamic lastResponse;
+    Object? lastError;
+    StackTrace? lastStack;
+
+    for (var index = 0; index < candidates.length; index++) {
+      final candidate = candidates[index];
+      try {
+        DriverFlowDebug.send(
+          'otp_verify_requested',
+          bookingId: bookingId,
+          data: <String, dynamic>{
+            'otp_length': candidate.length,
+            'attempt': index + 1,
+            'candidate_count': candidates.length,
+          },
+        );
+        final response = await Api().post(
+          ApiConstants.customerOtpVerify,
+          bodyData: {
+            'booking_id': bookingId,
+            'otp': candidate,
+          },
+        );
+        lastResponse = response;
+        final summary = _debugResponseSummary(response.body);
+        DriverFlowDebug.send(
+          'otp_verify_http_response',
+          bookingId: bookingId,
+          data: <String, dynamic>{
+            'http_status': response.statusCode,
+            'body_length': response.body.length,
+            'attempt': index + 1,
+            'submitted_length': candidate.length,
+            'response_summary': summary,
+          },
+        );
+
+        if (response.statusCode >= 200 && response.statusCode < 300) {
+          return jsonDecode(response.body);
+        }
+      } catch (error, stack) {
+        lastError = error;
+        lastStack = stack;
+      }
+    }
+
+    if (lastResponse != null) {
+      await ResponseHandler.checkResponseError(
+        lastResponse,
+        showException: false,
+      );
+    }
+
+    DriverFlowDebug.send(
+      'otp_verify_http_exception',
+      bookingId: bookingId,
+      data: <String, dynamic>{
+        'error': lastError?.toString() ?? 'OTP verification failed',
+        'stack': lastStack?.toString() ?? '',
+      },
+    );
+    throw lastError ?? Exception('OTP verification failed');
+  }
+
+  static Future confirmCashCollected({
+    required String bookingId,
+    required double cashAmount,
+    required double tipAmount,
   }) async {
     try {
       final response = await Api().post(
-        ApiConstants.vehicleBook,
+        ApiConstants.collectCash,
         bodyData: {
           "booking_id": bookingId,
-          "ride_type_id": vehicleId,
-          "payment_type": paymentType,
+          "cash_amount": cashAmount,
+          "tip_amount": tipAmount,
         },
       );
-      await ResponseHandler.checkResponseError(response);
-      return jsonDecode(response.body);
-    } catch (e, st) {
-      LogUtils.printError("Book Vehicle Error ; $e, $st");
-      rethrow;
-    }
-  }
-
-  static Future confirmRide(String bookingId) async {
-    try {
-      final response = await Api().post(
-        "${ApiConstants.bookingPrefix}$bookingId/is-conform",
-      );
-      await ResponseHandler.checkResponseError(response);
-      log("LOG CONFIRM RIDE::::::${response.body}");
-      return jsonDecode(response.body);
-    } catch (e, st) {
-      LogUtils.printError("Confirm RIde Error ; $e, $st");
-
-      rethrow;
-    }
-  }
-
-  static Future cancelRide(String bookingId, String reason) async {
-    try {
-      final response = await Api().post(
-        ApiConstants.cancelRide,
-        bodyData: {"booking_id": bookingId, "reason": reason},
-      );
-      dynamic decoded;
-      try {
-        decoded = jsonDecode(response.body);
-      } catch (_) {
-        decoded = <String, dynamic>{};
-      }
-      final String message = decoded is Map
-          ? (decoded['message'] ?? '').toString().toLowerCase()
-          : '';
-      final String bodyLower = response.body.toLowerCase();
-      final bool alreadyCancelled = response.statusCode == 400 &&
-          (message.contains('already canceled') ||
-              message.contains('already cancelled') ||
-              message.contains('már törölve') ||
-              message.contains('már lemondva'));
-      final bool knownPartialBackendCancel = response.statusCode == 500 &&
-          bodyLower.contains('is_available') &&
-          bodyLower.contains('mass assignment');
-
-      PassengerFlowDebug.send(
-        'passenger_cancel_http_response',
+      DriverFlowDebug.send(
+        'cash_payment_http_response',
         bookingId: bookingId,
         data: <String, dynamic>{
           'http_status': response.statusCode,
-          'already_cancelled': alreadyCancelled,
-          'known_partial_backend_cancel': knownPartialBackendCancel,
-          'message': message,
-        },
-      );
-
-      if (alreadyCancelled || knownPartialBackendCancel) {
-        return <String, dynamic>{
-          'success': true,
-          'already_cancelled': alreadyCancelled,
-          'partial_backend_cleanup': knownPartialBackendCancel,
-        };
-      }
-
-      await ResponseHandler.checkResponseError(response, showException: false);
-      return decoded;
-    } catch (e, st) {
-      LogUtils.printError("Cancel Ride Error :$e, $st");
-      rethrow;
-    }
-  }
-
-  static Future<OfferModel> getOfferList({
-    required int pageNo,
-    required String bookingID,
-    required String rideType,
-  }) async {
-    try {
-      log("HERE:::");
-      final response = await Api().get(
-        "${ApiConstants.getOfferList}$pageNo&booking_id=$bookingID&ride_type_id=$rideType",
-        getHeaders: {'content-type': 'application/json'},
-      );
-      log("response::${response.body}");
-      await ResponseHandler.checkResponseError(response);
-      return OfferModel.fromJson(jsonDecode(response.body));
-    } catch (e, st) {
-      LogUtils.printError("Get Code Error :$e, $st");
-
-      rethrow;
-    }
-  }
-
-  static Future applyCode({
-    required String code,
-    required int bookingId,
-    required String rideTypeId,
-  }) async {
-    try {
-      final response = await Api().post(
-        ApiConstants.promoCodeApply,
-        bodyData: {
-          "promo_code": code,
-          "booking_id": bookingId,
-          "ride_type_id": rideTypeId,
+          'body_length': response.body.length,
+          'response_summary': _debugResponseSummary(response.body),
         },
       );
       await ResponseHandler.checkResponseError(response);
-
       return jsonDecode(response.body);
-    } catch (e, st) {
-      LogUtils.printError("Applt Code Error :$e, $st");
-
-      return;
-    }
-  }
-
-  static Future<BannerModel> getBannerList({
-    double? latitude,
-    double? longitude,
-  }) async {
-    try {
-      final queryData = <String, dynamic>{};
-      if (latitude != null && longitude != null) {
-        queryData['latitude'] = latitude;
-        queryData['longitude'] = longitude;
-      }
-
-      final response = await Api().get(
-        ApiConstants.banner,
-        queryData: queryData.isEmpty ? null : queryData,
+    } catch (error, stack) {
+      DriverFlowDebug.send(
+        'cash_payment_http_exception',
+        bookingId: bookingId,
+        data: <String, dynamic>{
+          'error': error.toString(),
+          'stack': stack.toString(),
+        },
       );
-
-      await ResponseHandler.checkResponseError(response);
-
-      return BannerModel.fromJson(jsonDecode(response.body));
-    } catch (e) {
       rethrow;
     }
   }
 
-  static Future removePromoCode(int bookingId) async {
-    try {
-      final response = await Api().post(
-        ApiConstants.removePromoCode,
-        bodyData: {"booking_id": bookingId},
-      );
-
-      await ResponseHandler.checkResponseError(response);
-
-      return jsonDecode(response.body);
-    } catch (e) {
-      rethrow;
-    }
-  }
-
-  static Future driverRating({
+  static Future driverReview({
     required int bookingId,
     required double rating,
     required String comment,
   }) async {
     try {
       final response = await Api().post(
-        ApiConstants.driverRating,
+        ApiConstants.reviewDriver,
         bodyData: {
           "booking_id": bookingId,
           "rating": rating,
@@ -341,102 +318,62 @@ class HomeService {
       );
       await ResponseHandler.checkResponseError(response);
       return jsonDecode(response.body);
-    } catch (e) {
+    } catch (e, st) {
+      LogUtils.printError("Driver Review FAILED::$e, $st}");
       rethrow;
     }
   }
 
-  static Future<Map> paymentInt({
-    required String bookingId,
+  static Future driverAcceptPayment({
+    required int paymentId,
     required double amount,
-    required String method,
-    required bool isSplit,
-    required String tip,
   }) async {
     try {
       final response = await Api().post(
-        ApiConstants.onlinePaymentInt,
-        bodyData: {
-          "booking_id": bookingId,
-          "payment_method": method,
-          "amount": amount,
-          "currency": AppConstant().currency,
-          "is_split": isSplit,
-          "tip_amount": tip,
-        },
+        ApiConstants.driverPaymentAccept,
+        bodyData: {"payment_method_id": paymentId, "amount": amount},
       );
-
       await ResponseHandler.checkResponseError(response);
-
-      return jsonDecode(response.body);
-    } catch (e) {
-      rethrow;
-    }
-  }
-
-  static Future<Map> verifyPayment({required String transactionID}) async {
-    try {
-      final response = await Api().post(
-        ApiConstants.verifyPayment,
-        bodyData: {"transaction_id": transactionID},
-      );
-
-      await ResponseHandler.checkResponseError(response);
-
-      return jsonDecode(response.body);
-    } catch (e) {
-      rethrow;
-    }
-  }
-
-  static Future<Map> updatePaymentMode({
-    required String paymentMode,
-    required String bookingId,
-  }) async {
-    try {
-      final response = await Api().post(
-        ApiConstants.paymentModeUpdate,
-        bodyData: {"booking_id": bookingId, "payment_method": paymentMode},
-      );
-
-      await ResponseHandler.checkResponseError(response);
-
       return jsonDecode(response.body);
     } catch (e, st) {
-      LogUtils.printError("PAYMENT MODE UPADTE ERROR :$e, $st");
-
+      LogUtils.printError("Driver Review FAILED::$e, $st}");
       rethrow;
     }
   }
 
-  static Future<UserAccountListModel> getUserNameList() async {
-    try {
-      final response = await Api().get(ApiConstants.forMeGetList);
-      await ResponseHandler.checkResponseError(response);
-      return UserAccountListModel.fromJson(jsonDecode(response.body));
-    } catch (e) {
-      rethrow;
-    }
-  }
-
-  static Future addUserName({
-    required String name,
-    required String phone,
-    required String imagePath,
+  static Future reportIssueSubmit({
+    required int bookingId,
+    required String issueType,
+    required String description,
   }) async {
     try {
-      final res = await Api().sendMultipartRequestPost1(
-        ApiConstants.forMeAdd,
-        bodyData: {'name': name, "mobile_number": phone},
-        imageName: ['profile_pic'],
-        profileImage: imagePath.isEmpty ? [] : [imagePath],
+      final response = await Api().post(
+        ApiConstants.reportIssue,
+        bodyData: {
+          "booking_id": bookingId,
+          "issue_type": issueType,
+          "custom_issue": description,
+        },
       );
+      await ResponseHandler.checkResponseError(response);
+      return jsonDecode(response.body);
+    } catch (e, st) {
+      LogUtils.printError("REPORT ISUE ERROR :::$e,$st");
+      rethrow;
+    }
+  }
 
-      if (res['success'] == false) {
-        AppSnackBar.showErrorSnackBar(message: res['message'], isError: true);
-        throw "ERROR::$res";
-      }
-      return res;
+  static Future driverConfirmCashPayment({
+    required String transactionId,
+    required String status,
+  }) async {
+    try {
+      final response = await Api().post(
+        ApiConstants.driverPaymentAccept,
+        bodyData: {"transaction_id": transactionId, "status": status},
+      );
+      await ResponseHandler.checkResponseError(response);
+      return jsonDecode(response.body);
     } catch (e) {
       rethrow;
     }
@@ -451,20 +388,4 @@ class HomeService {
       rethrow;
     }
   }
-
-  // static Future  acceptDemo({required String bookingId,required int isDemo})async{
-  //   try{
-  //       final response =await Api().post(ApiConstants.demoAccept,bodyData: {
-  //         'booking_id':bookingId,
-  //         'is_demo': isDemo
-  //
-  //
-  //       });
-  //     await ResponseHandler.checkResponseError(response);
-  //     return  jsonDecode(response.body);
-  //
-  //   }catch(e){
-  //     rethrow;
-  //   }
-  // }
 }

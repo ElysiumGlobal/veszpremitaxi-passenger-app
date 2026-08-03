@@ -1,9 +1,10 @@
+import 'dart:async';
 import 'dart:ui';
 
+import 'package:e_taxi/feature/account/controller/account_controller.dart';
+import 'package:e_taxi/feature/home/controller/home_controller.dart';
 import 'package:e_taxi/utils/app_colors.dart';
 import 'package:e_taxi/utils/app_preferences.dart';
-import 'package:e_taxi/utils/build_config.dart';
-import 'package:e_taxi/utils/constants.dart';
 import 'package:e_taxi/utils/navigation_utils/routes.dart';
 import 'package:e_taxi/utils/utils.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -14,9 +15,9 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
 
-import 'core/debug/passenger_flow_debug.dart';
-import 'core/helper/language_provider/localization/language/english.dart';
-import 'core/helper/notification_service/firebase_notification_service.dart';
+import 'core/debug/driver_flow_debug.dart';
+import 'core/localization/localization.dart';
+import 'core/service/firebase_notification_new.dart';
 import 'firebase_options.dart';
 
 Future<Locale> updateLocal() async {
@@ -25,104 +26,152 @@ Future<Locale> updateLocal() async {
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await dotenv.load(fileName: "assets/.env");
-
-  if (BuildConfig.firebaseEnabled) {
-    try {
-      await Firebase.initializeApp(
-        options: DefaultFirebaseOptions.currentPlatform,
-      );
-      if (BuildConfig.pushNotificationsEnabled) {
-        await FireBaseNotification().firebaseCloudMessagingLSetup();
-        await FireBaseNotification().setUpLocalNotification();
-      }
-    } catch (error, stack) {
-      debugPrint('Firebase initialization failed: $error\n$stack');
-    }
-  }
-
-  await AppPreference.initMySharedPreferences();
-  await PassengerFlowDebug.initialize();
 
   FlutterError.onError = (FlutterErrorDetails details) {
     FlutterError.presentError(details);
-    PassengerFlowDebug.runtimeError(
-      'flutter',
-      details.exception,
-      details.stack,
-    );
+    DriverFlowDebug.runtimeError('flutter', details.exception, details.stack);
   };
+
   PlatformDispatcher.instance.onError = (Object error, StackTrace stack) {
-    PassengerFlowDebug.runtimeError('platform', error, stack);
-    return false;
+    DriverFlowDebug.runtimeError('platform', error, stack);
+    debugPrint('Unhandled platform error: $error');
+    debugPrintStack(stackTrace: stack);
+    return true;
   };
-  WidgetsBinding.instance.addObserver(PassengerDebugLifecycleObserver());
-  PassengerFlowDebug.send(
-    'app_started',
-    data: <String, dynamic>{
-      'firebase_enabled': BuildConfig.firebaseEnabled,
-      'push_enabled': BuildConfig.pushNotificationsEnabled,
-      'expected_collector_version':
-          PassengerFlowDebug.expectedCollectorVersion,
-      'durable_debug_queue': true,
-    },
-  );
+  WidgetsBinding.instance.addObserver(DriverDebugLifecycleObserver());
+  Locale initialLocale = const Locale('hu', 'HU');
+
+  try {
+    await AppPreference.initMySharedPreferences();
+    await DriverFlowDebug.initialize();
+    initialLocale = await updateLocal();
+    DriverFlowDebug.send(
+      'app_started',
+      data: <String, dynamic>{
+        'expected_collector_version': DriverFlowDebug.expectedCollectorVersion,
+        'orientation': 'adaptive',
+        'auth_mode': 'fixed_driver_pin',
+        'durable_debug_queue': true,
+      },
+    );
+  } catch (error, stack) {
+    debugPrint('SharedPreferences initialization failed: $error');
+    debugPrintStack(stackTrace: stack);
+  }
+
+  // A gyari forrasbol hianyzott ez a fajl. Emiatt a debug APK meg a
+  // runApp() elott kilepett. Most a fajl is benne van, es a betoltes sem
+  // tudja tobbe leallitani az alkalmazast.
+  try {
+    await dotenv.load(fileName: 'assets/.env');
+  } catch (error, stack) {
+    debugPrint('Environment file load failed: $error');
+    debugPrintStack(stackTrace: stack);
+  }
+
+  // A Firebase Core meg a FirebaseAuth hasznalata elott inicializalva van,
+  // de egy regi telefonon vagy hibas Google Play Services mellett sem
+  // tarthatja vegtelenul a nyitokepernyot.
+  try {
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    ).timeout(const Duration(seconds: 5));
+  } catch (error, stack) {
+    debugPrint('Firebase initialization failed: $error');
+    debugPrintStack(stackTrace: stack);
+  }
+
+  // Telefonon és tableten is engedjük a rendszer által választott tájolást.
+  // A felület reszponzív; nincs kényszerített fekvő mód.
+  await SystemChrome.setPreferredOrientations(DeviceOrientation.values);
 
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(
       statusBarColor: AppColors.transparent,
-      statusBarIconBrightness: Brightness.dark,
       statusBarBrightness: Brightness.light,
+      statusBarIconBrightness: Brightness.dark,
     ),
   );
 
-  final locale = await updateLocal();
+  runApp(MyApp(initialLocale: initialLocale));
+
+  // Ezek nem feltetelei annak, hogy az alkalmazas elinduljon. Korabban
+  // barmelyik hibaja bezarta az appot meg az elso kepernyo elott.
+  unawaited(_initializeOptionalServices());
+}
+
+Future<void> _initializeOptionalServices() async {
+  try {
+    await FireBaseNotification()
+        .firebaseCloudMessagingLSetup()
+        .timeout(const Duration(seconds: 10));
+  } catch (error, stack) {
+    debugPrint('Firebase messaging setup failed: $error');
+    debugPrintStack(stackTrace: stack);
+  }
+
+  try {
+    await FireBaseNotification()
+        .setUpLocalNotification()
+        .timeout(const Duration(seconds: 10));
+  } catch (error, stack) {
+    debugPrint('Local notification setup failed: $error');
+    debugPrintStack(stackTrace: stack);
+  }
 
   try {
     await Utils().setCurrentMarker();
-    await Utils().setRouteMarkers();
-    await Utils().setCarMarker();
   } catch (error, stack) {
-    debugPrint('Map marker initialization failed: $error\n$stack');
+    debugPrint('Current-location marker setup failed: $error');
+    debugPrintStack(stackTrace: stack);
   }
 
-  runApp(MyApp(initialLocale: locale));
+  try {
+    await Utils().setCarMarker();
+  } catch (error, stack) {
+    debugPrint('Car marker setup failed: $error');
+    debugPrintStack(stackTrace: stack);
+  }
 }
 
 class MyApp extends StatelessWidget {
   final Locale initialLocale;
 
-  const MyApp({
-    super.key,
-    required this.initialLocale,
-  });
+  const MyApp({required this.initialLocale, super.key});
 
   @override
   Widget build(BuildContext context) {
     return ScreenUtilInit(
-      designSize: const Size(390, 844),
+      designSize: const Size(1280, 800),
       minTextAdapt: true,
       splitScreenMode: true,
       builder: (_, child) {
         return GetMaterialApp(
           debugShowCheckedModeBanner: false,
           navigatorObservers: <NavigatorObserver>[
-            PassengerDebugNavigatorObserver(),
+            DriverDebugNavigatorObserver(),
           ],
-          translations: AppTranslations(),
+          translations: Languages(),
           locale: initialLocale,
           fallbackLocale: const Locale('hu', 'HU'),
           supportedLocales: const [
             Locale('hu', 'HU'),
+            Locale('en', 'US'),
+            Locale('hi', 'IN'),
+            Locale('ar', 'AE'),
+            Locale('pt', 'PT'),
+            Locale('he', 'IL'),
+            Locale('ru', 'RU'),
           ],
           localizationsDelegates: const [
             GlobalMaterialLocalizations.delegate,
             GlobalWidgetsLocalizations.delegate,
             GlobalCupertinoLocalizations.delegate,
           ],
+          initialBinding: AppBidding(),
           theme: ThemeData(
-            fontFamily: Constants.fontFamily,
-            textSelectionTheme: const TextSelectionThemeData(
+            scaffoldBackgroundColor: AppColors.whiteGrey,
+            textSelectionTheme: TextSelectionThemeData(
               selectionHandleColor: AppColors.mainPrimaryColor,
               selectionColor: AppColors.transparent,
             ),
@@ -137,7 +186,7 @@ class MyApp extends StatelessWidget {
                   onTap: () {
                     Utils.hideKeyboardInApp(context);
                   },
-                  child: child,
+                  child: child ?? const SizedBox.shrink(),
                 ),
               ],
             );
@@ -145,5 +194,13 @@ class MyApp extends StatelessWidget {
         );
       },
     );
+  }
+}
+
+class AppBidding extends Bindings {
+  @override
+  void dependencies() {
+    Get.put<AccountController>(AccountController(), permanent: true);
+    Get.put<HomeController>(HomeController(), permanent: true);
   }
 }

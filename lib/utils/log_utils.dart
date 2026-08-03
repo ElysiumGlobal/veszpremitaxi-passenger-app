@@ -5,6 +5,9 @@ import 'package:flutter/foundation.dart';
 
 class LogUtils {
   static showLogs({String? tag, String? message}) {
+    if (!kDebugMode) {
+      return;
+    }
     if (!kReleaseMode) {
       log(message ?? '', name: tag ?? '');
     }

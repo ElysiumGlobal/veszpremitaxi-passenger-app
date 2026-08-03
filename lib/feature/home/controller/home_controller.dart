@@ -2,2199 +2,1904 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:developer';
 import 'dart:io';
-import 'package:e_taxi/core/debug/passenger_flow_debug.dart';
-import 'package:e_taxi/core/location_utils.dart';
-import 'package:e_taxi/feature/home/model/offer_model.dart';
-import 'package:e_taxi/feature/home/page/payment_screen.dart';
+import 'package:http/http.dart'as http;
+import 'package:e_taxi/core/service/socket_channel.dart';
+import 'package:e_taxi/core/debug/driver_flow_debug.dart';
+import 'package:e_taxi/feature/account/controller/account_controller.dart';
 import 'package:e_taxi/feature/home/service/home_service.dart';
-import 'package:e_taxi/feature/trip/controller/trip_controller.dart';
-import 'package:e_taxi/feature/wallet/controller/wallet_controller.dart';
-import 'package:e_taxi/utils/api_constants.dart';
 import 'package:e_taxi/utils/common_api_caller.dart';
-import 'package:e_taxi/utils/constants.dart';
 import 'package:e_taxi/utils/loading_mixin.dart';
-import 'package:e_taxi/widgets/app_snackbar.dart';
+import 'package:e_taxi/utils/log_utils.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
-import 'package:geocoding/geocoding.dart';
-import 'package:geolocator/geolocator.dart';
 import 'package:get/get.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
-import 'package:http/http.dart' as http;
-import '../../../core/socket_channel.dart';
+
+import '../../../core/service/firebase_notification_new.dart';
+import '../../../core/service/location_utils.dart';
+import '../../../utils/api_constants.dart';
 import '../../../utils/app_colors.dart';
 import '../../../utils/app_preferences.dart';
 import '../../../utils/app_string.dart';
 import '../../../utils/assets.dart';
-import '../../../utils/log_utils.dart';
+import '../../../utils/constants.dart';
 import '../../../utils/navigation_utils/navigation.dart';
 import '../../../utils/navigation_utils/routes.dart';
+import '../../../utils/utils.dart';
 import '../../../widgets/common_text.dart';
 import '../../../widgets/custom_button.dart';
 import '../../../widgets/custome_img.dart';
-import '../model/address_model.dart';
-import '../model/banner_model.dart' as banner;
-import '../model/create_booking_model.dart';
-import '../model/get_socket_model.dart';
-import '../model/origin_destination_model.dart';
-import '../model/place_adress_model.dart';
-import '../model/user_account_list_model.dart';
-import '../widget/dialog.dart';
-import '../model/ride_type_list_model.dart' as rideType;
+import '../../../widgets/dialog.dart';
+import '../../../widgets/app_snackbar.dart';
+import '../../auth/model/ride_type_list_model.dart' as rideType;
+import '../model/new_ride_model.dart';
+import '../model/ride_complete_model.dart' hide RideType;
+import '../pages/home_screen.dart';
+import '../widget/arrival_eta_selector.dart';
+import '../widget/icon_widget.dart';
+import '../widget/listTileWidget.dart';
+import '../widget/originDestinationTime.dart';
 
-Rxn<NewRideModel> riderBookingModel =
-    Rxn<NewRideModel>(); // clear when new ride confirm create
+class HomeController extends GetxController with LoadingApiMixin, LoadingMixin {
+  Rx<BuildContext?> sheetContext = Rx<BuildContext?>(null);
 
-String _firstNonEmptyAmount(Iterable<String?> values) {
-  for (final value in values) {
-    if (value != null && value.trim().isNotEmpty) {
-      return value.trim();
+  void close() {
+    if (sheetContext.value != null && isRideAvailable.value == -1) {
+      Navigator.of(sheetContext.value!).pop();
+      sheetContext.value = null;
+    }
+    if (rideTimerSec.value <= 0) {
+      isRideAvailable.value = -1;
+      update();
     }
   }
-  return '0';
-}
 
-void saveBookingFare(String? bookingId, String? fare) {
-  if (bookingId == null ||
-      bookingId.isEmpty ||
-      fare == null ||
-      fare.trim().isEmpty) {
-    return;
-  }
-  AppPreference.setString(
-    AppPreference.bookingFare,
-    jsonEncode({'bookingId': bookingId, 'fare': fare.trim()}),
-  );
-}
+  StreamSubscription<Map<String, dynamic>>? _notificationStream;
 
-String? getSavedBookingFare(String? bookingId) {
-  if (bookingId == null || bookingId.isEmpty) {
-    return null;
-  }
-  final raw = AppPreference.getString(AppPreference.bookingFare);
-  if (raw.isEmpty) {
-    return null;
-  }
-  try {
-    final map = jsonDecode(raw) as Map<String, dynamic>;
-    if ('${map['bookingId']}' == bookingId) {
-      return map['fare']?.toString();
-    }
-  } catch (_) {}
-  return null;
-}
+  Future<void> notificationRedirect() async {
+    FireBaseNotification().notificationPermission();
+    _notificationStream?.cancel();
+    _notificationStream = FireBaseNotification.selectNotificationSubject.listen(
+      (Map<String, dynamic> value) async {
+        try {
+          final String eventType =
+              (value['event_type'] ?? value['event'] ?? '').toString();
+          DriverFlowDebug.send(
+            'push_event_received',
+            bookingId: (value['booking_id'] ?? '').toString(),
+            data: <String, dynamic>{
+              'event_type': eventType,
+              'has_data': value['data'] != null,
+              'route': Get.currentRoute,
+            },
+          );
 
-void clearSavedBookingFare() {
-  AppPreference.removeKey(AppPreference.bookingFare);
-}
+          if (eventType == 'new_ride_request') {
+            final bool driverIsOnline =
+                isOnline.value ||
+                AppPreference.getBoolean(AppPreference.driverOnline) ||
+                (accountController.userModel.value?.isOnline ?? '0') == '1';
+            if (!driverIsOnline) {
+              DriverFlowDebug.send(
+                'push_offer_ignored_driver_offline',
+                bookingId: (value['booking_id'] ?? '').toString(),
+              );
+              return;
+            }
 
-String resolveRideAmount([SocketDataModel? data]) {
-  data ??= riderBookingModel.value?.data;
-  final bookingCreateFare = Get.isRegistered<HomeController>()
-      ? Get.find<HomeController>()
-            .bookingCreateModel
-            .value
-            ?.data
-            ?.fareBreakdown
-            ?.total
-      : null;
+            final dynamic rawData = value['data'];
+            dynamic decoded = rawData;
+            if (rawData is String && rawData.trim().isNotEmpty) {
+              decoded = jsonDecode(rawData);
+            }
+            if (decoded is Map &&
+                !decoded.containsKey('booking_id') &&
+                decoded['data'] is Map) {
+              decoded = decoded['data'];
+            }
+            if (decoded is! Map) {
+              DriverFlowDebug.send(
+                'push_offer_payload_invalid',
+                data: <String, dynamic>{'payload_type': decoded.runtimeType.toString()},
+              );
+              return;
+            }
 
-  return _firstNonEmptyAmount([
-    data?.tripDetails?.fare,
-    data?.fare?.totalAmount,
-    data?.booking?.finalFare,
-    data?.booking?.totalAmount,
-    data?.booking?.estimatedFare,
-    data?.invoice?.fareBreakdown?.totalAmount,
-    getSavedBookingFare(data?.booking?.id),
-    bookingCreateFare,
-  ]);
-}
+            _presentRideOffer(
+              Map<String, dynamic>.from(decoded),
+              source: 'push',
+            );
+            return;
+          }
 
-String resolveTotalAmount([SocketDataModel? data]) {
-  data ??= riderBookingModel.value?.data;
-  final booking = data?.booking;
-  final finalFare = booking?.finalFare?.trim() ?? '';
-  if (finalFare.isNotEmpty) {
-    return finalFare;
-  }
-
-  final rideAmount = resolveRideAmount(data);
-  final discount = booking?.discountAmount?.trim() ?? '';
-  if (discount.isEmpty || discount == '0' || discount == '0.0') {
-    return rideAmount;
-  }
-
-  try {
-    final total =
-        double.parse(rideAmount.replaceAll(',', '')) -
-        double.parse(discount.replaceAll(',', ''));
-    return total.toString();
-  } catch (_) {
-    return rideAmount;
-  }
-}
-
-void persistBookingFareFromModel(SocketDataModel? data) {
-  saveBookingFare(data?.booking?.id, resolveRideAmount(data));
-}
-
-class HomeController extends GetxController with LoadingMixin, LoadingApiMixin {
-  final RxBool awaitingRidePayment = false.obs;
-  final RxString awaitingRidePaymentBookingId = ''.obs;
-  final Set<String> _finalizedCompletedBookingIds = <String>{};
-  String _paymentSelectionShownForBooking = '';
-
-  bool _isPaymentSettled(String? value) {
-    final normalized = (value ?? '').trim().toLowerCase();
-    return const <String>{
-      'paid',
-      'completed',
-      'complete',
-      'success',
-      'successful',
-      'settled',
-      '1',
-      'true',
-    }.contains(normalized);
+          if (value.containsKey('chat_id')) {
+            final String bookingId = (value['booking_id'] ?? '').toString();
+            if (bookingId.trim().isEmpty) {
+              DriverFlowDebug.send('push_chat_missing_booking_id');
+              return;
+            }
+            Navigation.pushNamed(
+              Routes.chatScreen,
+              params: <String, String>{'bookingId': bookingId},
+            );
+          }
+        } catch (error, stack) {
+          DriverFlowDebug.runtimeError('driver_push_listener', error, stack);
+          log('DRIVER PUSH ERROR: $error, $stack');
+        }
+      },
+    );
   }
 
-  String _currentPaymentStatus() {
-    return (riderBookingModel.value?.data?.booking?.paymentStatus ?? '')
-        .trim()
-        .toLowerCase();
+  void onResumed() {
+    close();
+    unawaited(ensureOnlineHeartbeat(reason: 'app_resumed', force: true));
+    forceRideOfferRefresh(reason: 'app_resumed');
   }
 
-  String? placeApi = Platform.isAndroid
-      ? dotenv.env['GOOGLE_MAPS_API_KEY_Android']
-      : dotenv.env['GOOGLE_MAPS_API_KEY_Ios'];
-  Timer? debounce;
-  Timer? _bannerLocationDebounce;
-  LatLng? _lastBannerLatLng;
+  RxInt isRideAvailable = (-1).obs;
+  static const List<int> allowedArrivalEtaMinutes = <int>[10, 12, 15, 20, 25, 30];
+  final RxInt selectedArrivalEtaMinutes = 0.obs;
+
+  void resetArrivalEta() {
+    selectedArrivalEtaMinutes.value = 0;
+  }
+
+  RxInt rideTimerSec = 0.obs;
+  Timer? timer;
   final SocketChannelService _socketService = SocketChannelService();
 
-  void _scheduleBannerForLocation(LatLng latLng) {
-    if (latLng.latitude == 0 && latLng.longitude == 0) return;
-
-    if (_lastBannerLatLng != null) {
-      final distance = Geolocator.distanceBetween(
-        _lastBannerLatLng!.latitude,
-        _lastBannerLatLng!.longitude,
-        latLng.latitude,
-        latLng.longitude,
-      );
-      if (distance < 500) return;
-    }
-
-    _bannerLocationDebounce?.cancel();
-    _bannerLocationDebounce = Timer(const Duration(milliseconds: 500), () {
-      _lastBannerLatLng = latLng;
-      getBanner(lat: latLng.latitude, lng: latLng.longitude);
+  void getRideTimer(int time, {bool closeBottomSheet = false}) {
+    rideTimerSec.value = time;
+    if (timer?.isActive ?? false) timer?.cancel();
+    timer = Timer.periodic(Duration(seconds: 1), (timer) {
+      if (rideTimerSec.value > 0) {
+        rideTimerSec.value--;
+      } else {
+        this.timer?.cancel();
+        timer.cancel();
+        final String expiredOfferId = _lastPresentedOfferId;
+        if (expiredOfferId.isNotEmpty) {
+          dismissVisibleRideOffer(
+            bookingId: expiredOfferId,
+            reason: 'acceptance_timeout',
+          );
+        } else {
+          isRideAvailable.value = -1;
+          update();
+          close();
+        }
+      }
     });
   }
 
   @override
   void onInit() {
-    LogUtils.printAction("ON INIT CALLED");
-    // TODO: implement onInit
     super.onInit();
-
-    final currentLocation = LocationService().currentUserLatLg.value;
-    if (currentLocation != null) {
-      _scheduleBannerForLocation(currentLocation);
-    }
-    ever(LocationService().currentUserLatLg, (LatLng? latLng) {
-      if (latLng != null) {
-        _scheduleBannerForLocation(latLng);
-      }
-    });
-
-    getAddress();
-    getUserNameList();
+    isOnline.value = AppPreference.getBoolean(AppPreference.driverOnline);
+    debugPrint("HOME INIT ");
+    notificationRedirect();
     getRideTypeList();
     _initializeSocket();
     _listenToSocket();
     _listenToConnection();
+    _startRideOfferPolling();
+    unawaited(ensureOnlineHeartbeat(reason: 'home_controller_init', force: true));
+    getSetting();
   }
 
-  // Observable connection state
   final RxBool isConnected = false.obs;
 
   @override
   void onClose() {
     _socketService.disconnect();
     _socketSubscription?.cancel();
-    _bannerLocationDebounce?.cancel();
+    _notificationStream?.cancel();
+    _rideOfferPollingTimer?.cancel();
+    FireBaseNotification().removeListen();
     super.onClose();
   }
 
-  /// Initialize WebSocket connection
+  Timer? _rideOfferPollingTimer;
+  bool _rideOfferPollInProgress = false;
+  String _lastPresentedOfferId = '';
+  DateTime? _lastPresentedOfferAt;
+  DateTime? _nextRideOfferPollAt;
+  int _rideOfferPollFailureCount = 0;
+  String _lastPollSkipReason = '';
+  DateTime? _lastPollSkipLoggedAt;
+  DateTime? _lastActiveRideCheckAt;
+  bool _activeRideCheckInProgress = false;
+  String _lastAlertedOfferId = '';
+  String _offerUiRenderedId = '';
+  DateTime? _offerUiRenderedAt;
+  String _offerPointerDownId = '';
+  DateTime? _offerPointerDownAt;
+  bool _offerAcceptInFlight = false;
+
+  String get visibleOfferBookingId => _lastPresentedOfferId;
+  bool get offerAcceptInFlight => _offerAcceptInFlight;
+
+  void markOfferUiRendered(String bookingId) {
+    final String normalized = bookingId.trim();
+    if (normalized.isEmpty ||
+        normalized != _lastPresentedOfferId ||
+        isRideAvailable.value != 1) {
+      DriverFlowDebug.send(
+        'offer_ui_render_ignored',
+        bookingId: normalized,
+        data: <String, dynamic>{
+          'last_offer_id': _lastPresentedOfferId,
+          'ride_available': isRideAvailable.value,
+        },
+      );
+      return;
+    }
+    if (_offerUiRenderedId == normalized) return;
+    _offerUiRenderedId = normalized;
+    _offerUiRenderedAt = DateTime.now();
+    DriverFlowDebug.send(
+      'offer_ui_rendered',
+      bookingId: normalized,
+      data: <String, dynamic>{
+        'route': Get.currentRoute,
+        'timer_seconds': rideTimerSec.value,
+      },
+    );
+  }
+
+  void markOfferPointerDown(String bookingId) {
+    final String normalized = bookingId.trim();
+    _offerPointerDownId = normalized;
+    _offerPointerDownAt = DateTime.now();
+    DriverFlowDebug.send(
+      'offer_accept_pointer_down',
+      bookingId: normalized,
+      data: <String, dynamic>{
+        'ui_rendered': _offerUiRenderedId == normalized,
+        'ride_available': isRideAvailable.value,
+      },
+    );
+  }
+
+  void dismissVisibleRideOffer({
+    required String bookingId,
+    String reason = 'driver_dismissed',
+  }) {
+    final String normalized = bookingId.trim();
+    if (normalized.isEmpty || normalized != _lastPresentedOfferId) {
+      DriverFlowDebug.send(
+        'offer_dismiss_ignored',
+        bookingId: normalized,
+        data: <String, dynamic>{
+          'last_offer_id': _lastPresentedOfferId,
+          'reason': reason,
+        },
+      );
+      return;
+    }
+    timer?.cancel();
+    isRideAvailable.value = -1;
+    _lastPresentedOfferId = '';
+    _lastPresentedOfferAt = null;
+    _offerUiRenderedId = '';
+    _offerUiRenderedAt = null;
+    _offerPointerDownId = '';
+    _offerPointerDownAt = null;
+    resetArrivalEta();
+    DriverFlowDebug.send(
+      'offer_dismissed',
+      bookingId: normalized,
+      data: <String, dynamic>{'reason': reason},
+    );
+    update();
+    Future<void>.delayed(
+      const Duration(milliseconds: 600),
+      () => forceRideOfferRefresh(reason: 'after_offer_dismiss'),
+    );
+  }
+
+  Future<bool> acceptVisibleRideOffer(NewRideModel offer) async {
+    final String bookingId = (offer.bookingId ?? '').toString().trim();
+    final DateTime now = DateTime.now();
+    final bool uiIsCurrent =
+        bookingId.isNotEmpty &&
+        bookingId == _lastPresentedOfferId &&
+        bookingId == _offerUiRenderedId &&
+        isRideAvailable.value == 1;
+    final bool recentRealPointer =
+        bookingId == _offerPointerDownId &&
+        _offerPointerDownAt != null &&
+        now.difference(_offerPointerDownAt!).inMilliseconds <= 2500;
+    final bool renderedRecently =
+        _offerUiRenderedAt != null &&
+        now.difference(_offerUiRenderedAt!).inMinutes < 3;
+    final int etaMinutes = selectedArrivalEtaMinutes.value;
+
+    DriverFlowDebug.send(
+      'offer_accept_guard_checked',
+      bookingId: bookingId,
+      data: <String, dynamic>{
+        'ui_is_current': uiIsCurrent,
+        'recent_real_pointer': recentRealPointer,
+        'rendered_recently': renderedRecently,
+        'accept_in_flight': _offerAcceptInFlight,
+        'eta_minutes': etaMinutes,
+        'last_offer_id': _lastPresentedOfferId,
+      },
+    );
+
+    if (_offerAcceptInFlight) return false;
+    if (!uiIsCurrent || !recentRealPointer || !renderedRecently) {
+      AppSnackBar.showErrorSnackBar(
+        message: 'A fuvarajánlat már nem aktív. Frissítjük a listát.',
+        isError: true,
+      );
+      forceRideOfferRefresh(reason: 'accept_guard_rejected');
+      return false;
+    }
+    if (!allowedArrivalEtaMinutes.contains(etaMinutes)) {
+      AppSnackBar.showErrorSnackBar(
+        message: 'Válaszd ki a vállalt érkezési időt.',
+        isError: true,
+      );
+      return false;
+    }
+
+    final double? dropLat = double.tryParse(offer.dropoff?.latitude ?? '');
+    final double? dropLng = double.tryParse(offer.dropoff?.longitude ?? '');
+    if (dropLat == null || dropLng == null) {
+      DriverFlowDebug.send(
+        'offer_accept_invalid_dropoff',
+        bookingId: bookingId,
+      );
+      AppSnackBar.showErrorSnackBar(
+        message: 'A cél koordinátája hiányzik. A fuvar nem fogadható el.',
+        isError: true,
+      );
+      return false;
+    }
+
+    _offerAcceptInFlight = true;
+    _offerPointerDownId = '';
+    _offerPointerDownAt = null;
+    DriverFlowDebug.send(
+      'offer_accept_user_confirmed',
+      bookingId: bookingId,
+      data: <String, dynamic>{'eta_minutes': etaMinutes},
+    );
+    try {
+      final bool accepted = await updateBookingRideStatus(
+        bookingId: bookingId,
+        statusNo: 1,
+        dropLatLng: LatLng(dropLat, dropLng),
+        dropAddress: offer.dropoff?.address ?? '',
+        rideModel: offer,
+        etaMinutes: etaMinutes,
+      );
+      if (accepted) {
+        isRideAvailable.value = -1;
+        _offerUiRenderedId = '';
+        _offerUiRenderedAt = null;
+        update();
+      } else {
+        _lastPresentedOfferId = '';
+        _lastPresentedOfferAt = null;
+      }
+      return accepted;
+    } finally {
+      _offerAcceptInFlight = false;
+    }
+  }
+
+  void _startRideOfferPolling() {
+    _rideOfferPollingTimer?.cancel();
+    unawaited(_pollPendingRideOffer(force: true));
+    _rideOfferPollingTimer = Timer.periodic(
+      const Duration(seconds: 3),
+      (_) => unawaited(_pollPendingRideOffer()),
+    );
+  }
+
+  void forceRideOfferRefresh({String reason = 'manual'}) {
+    _nextRideOfferPollAt = null;
+    DriverFlowDebug.send(
+      'pending_offer_force_refresh',
+      data: <String, dynamic>{'reason': reason, 'route': Get.currentRoute},
+    );
+    unawaited(_pollPendingRideOffer(force: true));
+  }
+
+  String _currentLocalRideBookingId() {
+    final String rideModelId =
+        (rideDataModel.value?.booking?.id ?? rideDataModel.value?.bookingId ?? '')
+            .toString()
+            .trim();
+    if (rideModelId.isNotEmpty) return rideModelId;
+    final String constantId = Constants.bookingId.trim();
+    if (constantId.isNotEmpty) return constantId;
+    return (accountController.userModel.value?.currentBookingId ?? '').trim();
+  }
+
+  void clearTerminalRideState({
+    String reason = 'terminal_status',
+    String bookingId = '',
+    bool refreshOffers = true,
+  }) {
+    final String incomingId = bookingId.trim();
+    final String activeId = _currentLocalRideBookingId();
+    final String serverCurrentId =
+        (accountController.userModel.value?.currentBookingId ?? '').trim();
+
+    final bool mismatchesActive =
+        incomingId.isNotEmpty &&
+        activeId.isNotEmpty &&
+        incomingId != activeId;
+    final bool mismatchesVisibleOffer =
+        incomingId.isNotEmpty &&
+        activeId.isEmpty &&
+        _lastPresentedOfferId.isNotEmpty &&
+        incomingId != _lastPresentedOfferId;
+    final bool emptyIdWouldClearServerActive =
+        incomingId.isEmpty && activeId.isNotEmpty && serverCurrentId.isNotEmpty;
+
+    if (mismatchesActive ||
+        mismatchesVisibleOffer ||
+        emptyIdWouldClearServerActive) {
+      DriverFlowDebug.send(
+        'stale_terminal_clear_ignored',
+        bookingId: incomingId,
+        data: <String, dynamic>{
+          'reason': reason,
+          'active_booking_id': activeId,
+          'server_current_booking_id': serverCurrentId,
+          'visible_offer_id': _lastPresentedOfferId,
+          'route': Get.currentRoute,
+        },
+      );
+      return;
+    }
+
+    timer?.cancel();
+    timer1?.cancel();
+    rideDataModel.value = null;
+    rideDataModel.refresh();
+    isRideAvailable.value = -1;
+    rideStatus.value = 1;
+    isDrawPoliLine.value = false;
+    Constants.bookingId = '';
+    AppPreference.removeKey(AppPreference.driverRideTime);
+    accountController.userModel.update((value) {
+      value?.currentBookingId = '';
+    });
+    accountController.userModel.refresh();
+    _lastPresentedOfferId = '';
+    _lastPresentedOfferAt = null;
+    _lastAlertedOfferId = '';
+    _offerUiRenderedId = '';
+    _offerUiRenderedAt = null;
+    _offerPointerDownId = '';
+    _offerPointerDownAt = null;
+    _offerAcceptInFlight = false;
+    _nextRideOfferPollAt = null;
+    DriverFlowDebug.send(
+      'active_ride_state_cleared',
+      bookingId: incomingId.isNotEmpty ? incomingId : activeId,
+      data: <String, dynamic>{'reason': reason, 'route': Get.currentRoute},
+    );
+    update();
+    if (refreshOffers) {
+      Future.delayed(
+        const Duration(milliseconds: 800),
+        () => forceRideOfferRefresh(reason: 'after_$reason'),
+      );
+    }
+  }
+
+  void _logPollSkip(String reason, Map<String, dynamic> data) {
+    final now = DateTime.now();
+    final shouldLog = reason != _lastPollSkipReason ||
+        _lastPollSkipLoggedAt == null ||
+        now.difference(_lastPollSkipLoggedAt!).inSeconds >= 15;
+    if (!shouldLog) return;
+    _lastPollSkipReason = reason;
+    _lastPollSkipLoggedAt = now;
+    DriverFlowDebug.send(
+      'pending_offer_poll_skipped',
+      data: <String, dynamic>{'reason': reason, ...data},
+    );
+  }
+
+  void _presentRideOffer(
+    Map<String, dynamic> payload, {
+    required String source,
+  }) {
+    final String bookingId = payload['booking_id']?.toString().trim() ?? '';
+    if (bookingId.isEmpty) {
+      DriverFlowDebug.send(
+        'offer_state_rejected_missing_booking_id',
+        data: <String, dynamic>{'source': source},
+      );
+      return;
+    }
+
+    final String activeId = _currentLocalRideBookingId();
+    if (activeId.isNotEmpty && activeId != bookingId) {
+      DriverFlowDebug.send(
+        'offer_state_rejected_active_ride',
+        bookingId: bookingId,
+        data: <String, dynamic>{
+          'active_booking_id': activeId,
+          'source': source,
+          'route': Get.currentRoute,
+        },
+      );
+      return;
+    }
+
+    if (bookingId == _lastPresentedOfferId && isRideAvailable.value == 1) {
+      DriverFlowDebug.send(
+        'offer_duplicate_signal_ignored',
+        bookingId: bookingId,
+        data: <String, dynamic>{'source': source},
+      );
+      return;
+    }
+
+    _lastPresentedOfferId = bookingId;
+    _lastPresentedOfferAt = DateTime.now();
+    _offerUiRenderedId = '';
+    _offerUiRenderedAt = null;
+    _offerPointerDownId = '';
+    _offerPointerDownAt = null;
+    _offerAcceptInFlight = false;
+    resetArrivalEta();
+    rideDataTempModel = NewRideModel.fromJson(payload);
+    getRideTimer(rideDataTempModel.acceptanceTimer ?? 30);
+    isRideAvailable.value = 1;
+    isRideAvailable.refresh();
+
+    final String routeBeforeRedirect = Get.currentRoute;
+    if (routeBeforeRedirect != Routes.homeScreen &&
+        routeBeforeRedirect != Routes.mapNavigationScreen) {
+      Navigation.replaceAll(Routes.homeScreen);
+    }
+    update();
+
+    if (_lastAlertedOfferId != bookingId) {
+      _lastAlertedOfferId = bookingId;
+      unawaited(SystemSound.play(SystemSoundType.alert));
+      unawaited(HapticFeedback.heavyImpact());
+      unawaited(
+        FireBaseNotification().showIncomingRideAlert(bookingId: bookingId),
+      );
+      DriverFlowDebug.send(
+        'incoming_ride_alert_triggered',
+        bookingId: bookingId,
+        data: <String, dynamic>{'source': source},
+      );
+    }
+
+    DriverFlowDebug.send(
+      'pending_offer_state_ready',
+      bookingId: bookingId,
+      data: <String, dynamic>{
+        'source': source,
+        'route_before_redirect': routeBeforeRedirect,
+        'route_after_redirect': Get.currentRoute,
+        'pickup_present':
+            (rideDataTempModel.pickup?.address ?? '').trim().isNotEmpty,
+        'dropoff_present':
+            (rideDataTempModel.dropoff?.address ?? '').trim().isNotEmpty,
+        'acceptance_timer': rideDataTempModel.acceptanceTimer ?? 30,
+      },
+    );
+  }
+
+  Future<void> _reconcileActiveRideFromProfile() async {
+    final DateTime now = DateTime.now();
+    if (_activeRideCheckInProgress ||
+        (_lastActiveRideCheckAt != null &&
+            now.difference(_lastActiveRideCheckAt!).inSeconds < 5)) {
+      return;
+    }
+    _activeRideCheckInProgress = true;
+    _lastActiveRideCheckAt = now;
+    final String previousBookingId = _currentLocalRideBookingId();
+    try {
+      await accountController.getUserData();
+      final String serverStatus =
+          accountController.lastServerRideStatus.value.toLowerCase().trim();
+      final String serverBookingId =
+          accountController.lastServerRideBookingId.value.trim();
+      final String serverCurrentBookingId =
+          (accountController.userModel.value?.currentBookingId ?? '').trim();
+      final String serverPaymentStatus =
+          accountController.lastServerRidePaymentStatus.value
+              .toLowerCase()
+              .trim();
+      final bool paymentSettled = const <String>{
+        'paid',
+        'completed',
+        'complete',
+        'success',
+        'successful',
+        'settled',
+        '1',
+        'true',
+      }.contains(serverPaymentStatus);
+      final bool completedAwaitingPayment =
+          serverStatus == 'completed' && !paymentSettled;
+      final bool terminal = const <String>{
+        'cancelled',
+        'completed',
+        'expired',
+      }.contains(serverStatus);
+
+      if (completedAwaitingPayment) {
+        DriverFlowDebug.send(
+          'completed_ride_preserved_until_payment',
+          bookingId: serverBookingId,
+          data: <String, dynamic>{
+            'payment_status': serverPaymentStatus,
+            'previous_booking_id': previousBookingId,
+            'route': Get.currentRoute,
+          },
+        );
+        if (serverBookingId.isNotEmpty &&
+            previousBookingId == serverBookingId &&
+            Get.currentRoute != Routes.cashCollectScreen) {
+          Navigation.replaceAll(Routes.cashCollectScreen);
+        }
+        return;
+      }
+
+      if (!terminal) {
+        DriverFlowDebug.send(
+          'active_ride_reconcile_non_terminal',
+          bookingId: serverBookingId,
+          data: <String, dynamic>{
+            'server_status': serverStatus,
+            'previous_booking_id': previousBookingId,
+            'server_current_booking_id': serverCurrentBookingId,
+            'server_payment_status': serverPaymentStatus,
+          },
+        );
+        return;
+      }
+
+      if (previousBookingId.isEmpty ||
+          serverBookingId.isEmpty ||
+          serverBookingId != previousBookingId) {
+        DriverFlowDebug.send(
+          'stale_terminal_profile_result_ignored',
+          bookingId: serverBookingId,
+          data: <String, dynamic>{
+            'server_status': serverStatus,
+            'previous_booking_id': previousBookingId,
+            'server_current_booking_id': serverCurrentBookingId,
+            'route': Get.currentRoute,
+          },
+        );
+        return;
+      }
+
+      DriverFlowDebug.send(
+        'active_ride_reconciled_terminal',
+        bookingId: serverBookingId,
+        data: <String, dynamic>{
+          'server_status': serverStatus,
+          'route': Get.currentRoute,
+        },
+      );
+      clearTerminalRideState(
+        reason: serverStatus == 'cancelled'
+            ? 'passenger_cancelled_profile_poll'
+            : 'terminal_profile_poll',
+        bookingId: serverBookingId,
+      );
+      if (const <String>{
+        Routes.mapNavigationScreen,
+        Routes.customerOtpVerify,
+        Routes.cashCollectScreen,
+      }.contains(Get.currentRoute)) {
+        Navigation.replaceAll(Routes.homeScreen);
+        AppSnackBar.showErrorSnackBar(
+          message: serverStatus == 'cancelled'
+              ? 'Az utas lemondta az utazást.'
+              : 'Az aktív utazás lezárult.',
+          isError: serverStatus == 'cancelled',
+        );
+      }
+    } catch (error, stack) {
+      DriverFlowDebug.send(
+        'active_ride_reconcile_error',
+        bookingId: previousBookingId,
+        data: <String, dynamic>{
+          'error': error.toString(),
+          'stack': stack.toString(),
+        },
+      );
+    } finally {
+      _activeRideCheckInProgress = false;
+    }
+  }
+
+  Future<void> _pollPendingRideOffer({bool force = false}) async {
+    final bool driverIsOnline =
+        isOnline.value ||
+        AppPreference.getBoolean(AppPreference.driverOnline) ||
+        (accountController.userModel.value?.isOnline ?? '0') == '1';
+
+    final String currentRideStatus =
+        rideDataModel.value?.booking?.status?.toLowerCase().trim() ?? '';
+    final bool localRideLooksActive = const {'accepted', 'arrived', 'started'}
+        .contains(currentRideStatus);
+    final String serverCurrentBookingId =
+        (accountController.userModel.value?.currentBookingId ?? '').trim();
+    final bool activeRideScreen = const <String>{
+      Routes.mapNavigationScreen,
+      Routes.customerOtpVerify,
+      Routes.cashCollectScreen,
+    }.contains(Get.currentRoute);
+
+    // A korábban lemondott/befejezett fuvar helyi modellje nem állíthatja le
+    // örökre az új ajánlatok lekérését.
+    if (localRideLooksActive &&
+        serverCurrentBookingId.isEmpty &&
+        !activeRideScreen) {
+      rideDataModel.value = null;
+      rideDataModel.refresh();
+      rideStatus.value = 1;
+      isDrawPoliLine.value = false;
+      DriverFlowDebug.send(
+        'stale_local_ride_removed_before_poll',
+        data: <String, dynamic>{
+          'local_status': currentRideStatus,
+          'route': Get.currentRoute,
+        },
+      );
+    }
+
+    // A profilban önmagában beragadt current_booking_id nem állíthatja le
+    // örökre a pending-offer végpontot. Valódi aktív fuvarnak csak a helyi
+    // aktív állapotot vagy a megnyitott navigációt tekintjük; a backend ettől
+    // még biztonságosan visszaadhat üres ajánlatot.
+    final bool hasActiveRide = activeRideScreen ||
+        (localRideLooksActive && serverCurrentBookingId.isNotEmpty);
+    final DateTime now = DateTime.now();
+
+    if (!driverIsOnline) {
+      _logPollSkip('driver_offline', <String, dynamic>{
+        'local_online': isOnline.value,
+        'stored_online': AppPreference.getBoolean(AppPreference.driverOnline),
+        'profile_online': accountController.userModel.value?.isOnline ?? '',
+      });
+      return;
+    }
+    if (_rideOfferPollInProgress) {
+      _logPollSkip('poll_in_progress', <String, dynamic>{});
+      return;
+    }
+    if (isRideAvailable.value == 1) {
+      _logPollSkip('offer_already_visible', <String, dynamic>{
+        'booking_id': _lastPresentedOfferId,
+      });
+      return;
+    }
+    if (hasActiveRide) {
+      _logPollSkip('active_ride', <String, dynamic>{
+        'server_booking_id': serverCurrentBookingId,
+        'local_status': currentRideStatus,
+        'route': Get.currentRoute,
+      });
+      unawaited(_reconcileActiveRideFromProfile());
+      return;
+    }
+    if (!force &&
+        _nextRideOfferPollAt != null &&
+        now.isBefore(_nextRideOfferPollAt!)) {
+      _logPollSkip('backoff', <String, dynamic>{
+        'retry_at': _nextRideOfferPollAt!.toIso8601String(),
+      });
+      return;
+    }
+
+    _rideOfferPollInProgress = true;
+    DriverFlowDebug.send(
+      'pending_offer_poll_started',
+      data: <String, dynamic>{
+        'force': force,
+        'route': Get.currentRoute,
+        'last_offer_id': _lastPresentedOfferId,
+      },
+    );
+
+    try {
+      final dynamic response = await HomeServices.pendingRideOffer(
+        onlineHeartbeat: driverIsOnline,
+        currentLocation: LocationService().currentUserLatLg.value,
+      );
+      _rideOfferPollFailureCount = 0;
+      _nextRideOfferPollAt = null;
+
+      dynamic rawPayload = response is Map ? response['data'] : null;
+      if (rawPayload is Map &&
+          !rawPayload.containsKey('booking_id') &&
+          rawPayload['data'] is Map) {
+        rawPayload = rawPayload['data'];
+      }
+
+      if (rawPayload is! Map) {
+        final String responseMessage = response is Map
+            ? response['message']?.toString() ?? ''
+            : '';
+        DriverFlowDebug.send(
+          'pending_offer_none',
+          data: <String, dynamic>{
+            'reason_code': response is Map
+                ? response['reason_code']?.toString() ?? ''
+                : '',
+            'message': responseMessage,
+          },
+        );
+        if (driverIsOnline &&
+            responseMessage.toLowerCase().contains('offline')) {
+          unawaited(
+            ensureOnlineHeartbeat(
+              reason: 'pending_offer_server_offline',
+              force: true,
+            ),
+          );
+        }
+        return;
+      }
+
+      final payload = Map<String, dynamic>.from(rawPayload);
+      final bookingId = payload['booking_id']?.toString().trim() ?? '';
+      if (bookingId.isEmpty) {
+        DriverFlowDebug.send('pending_offer_missing_booking_id');
+        return;
+      }
+
+      final bool sameOfferRecentlyShown = bookingId == _lastPresentedOfferId &&
+          _lastPresentedOfferAt != null &&
+          now.difference(_lastPresentedOfferAt!).inSeconds < 12;
+      if (sameOfferRecentlyShown) return;
+
+      final targetDriverId =
+          payload['driver_auth_token']?.toString().trim() ?? '';
+      final currentDriverId =
+          AppPreference.getString(AppPreference.userId).trim();
+
+      if (targetDriverId.isNotEmpty &&
+          currentDriverId.isNotEmpty &&
+          targetDriverId != currentDriverId) {
+        DriverFlowDebug.send(
+          'pending_offer_wrong_driver',
+          bookingId: bookingId,
+          data: <String, dynamic>{
+            'target_driver_id': targetDriverId,
+            'current_driver_id': currentDriverId,
+          },
+        );
+        return;
+      }
+
+      _presentRideOffer(payload, source: 'polling');
+    } catch (error, stack) {
+      if (_rideOfferPollFailureCount < 5) {
+        _rideOfferPollFailureCount++;
+      }
+      final int retrySeconds = switch (_rideOfferPollFailureCount) {
+        1 => 4,
+        2 => 8,
+        3 => 15,
+        _ => 25,
+      };
+      _nextRideOfferPollAt = DateTime.now().add(Duration(seconds: retrySeconds));
+      DriverFlowDebug.send(
+        'pending_offer_poll_error',
+        data: <String, dynamic>{
+          'error': error.toString(),
+          'retry_seconds': retrySeconds,
+        },
+      );
+      LogUtils.printError('RIDE OFFER POLLING ERROR: $error, $stack');
+    } finally {
+      _rideOfferPollInProgress = false;
+    }
+  }
+
   void _initializeSocket() {
     _socketService.initSocket(
-      url: "wss://ws-ap2.pusher.com/app/bd173a4219b16bb73593",
-      subscriptionData: {"channel": "user.all"},
+      url: "wss://ws-ap2.pusher.com/app/bd173a4219b16bb73593?protocol=7&client=flutter&version=1.0&flash=false",
+      subscriptionData: {"channel": "drivers.all"},
       reconnectInterval: const Duration(seconds: 5),
-      maxReconnectAttempts: -1, // Infinite reconnection attempts
+      maxReconnectAttempts: -1,
     );
   }
 
   StreamSubscription? _socketSubscription;
 
-  Map<String, dynamic>? _decodeSocketMap(dynamic raw) {
-    try {
-      if (raw is Map<String, dynamic>) return raw;
-      if (raw is Map) {
-        return raw.map<String, dynamic>(
-          (dynamic key, dynamic value) =>
-              MapEntry<String, dynamic>(key.toString(), value),
-        );
-      }
-      if (raw is String && raw.trim().isNotEmpty) {
-        final dynamic decoded = jsonDecode(raw);
-        if (decoded is Map<String, dynamic>) return decoded;
-        if (decoded is Map) {
-          return decoded.map<String, dynamic>(
-            (dynamic key, dynamic value) =>
-                MapEntry<String, dynamic>(key.toString(), value),
-          );
-        }
-      }
-    } catch (error, stack) {
-      PassengerFlowDebug.runtimeError(
-        'home_socket_decode',
-        error,
-        stack,
-      );
-    }
-    return null;
-  }
-
-  /// Listen to socket data stream
   void _listenToSocket() {
     _socketSubscription?.cancel();
     _socketSubscription = _socketService.onSocketDataListen.listen((event) {
       try {
-        final Map<String, dynamic>? data = _decodeSocketMap(event);
-        if (data == null) {
-          PassengerFlowDebug.send(
-            'socket_outer_payload_invalid',
-            data: <String, dynamic>{
-              'runtime_type': event.runtimeType.toString(),
-            },
-          );
-          return;
-        }
+        if (event != null) {
+          final data = jsonDecode(event);
 
-        final String eventName = '${data['event'] ?? ''}'.trim();
-        final Map<String, dynamic>? eventData = _decodeSocketMap(data['data']);
-        final dynamic bookingRaw = eventData?['booking'];
-        final Map<String, dynamic>? booking = _decodeSocketMap(bookingRaw);
-        final String bookingId =
-            '${booking?['id'] ?? eventData?['booking_id'] ?? AppConstant().bookingId}'
-                .trim();
-
-        PassengerFlowDebug.send(
-          'socket_event_received',
-          bookingId: bookingId,
-          data: <String, dynamic>{
-            'event_name': eventName,
-            'outer_keys': data.keys.toList(),
-            'payload_keys': eventData?.keys.toList() ?? const <String>[],
-            'booking_status': booking?['status'] ?? eventData?['status'],
-          },
-        );
-
-        if (eventName == 'connection_established') {
-          final String socketId = '${eventData?['socket_id'] ?? ''}'.trim();
-          if (socketId.isNotEmpty) {
-            AppConstant().socketId = socketId;
+          if (data['event'] == "pusher:connection_established") {
+            Constants.socketId = jsonDecode(data['data'])['socket_id'];
           }
-          return;
-        }
-
-        if (eventName == 'new.ride.request') {
-          final String socketUserId = '${booking?['user'] is Map
-                  ? (booking?['user'] as Map)['id']
-                  : booking?['user_id'] ?? ''}'
-              .trim();
-          final String currentUserId =
+          final dynamic decodedPayload = data['data'] is String
+              ? jsonDecode(data['data'])
+              : data['data'];
+          final Map<String, dynamic> payload = decodedPayload is Map
+              ? Map<String, dynamic>.from(decodedPayload)
+              : <String, dynamic>{};
+          final String currentDriverId =
               AppPreference.getString(AppPreference.userId).trim();
-          final String currentBookingId = AppConstant().bookingId.trim();
+          final dynamic payloadBooking = payload['booking'];
+          final String targetDriverId =
+              (payload['driver_auth_token'] ??
+                      payload['driver_id'] ??
+                      (payloadBooking is Map
+                          ? payloadBooking['driver_id']
+                          : null) ??
+                      '')
+                  .toString()
+                  .trim();
+          final String eventName = (data['event'] ?? '').toString();
+          final String eventStatus =
+              (payload['status'] ??
+                      (payloadBooking is Map ? payloadBooking['status'] : null) ??
+                      '')
+                  .toString()
+                  .toLowerCase()
+                  .trim();
+          final bool isPassengerCancellation =
+              <String>{
+                'user_cancle_booking',
+                'user_cancel_booking',
+                'booking_cancelled',
+                'booking.cancelled',
+              }.contains(eventName) ||
+              (eventName.toLowerCase().contains('bookingstatuschanged') &&
+                  eventStatus == 'cancelled');
+          final bool isDriverOnline =
+              isOnline.value ||
+              AppPreference.getBoolean(AppPreference.driverOnline) ||
+              (accountController.userModel.value?.isOnline ?? "0") == "1";
 
-          final bool userMatches = socketUserId == currentUserId;
-          final bool bookingMatches = bookingId == currentBookingId;
-          PassengerFlowDebug.send(
-            'socket_ride_match_evaluated',
-            bookingId: bookingId,
-            data: <String, dynamic>{
-              'user_matches': userMatches,
-              'booking_matches': bookingMatches,
-              'has_booking': booking != null,
-            },
-          );
-
-          if (userMatches && bookingMatches) {
-            riderBookingModel.value = NewRideModel.fromJson(data);
-            persistBookingFareFromModel(riderBookingModel.value?.data);
-            socketData();
-          }
-          return;
-        }
-
-        if (eventName == 'issue.reported') {
-          final String issueUserId = '${booking?['user_id'] ?? ''}'.trim();
-          final String currentUserId =
-              AppPreference.getString(AppPreference.userId).trim();
-          if (issueUserId == currentUserId &&
-              bookingId == AppConstant().bookingId.trim()) {
-            final Map<String, dynamic>? issue =
-                _decodeSocketMap(eventData?['issue_report']);
-            AppConstant().reportString.value =
-                '${issue?['issue_type_label'] ?? ''}@@${issue?['custom_issue'] ?? ''}';
-          }
-        }
-      } catch (error, stack) {
-        PassengerFlowDebug.runtimeError(
-          'home_socket_listener',
-          error,
-          stack,
-        );
-        log('PASSENGER SOCKET LISTENER ERROR: $error, $stack');
-      }
-    });
-  }
-
-  /// Listen to connection state
-  void _listenToConnection() {
-    _socketService.connectionStream.listen((connected) {
-      log("CONNECTION :::::::${connected}");
-      isConnected.value = connected;
-      PassengerFlowDebug.send(
-        'socket_connection_changed',
-        bookingId: AppConstant().bookingId,
-        data: <String, dynamic>{'connected': connected},
-      );
-    });
-  }
-
-  bool changePolyLine = false;
-
-  Future<void> socketData({bool isFirstTime = false}) async {
-    final booking = riderBookingModel.value?.data?.booking;
-    final status = (booking?.status ?? '').toLowerCase().trim();
-    final bookingId = '${booking?.id ?? AppConstant().bookingId}'.trim();
-    const activeStatuses = <String>{
-      'searching',
-      'accepted',
-      'arrived',
-      'started',
-    };
-    const terminalStatuses = <String>{
-      'completed',
-      'cancelled',
-      'expired',
-    };
-
-    log('PASSENGER STATUS: $status / $bookingId / ${Get.currentRoute}');
-    PassengerFlowDebug.send(
-      'booking_state_received',
-      bookingId: bookingId,
-      data: <String, dynamic>{
-        'status': status,
-        'is_first_time': isFirstTime,
-        'route': Get.currentRoute,
-        'trip_auth_present': (booking?.otp ?? '').trim().isNotEmpty,
-        'trip_auth_length': (booking?.otp ?? '').trim().length,
-        'driver_present': riderBookingModel.value?.data?.driver != null,
-      },
-    );
-
-    if (isFirstTime && activeStatuses.contains(status)) {
-      final pickupLat = double.tryParse(
-            riderBookingModel.value?.data?.pickup?.latitude ?? '',
-          ) ??
-          0;
-      final pickupLng = double.tryParse(
-            riderBookingModel.value?.data?.pickup?.longitude ?? '',
-          ) ??
-          0;
-      final dropoffLat = double.tryParse(
-            riderBookingModel.value?.data?.dropoff?.latitude ?? '',
-          ) ??
-          0;
-      final dropoffLng = double.tryParse(
-            riderBookingModel.value?.data?.dropoff?.longitude ?? '',
-          ) ??
-          0;
-
-      if (pickupLat != 0 &&
-          pickupLng != 0 &&
-          dropoffLat != 0 &&
-          dropoffLng != 0 &&
-          Get.currentRoute != Routes.searchDriverScreen) {
-        PassengerFlowDebug.send(
-          'active_trip_screen_open_requested',
-          bookingId: bookingId,
-          data: <String, dynamic>{'status': status},
-        );
-        Navigation.pushNamed(
-          Routes.searchDriverScreen,
-          arg: <String, LatLng>{
-            'origin': LatLng(pickupLat, pickupLng),
-            'destination': LatLng(dropoffLat, dropoffLng),
-          },
-        );
-      }
-    }
-
-    try {
-      if (status == 'accepted') {
-        isDriverCome.value = false;
-        tripType.value = 1;
-        changePolyLine = true;
-        AppPreference.removeKey(AppPreference.RideTime);
-      } else if (status == 'arrived') {
-        changePolyLine = false;
-        tripType.value = 1;
-        isDriverCome.value = true;
-        PassengerFlowDebug.send(
-          'trip_auth_display_ready',
-          bookingId: bookingId,
-          data: <String, dynamic>{
-            'trip_auth_present': (booking?.otp ?? '').trim().isNotEmpty,
-            'trip_auth_length': (booking?.otp ?? '').trim().length,
-          },
-        );
-        final waitingLimit = int.tryParse(
-              booking?.rideType?.waitingTimeLimit ?? '0',
-            ) ??
-            0;
-        getRideTimer(waitingLimit);
-      } else if (status == 'started') {
-        tripType.value = 2;
-        AppPreference.removeKey(AppPreference.RideTime);
-      } else if (terminalStatuses.contains(status)) {
-        final paymentMethod = (booking?.paymentMethod ?? '').trim().toLowerCase();
-        final paymentStatus = (booking?.paymentStatus ?? '').trim().toLowerCase();
-        final finalAmount = resolveTotalAmount(riderBookingModel.value?.data);
-
-        PassengerFlowDebug.send(
-          'terminal_booking_payment_evaluated',
-          bookingId: bookingId,
-          data: <String, dynamic>{
-            'status': status,
-            'payment_method': paymentMethod,
-            'payment_status': paymentStatus,
-            'payment_settled': _isPaymentSettled(paymentStatus),
-            'is_first_time': isFirstTime,
-          },
-        );
-
-        if (status == 'completed') {
-          AppConstant().reportString.value = '';
-          if (Get.isRegistered<TripController>()) {
-            unawaited(Get.find<TripController>().getTripHistory());
-          }
-
-          if (_isPaymentSettled(paymentStatus)) {
-            await _finalizeCompletedRide(
-              bookingId: bookingId,
-              paymentMethod: paymentMethod,
-              paymentStatus: paymentStatus,
+          if (data['event'] == "new.ride.request" &&
+              targetDriverId.isNotEmpty &&
+              currentDriverId.isNotEmpty &&
+              targetDriverId == currentDriverId &&
+              isDriverOnline) {
+            _presentRideOffer(payload, source: 'socket');
+          } else if (isPassengerCancellation &&
+              (targetDriverId.isEmpty || targetDriverId == currentDriverId)) {
+            clearTerminalRideState(
+              reason: 'passenger_cancelled',
+              bookingId: payload['booking_id']?.toString() ?? '',
             );
-          } else {
-            awaitingRidePayment.value = true;
-            awaitingRidePaymentBookingId.value = bookingId;
-            tripType.value = 3;
-            PassengerFlowDebug.send(
-              'completed_ride_waiting_for_payment',
-              bookingId: bookingId,
-              data: <String, dynamic>{
-                'payment_method': paymentMethod,
-                'payment_status': paymentStatus,
-                'final_amount': finalAmount,
-              },
-            );
-            await _openCompletedRidePaymentSelection(
-              bookingId: bookingId,
-              paymentMethod: paymentMethod,
-              finalAmount: finalAmount,
-            );
-          }
-          return;
-        }
-
-        _clearCurrentBookingState(
-          bookingId: bookingId,
-          reason: 'terminal_status_received',
-          status: status,
-        );
-
-        if (isFirstTime) {
-          PassengerFlowDebug.send(
-            'terminal_booking_ignored_on_restore',
-            bookingId: bookingId,
-            data: <String, dynamic>{'status': status},
-          );
-          if (Get.currentRoute != Routes.dashboardScreen) {
-            Navigation.popupUtil(Routes.dashboardScreen);
-          }
-          return;
-        }
-
-        if (status == 'cancelled') {
-          AppDialog.commonDialog(
-            barrierDismissible: false,
-            childs: Column(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                CustomImage(image: ImagesAsset.rideCancel),
-                16.verticalSpace,
-                CommonText(
-                  string: AppString.weAreSadToCancel.tr,
-                  fontSize: 16.sp,
-                  fontWeight: FontWeight.w500,
-                  textAlign: TextAlign.center,
-                  softWrap: true,
-                ),
-                12.verticalSpace,
-                CommonText(
-                  string: AppString.makeYourNextRideHappiest.tr,
-                  fontSize: 14.sp,
-                  fontWeight: FontWeight.w400,
-                  color: AppColors.textCaptionColor,
-                  softWrap: true,
-                  textAlign: TextAlign.center,
-                ),
-                16.verticalSpace,
-                CustomButton(
-                  text: AppString.backToHome.tr,
-                  onTap: () {
-                    Get.back();
-                    Navigation.popupUtil(Routes.dashboardScreen);
-                  },
-                ),
-              ],
-            ),
-          );
-        } else if (status == 'expired') {
-          AppDialog.commonBottomSheetWidget(
-            isDismiss: false,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Align(
-                  alignment: AlignmentDirectional.topStart,
-                  child: CommonText(
-                    string: AppString.noRideAvailable.tr,
-                    fontSize: 18.sp,
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.titleTextColor,
+            AppDialog.commonDialog(
+              barrierDismiss: false,
+              childs: Column(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  SizedBox(
+                    height: 159.h,
+                    child: Stack(
+                      children: [
+                        Positioned(
+                          bottom: 0,
+                          left: 0,
+                          right: 0,
+                          child: CustomImage(
+                            image: ImagesAsset.sadShadow,
+                            ht: 60.h,
+                            wt: 138.w,
+                            fit: BoxFit.fitHeight,
+                          ),
+                        ),
+                        Positioned(
+                          top: 0,
+                          left: 0,
+                          right: 0,
+                          child: CustomImage(
+                            image: ImagesAsset.sadImage,
+                            ht: 139.h,
+                            wt: 139.w,
+                            fit: BoxFit.fitHeight,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-                SizedBox(height: 8.h),
-                Container(height: 1.h, color: AppColors.textFieldBorderColor),
-                24.verticalSpace,
-                Center(
-                  child: CustomImage(
-                    image: ImagesAsset.noRide,
-                    ht: 160.h,
-                    wt: 180.w,
-                  ),
-                ),
-                20.verticalSpace,
-                Center(
-                  child: CommonText(
-                    string: AppString.noRideAvailableRightNow.tr,
+                  16.verticalSpace,
+                  CommonText(
+                    string: AppString.weAreSadYouHadToCancel.tr,
+                    fontWeight: FontWeight.w600,
                     fontSize: 16.sp,
-                    fontWeight: FontWeight.w500,
-                    color: AppColors.titleTextColor,
                     textAlign: TextAlign.center,
                   ),
-                ),
-                6.verticalSpace,
-                CommonText(
-                  string: AppString.pleaseTryAgainAfter.tr,
-                  softWrap: true,
-                  fontSize: 14.sp,
-                  color: AppColors.textCaptionColor,
-                  textAlign: TextAlign.center,
-                ).paddingSymmetric(horizontal: 42.w),
-                32.verticalSpace,
-                CustomButton(
-                  text: AppString.tryAgain.tr,
-                  buttonColor: AppColors.mainPrimaryColor,
-                  height: 48.h,
-                  width: double.infinity,
-                  onTap: () {
-                    Get.back();
-                    Navigation.popupUtil(Routes.dashboardScreen);
-                  },
-                ),
-                12.verticalSpace,
-              ],
-            ),
-          );
+                  8.verticalSpace,
+                  CommonText(
+                    string: AppString.weWorkExtraToNextRideHappiest.tr,
+                    softWrap: true,
+                    fontWeight: FontWeight.w400,
+                    fontSize: 14.sp,
+                    textAlign: TextAlign.center,
+                    color: AppColors.textCaptionColor,
+                  ),
+                  16.verticalSpace,
+                  CustomButton(
+                    text: AppString.backToHome.tr,
+                    onTap: () {
+                      Get.back();
+                      Navigation.popupUtil(Routes.homeScreen);
+                    },
+                  ),
+                ],
+              ),
+            );
+          } else if (data['event'] == "payment_success" &&
+              (jsonDecode(data['data']))['driver_auth_token']?.toString() ==
+                  AppPreference.getString(AppPreference.userId)) {
+            Constants.transactionId.value = (jsonDecode(
+              data['data'],
+            ))['transaction_id'];
+            Constants.paymentMode.value = (jsonDecode(
+              data['data'],
+            ))['payment_method'];
+
+            AppDialog.commonDialog(
+              barrierDismiss: false,
+              childs: Column(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                mainAxisSize: MainAxisSize.min,
+
+                children: [
+                  CustomImage(
+                    image: IconAsset.checkMarkDone,
+                    ht: 154.h,
+                    wt: 154.w,
+                    fit: BoxFit.cover,
+                  ),
+                  20.verticalSpace,
+                  CommonText(
+                    string:
+                        "Az utas fizetése sikeresen megtörtént (${Utils.paymentMethodLabel((jsonDecode(data['data']))['payment_method']?.toString())}).",
+                    softWrap: true,
+                  ),
+                  20.verticalSpace,
+                  CustomButton(
+                    text: AppString.done.tr,
+                    onTap: () {
+                      if ((jsonDecode(data['data']))['payment_method'] ==
+                          "cash") {
+                        driverConfirmCashPayment(
+                          transactionId: Constants.transactionId.value,
+                          status: "completed",
+                        );
+                      } else {
+                        Get.back();
+                        Navigation.pushNamed(Routes.reviewScreen);
+                        Constants.transactionId.value = "";
+                      }
+                    },
+                  ),
+                ],
+              ),
+            );
+          }
+        }
+      } catch (e, st) {
+        debugPrint("SOCKET ERROR ::$e, $st");
+      }
+    });
+  }
+
+  void _listenToConnection() {
+    _socketService.connectionStream.listen((connected) {
+      isConnected.value = connected;
+    });
+  }
+
+  @override
+  void dispose() {
+    _socketService.disconnect();
+    FireBaseNotification().removeListner();
+    super.dispose();
+  }
+
+  RxBool isOnline = false.obs;
+  RxBool dutyStatusLoading = false.obs;
+  DateTime? _lastDutyHeartbeatAt;
+  bool _dutyHeartbeatInProgress = false;
+
+  final accountController = Get.put(AccountController());
+
+  Future<bool> ensureOnlineHeartbeat({
+    String reason = 'periodic',
+    bool force = false,
+  }) async {
+    final bool shouldBeOnline = isOnline.value ||
+        AppPreference.getBoolean(AppPreference.driverOnline) ||
+        (accountController.userModel.value?.isOnline ?? '0') == '1';
+    if (!shouldBeOnline || _dutyHeartbeatInProgress) return false;
+
+    final DateTime now = DateTime.now();
+    if (!force &&
+        _lastDutyHeartbeatAt != null &&
+        now.difference(_lastDutyHeartbeatAt!).inSeconds < 25) {
+      return true;
+    }
+
+    _dutyHeartbeatInProgress = true;
+    try {
+      LatLng? location = LocationService().currentUserLatLg.value;
+      if (location == null) {
+        final String stored = AppPreference.getString(AppPreference.location);
+        if (stored.contains('@')) {
+          final List<String> parts = stored.split('@');
+          if (parts.length == 2) {
+            final double? lat = double.tryParse(parts.first);
+            final double? lng = double.tryParse(parts.last);
+            if (lat != null && lng != null) location = LatLng(lat, lng);
+          }
         }
       }
-    } catch (error, stack) {
-      log('PASSENGER STATUS ERROR: $error, $stack');
-      PassengerFlowDebug.send(
-        'booking_state_apply_error',
-        bookingId: bookingId,
-        data: <String, dynamic>{'status': status, 'error': '$error'},
+      location ??= await LocationService().ensureCurrentLocation();
+      if (location == null) {
+        DriverFlowDebug.send(
+          'driver_online_heartbeat_skipped',
+          data: <String, dynamic>{'reason': reason, 'cause': 'no_location'},
+        );
+        return false;
+      }
+
+      final bool success = await userOnlineOffline(
+        location,
+        onlineOffline: 1,
+        silent: true,
+        refreshOffers: false,
       );
-    }
-  }
-
-  Future<void> _openCompletedRidePaymentSelection({
-    required String bookingId,
-    required String paymentMethod,
-    required String finalAmount,
-  }) async {
-    if (bookingId.isEmpty || bookingId == 'null') {
-      PassengerFlowDebug.send(
-        'completed_payment_screen_blocked',
-        data: <String, dynamic>{'reason': 'missing_booking_id'},
-      );
-      return;
-    }
-    if (_paymentSelectionShownForBooking == bookingId) return;
-    if (Get.currentRoute == Routes.paymentSelectScreen) return;
-
-    _paymentSelectionShownForBooking = bookingId;
-    PassengerFlowDebug.send(
-      'completed_payment_screen_open_requested',
-      bookingId: bookingId,
-      data: <String, dynamic>{
-        'payment_method': paymentMethod,
-        'final_amount': finalAmount,
-      },
-    );
-    await Navigation.pushNamed(
-      Routes.paymentSelectScreen,
-      arg: <String, dynamic>{
-        'method': paymentMethod,
-        'finalAmount': finalAmount,
-        'bookingId': bookingId,
-        'completedRide': true,
-      },
-    );
-  }
-
-  Future<bool> selectCashForCompletedRide({
-    required String bookingId,
-  }) async {
-    final activeBookingId =
-        '${riderBookingModel.value?.data?.booking?.id ?? AppConstant().bookingId}'
-            .trim();
-    if (bookingId.isEmpty ||
-        bookingId == 'null' ||
-        activeBookingId.isEmpty ||
-        activeBookingId != bookingId) {
-      PassengerFlowDebug.send(
-        'completed_cash_selection_blocked',
-        bookingId: bookingId,
+      if (success) {
+        _lastDutyHeartbeatAt = DateTime.now();
+        try {
+          await updateDriverLocation(location);
+        } catch (_) {}
+      }
+      DriverFlowDebug.send(
+        'driver_online_heartbeat',
         data: <String, dynamic>{
-          'reason': 'booking_mismatch',
-          'active_booking_id': activeBookingId,
+          'reason': reason,
+          'success': success,
+          'latitude': location.latitude,
+          'longitude': location.longitude,
         },
       );
+      return success;
+    } catch (error, stack) {
+      DriverFlowDebug.send(
+        'driver_online_heartbeat_error',
+        data: <String, dynamic>{
+          'reason': reason,
+          'error': error.toString(),
+          'stack': stack.toString(),
+        },
+      );
+      return false;
+    } finally {
+      _dutyHeartbeatInProgress = false;
+    }
+  }
+
+  Future<bool> userOnlineOffline(
+    LatLng latLng, {
+    bool screenRedirect = false,
+    required int onlineOffline,
+    bool silent = false,
+    bool refreshOffers = true,
+  }) async {
+    if (dutyStatusLoading.value) return false;
+
+    dutyStatusLoading.value = true;
+    try {
+      final data = await HomeServices.userOnlineOffline(latLng, onlineOffline);
+      final dynamic responseData = data is Map ? data['data'] : null;
+      final dynamic rawOnline = responseData is Map
+          ? responseData['is_online']
+          : (data is Map ? data['is_online'] : null);
+      final String normalizedOnline = rawOnline?.toString().toLowerCase() ?? '';
+      final bool serverSaysOnline = rawOnline == null
+          ? onlineOffline == 1
+          : rawOnline == true ||
+              rawOnline == 1 ||
+              normalizedOnline == '1' ||
+              normalizedOnline == 'true' ||
+              normalizedOnline == 'online';
+      final String onlineValue = serverSaysOnline ? '1' : '0';
+
+      isOnline.value = serverSaysOnline;
+      await AppPreference.setBoolean(
+        AppPreference.driverOnline,
+        value: serverSaysOnline,
+      );
+      accountController.userModel.update((val) {
+        val?.isOnline = onlineValue;
+      });
+      accountController.userModel.refresh();
+
+      // Az online állapotot a sikeres attendance-válasz teszi hitelessé.
+      // Nem várunk a /user/profile végpontra, mert annak hibája nem blokkolhatja
+      // a munkába állást és a felület állapotváltását.
+      update();
+
+      final profile = accountController.userModel.value;
+      if (profile != null) {
+        AppPreference.setProfileModel(jsonEncode(profile.toJson()));
+      }
+
+      if (onlineOffline == 1) {
+        if (!silent) {
+          AppSnackBar.showErrorSnackBar(
+            message: 'Sikeresen munkába álltál.',
+          );
+        }
+        if (refreshOffers) {
+          forceRideOfferRefresh(reason: 'went_online');
+        }
+      } else {
+        _lastPresentedOfferId = '';
+        _lastPresentedOfferAt = null;
+      }
+
+      if (screenRedirect) {
+        Navigation.popupUtil(Routes.homeScreen);
+      }
+      return true;
+    } catch (error, stack) {
+      LogUtils.printError('ONLINE/OFFLINE ERROR: $error, $stack');
+      if (!silent) {
+        AppSnackBar.showErrorSnackBar(
+          message: onlineOffline == 1
+              ? 'Nem sikerült munkába állni. Próbáld újra.'
+              : 'Nem sikerült befejezni a műszakot. Próbáld újra.',
+          isError: true,
+        );
+      }
+      return false;
+    } finally {
+      dutyStatusLoading.value = false;
+    }
+  }
+
+  RxInt rideStatus = 1.obs;
+  RxBool isDrawPoliLine = false.obs;
+
+  Future<void> updateDriverLocation(LatLng latLng) async {
+    await processApi(
+      () => HomeServices.updateDriverLocation(latLng),
+      result: (data) {
+      },
+    );
+  }
+
+
+  Future<bool> updateBookingRideStatus({
+    NewRideModel? rideModel,
+    required String bookingId,
+    required int statusNo,
+    String dropAddress = "",
+    required LatLng dropLatLng,
+    String otp = "",
+    String cancelReason = "",
+    double totalDistance = 0,
+    bool isNotificationTap = false,
+    int? etaMinutes,
+  }) async {
+    DriverFlowDebug.send(
+      'status_update_requested',
+      bookingId: bookingId,
+      data: <String, dynamic>{
+        'status_no': statusNo,
+        'notification_tap': isNotificationTap,
+        'ride_model_present': rideModel != null,
+        'ride_status_before': rideStatus.value,
+        'current_route': Get.currentRoute,
+        'eta_minutes': etaMinutes,
+      },
+    );
+
+    if (statusNo == 4) {
+      rideCompleteModel.value = null;
+      Constants.transactionId.value = "";
+    }
+    bool isdone = false;
+
+    await processApi(
+      () => HomeServices.updateBookingRideStatus(
+        bookingId: bookingId,
+        status: statusNo,
+        address: dropAddress,
+        latLng: dropLatLng,
+        otp: otp,
+        cancelReason: cancelReason,
+        totalDistance: totalDistance,
+        etaMinutes: etaMinutes,
+      ),
+      result: (data) {
+        DriverFlowDebug.send(
+          'status_update_success',
+          bookingId: bookingId,
+          data: <String, dynamic>{
+            'status_no': statusNo,
+            'response_type': data.runtimeType.toString(),
+            'response': data,
+          },
+        );
+        LogUtils.printAction("RIDE STATUS:${statusNo}:${data}");
+        isdone = true;
+
+        debugPrint("STATUS :$statusNo:::${data}");
+        statusData(
+          statusNo: statusNo,
+          bookingId: bookingId,
+          data: data,
+          notificationTap: isNotificationTap,
+          newRideModel: rideModel,
+          etaMinutes: etaMinutes,
+        );
+      },
+      error: (error, stack) {
+        DriverFlowDebug.send(
+          'status_update_error',
+          bookingId: bookingId,
+          data: <String, dynamic>{
+            'status_no': statusNo,
+            'error': error.toString(),
+            'stack': stack.toString(),
+          },
+        );
+        LogUtils.printError("STATUS UPDATE ERROR::$error, $stack");
+        if (statusNo == 1) {
+          final String text = error.toString().toLowerCase();
+          if (text.contains('booking_already_taken') ||
+              text.contains('másik sofőr') ||
+              text.contains('masik sofor') ||
+              text.contains('409')) {
+            AppSnackBar.showErrorSnackBar(
+              message: 'A címet másik sofőr felvette.',
+              isError: true,
+              dismisDuration: 4,
+            );
+            clearTerminalRideState(
+              reason: 'offer_taken_by_another_driver',
+              bookingId: bookingId,
+            );
+          }
+        }
+      },
+      loading: handleLoading,
+    );
+
+    return isdone;
+  }
+
+  void statusData({
+    required int statusNo,
+    required String bookingId,
+    dynamic data,
+    bool redirectProfile = false,
+    bool notificationTap = false,
+    bool profileCome = false,
+    NewRideModel? newRideModel,
+    int? etaMinutes,
+  }) {
+    if (profileCome) {
+      LocationService().checkBackGroundPermission();
+    }
+    if (statusNo == 1) {
+      if (profileCome == false) {
+        rideDataModel.value = newRideModel;
+      }
+      rideDataModel.value?.booking?.status = 'accepted';
+      final int acceptedEta = etaMinutes ?? selectedArrivalEtaMinutes.value;
+      if (acceptedEta > 0) {
+        rideDataModel.value?.driverEtaMinutes = acceptedEta;
+        rideDataModel.value?.driverExpectedArrivalAt =
+            DateTime.now().add(Duration(minutes: acceptedEta)).toIso8601String();
+        rideDataModel.value?.booking?.driverEtaMinutes = acceptedEta.toString();
+        rideDataModel.value?.booking?.driverExpectedArrivalAt =
+            rideDataModel.value?.driverExpectedArrivalAt;
+      }
+      accountController.userModel.update((value) {
+        value?.currentBookingId = bookingId;
+      });
+      accountController.userModel.refresh();
+      rideDataModel.refresh();
+      AppPreference.removeKey(AppPreference.driverRideTime);
+      isRideAvailable.value = -1;
+
+      // The navigation screen must receive the accepted ride state before it
+      // is created. This also removes a race where the map could initialize
+      // with stale route data.
+      rideStatus.value = 1;
+      Constants.bookingId = bookingId;
+      isDrawPoliLine.value = false;
+      update();
+
+      DriverFlowDebug.send(
+        'accept_state_prepared',
+        bookingId: bookingId,
+        data: <String, dynamic>{
+          'ride_model_present': rideDataModel.value != null,
+          'ride_status': rideStatus.value,
+          'notification_tap': notificationTap,
+          'pickup_lat': rideDataModel.value?.pickup?.latitude ?? '',
+          'pickup_lng': rideDataModel.value?.pickup?.longitude ?? '',
+          'dropoff_lat': rideDataModel.value?.dropoff?.latitude ?? '',
+          'dropoff_lng': rideDataModel.value?.dropoff?.longitude ?? '',
+        },
+      );
+
+      if (notificationTap) {
+        handleLoading(false);
+        Get.back();
+      }
+
+      DriverFlowDebug.send(
+        'navigation_push_requested',
+        bookingId: bookingId,
+        data: <String, dynamic>{'target_route': Routes.mapNavigationScreen},
+      );
+      final Future<dynamic> navigationFuture =
+          Navigation.pushNamed(Routes.mapNavigationScreen);
+      DriverFlowDebug.send(
+        'navigation_push_dispatched',
+        bookingId: bookingId,
+        data: <String, dynamic>{'current_route': Get.currentRoute},
+      );
+      unawaited(
+        navigationFuture.then((dynamic result) {
+          DriverFlowDebug.send(
+            'navigation_screen_returned',
+            bookingId: bookingId,
+            data: <String, dynamic>{'result': result},
+          );
+        }),
+      );
+    } else if (statusNo == 2) {
+      getRideTimer1(
+        int.parse(
+          rideDataModel.value?.booking?.rideType?.waitingTimeLimit ?? "1",
+        ),
+      );
+      rideDataModel.value?.booking?.status = 'arrived';
+      rideDataModel.refresh();
+      rideStatus.value = 2;
+      isDrawPoliLine.value = false;
+    } else if (statusNo == 3) {
+      rideDataModel.value?.booking?.status = 'started';
+      rideDataModel.refresh();
+      rideStatus.value = 3;
+      isDrawPoliLine.value = false;
+      AppPreference.removeKey(AppPreference.driverRideTime);
+    } else if (statusNo == 4) {
+      rideCompleteModel.value = RideCompleteModel.fromJson(data);
+      rideDataModel.value?.booking?.status = 'completed';
+      rideDataModel.refresh();
+      timer?.cancel();
+      timer1?.cancel();
+      rideStatus.value = 4;
+      isDrawPoliLine.value = false;
+      isRideAvailable.value = -1;
+      Constants.bookingId = bookingId;
+      accountController.userModel.update((value) {
+        value?.currentBookingId = bookingId;
+      });
+      accountController.userModel.refresh();
+      DriverFlowDebug.send(
+        'trip_completed_waiting_for_payment',
+        bookingId: bookingId,
+        data: <String, dynamic>{
+          'payment_status': rideCompleteModel.value?.booking?.paymentStatus ?? '',
+          'payment_method': rideCompleteModel.value?.booking?.paymentMethod ?? '',
+        },
+      );
+      update();
+      if (Get.currentRoute != Routes.cashCollectScreen) {
+        Navigation.pushNamed(Routes.cashCollectScreen);
+      }
+    } else if (statusNo == 5) {
+      clearTerminalRideState(
+        reason: 'booking_cancelled',
+        bookingId: bookingId,
+      );
+      Navigation.replaceAll(Routes.homeScreen);
+    }
+  }
+
+  Rxn<RideCompleteModel> rideCompleteModel = Rxn<RideCompleteModel>();
+
+  String? placeApi = Platform.isAndroid
+      ? dotenv.env['GOOGLE_MAPS_API_KEY_Android']
+      : dotenv.env['GOOGLE_MAPS_API_KEY_Ios'];
+
+  String _bookingStatusFromResponse(dynamic response) {
+    if (response is! Map) return '';
+    final dynamic data = response['data'];
+    final dynamic booking = response['booking'] ??
+        (data is Map ? data['booking'] ?? data : null);
+    if (booking is Map) {
+      return (booking['status'] ?? '').toString().toLowerCase().trim();
+    }
+    return (response['status'] ?? '').toString().toLowerCase().trim();
+  }
+
+  Future<bool> verifyCustomerOtpAndStartTrip({
+    required String bookingId,
+    required String otp,
+    required LatLng dropLatLng,
+    required String dropAddress,
+  }) async {
+    if (bookingId.trim().isEmpty || otp.trim().length != 6) {
       AppSnackBar.showErrorSnackBar(
-        message: 'A fuvar azonosítása sikertelen. Frissítsd az oldalt.',
+        message: 'Adj meg egy érvényes, 6 számjegyű utazási kódot.',
         isError: true,
       );
       return false;
     }
 
-    PassengerFlowDebug.send(
-      'completed_cash_selection_requested',
-      bookingId: bookingId,
-    );
-    final result = await updatePaymentMode(
-      paymentMode: 'cash',
-      bookingId: bookingId,
-    );
-    if (result.isEmpty) {
-      PassengerFlowDebug.send(
-        'completed_cash_selection_failed',
+    handleLoading(true);
+    try {
+      final dynamic verifyResponse = await HomeServices.customerOtpVerify(
         bookingId: bookingId,
+        otp: otp.trim(),
       );
-      return false;
-    }
-
-    riderBookingModel.value?.data?.booking?.paymentMethod = 'cash';
-    awaitingRidePayment.value = true;
-    awaitingRidePaymentBookingId.value = bookingId;
-    PassengerFlowDebug.send(
-      'completed_cash_selection_saved',
-      bookingId: bookingId,
-      data: <String, dynamic>{'awaiting_driver_confirmation': true},
-    );
-    AppSnackBar.showErrorSnackBar(
-      message: 'Készpénzes fizetés kiválasztva. Várjuk a sofőr visszaigazolását.',
-    );
-    return true;
-  }
-
-  Future<void> _finalizeCompletedRide({
-    required String bookingId,
-    required String paymentMethod,
-    required String paymentStatus,
-  }) async {
-    if (bookingId.isEmpty || bookingId == 'null') return;
-    if (_finalizedCompletedBookingIds.contains(bookingId)) return;
-    _finalizedCompletedBookingIds.add(bookingId);
-
-    awaitingRidePayment.value = false;
-    awaitingRidePaymentBookingId.value = '';
-    _paymentSelectionShownForBooking = '';
-    AppConstant().bookingId = '';
-    clearSavedBookingFare();
-    tripType.value = 0;
-    isDriverCome.value = false;
-    changePolyLine = false;
-    AppPreference.removeKey(AppPreference.RideTime);
-
-    PassengerFlowDebug.send(
-      'completed_ride_payment_settled',
-      bookingId: bookingId,
-      data: <String, dynamic>{
-        'payment_method': paymentMethod,
-        'payment_status': paymentStatus,
-        'route': Get.currentRoute,
-      },
-    );
-
-    if (Get.currentRoute == Routes.paymentSelectScreen) {
-      Get.back();
-      await Future<void>.delayed(const Duration(milliseconds: 150));
-    }
-
-    AppDialog.commonDialog(
-      barrierDismissible: false,
-      childs: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          CustomImage(
-            image: ImagesAsset.tripComplete,
-            wt: 200.w,
-            ht: 110.h,
-          ),
-          16.verticalSpace,
-          CommonText(
-            string: 'Köszönjük, hogy a Veszprémi Taxit választottad!',
-            fontSize: 16.sp,
-            fontWeight: FontWeight.w600,
-            textAlign: TextAlign.center,
-            softWrap: true,
-          ),
-          12.verticalSpace,
-          CommonText(
-            string: 'A fizetés rendezve, a fuvar sikeresen lezárult.',
-            softWrap: true,
-            color: AppColors.textCaptionColor,
-            textAlign: TextAlign.center,
-          ),
-          16.verticalSpace,
-          CustomButton(
-            text: AppString.done.tr,
-            onTap: () {
-              Get.back();
-              Navigation.popupUtil(Routes.rateDriverScreen);
-            },
-          ),
-        ],
-      ),
-    );
-  }
-
-  void finishCompletedRideUi({String reason = 'rating_flow_finished'}) {
-    final bookingId =
-        '${riderBookingModel.value?.data?.booking?.id ?? ''}'.trim();
-    riderBookingModel.value = null;
-    awaitingRidePayment.value = false;
-    awaitingRidePaymentBookingId.value = '';
-    _paymentSelectionShownForBooking = '';
-    PassengerFlowDebug.send(
-      'completed_ride_ui_released',
-      bookingId: bookingId,
-      data: <String, dynamic>{'reason': reason},
-    );
-  }
-
-  void _clearCurrentBookingState({
-    required String bookingId,
-    required String reason,
-    required String status,
-  }) {
-    AppConstant().bookingId = '';
-    clearSavedBookingFare();
-    riderBookingModel.value = null;
-    tripType.value = 0;
-    isDriverCome.value = false;
-    changePolyLine = false;
-    awaitingRidePayment.value = false;
-    awaitingRidePaymentBookingId.value = '';
-    _paymentSelectionShownForBooking = '';
-    AppPreference.removeKey(AppPreference.RideTime);
-
-    PassengerFlowDebug.send(
-      'local_booking_state_cleared',
-      bookingId: bookingId,
-      data: <String, dynamic>{
-        'reason': reason,
-        'status': status,
-      },
-    );
-  }
-
-  void closeDebounce() {
-    if (debounce?.isActive ?? false) debounce?.cancel();
-  }
-
-  void userSearchPlace(String value) {
-    if (debounce?.isActive ?? false) debounce?.cancel();
-    debounce = Timer(const Duration(milliseconds: 300), () {
-      searchPlace(value);
-    });
-  }
-
-  RxList<Prediction> searchList = <Prediction>[].obs;
-  RxList<Prediction> recentSearchList = <Prediction>[].obs;
-
-  RxBool searchLoading = false.obs;
-
-  OriginDestinationModel selectedLocationModel = OriginDestinationModel();
-
-  Future<void> searchPlace(String value, {bool forDestination = false}) async {
-    if (value.trim().isEmpty) {
-      searchList.clear();
-      return;
-    }
-
-    final apiKey = placeApi?.trim() ?? '';
-    if (apiKey.isEmpty) {
-      LogUtils.printError('Google Maps API key is missing');
-      searchList.clear();
-      return;
-    }
-
-    try {
-      searchLoading(true);
-
-      final countryCode = LocationService().country.trim().isEmpty
-          ? 'HU'
-          : LocationService().country.trim().toUpperCase();
-
-      final body = <String, dynamic>{
-        'input': value.trim(),
-        'languageCode': 'hu',
-        'regionCode': 'HU',
-        'includedRegionCodes': [countryCode.toLowerCase()],
-      };
-
-      final currentLocation = LocationService().currentUserLatLg.value;
-      if (currentLocation != null) {
-        body['locationBias'] = {
-          'circle': {
-            'center': {
-              'latitude': currentLocation.latitude,
-              'longitude': currentLocation.longitude,
-            },
-            'radius': 25000.0,
-          },
-        };
-      }
-
-      if (forDestination) {
-        log(
-          '[DESTINATION_API] Typing destination → Places API (New) Autocomplete',
-        );
-      }
-
-      final Stopwatch placesStopwatch = Stopwatch()..start();
-      PassengerFlowDebug.send(
-        'places_autocomplete_request',
-        bookingId: AppConstant().bookingId,
-        data: <String, dynamic>{
-          'input_length': value.trim().length,
-          'for_destination': forDestination,
-          'has_location_bias': currentLocation != null,
-        },
-      );
-      final response = await http.post(
-        Uri.parse('https://places.googleapis.com/v1/places:autocomplete'),
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Goog-Api-Key': apiKey,
-          'X-Goog-FieldMask':
-              'suggestions.placePrediction.placeId,'
-              'suggestions.placePrediction.text.text,'
-              'suggestions.placePrediction.structuredFormat.mainText.text,'
-              'suggestions.placePrediction.structuredFormat.secondaryText.text,'
-              'suggestions.placePrediction.types',
-        },
-        body: jsonEncode(body),
-      );
-
-      placesStopwatch.stop();
-      PassengerFlowDebug.send(
-        'places_autocomplete_response',
-        bookingId: AppConstant().bookingId,
-        data: <String, dynamic>{
-          'status_code': response.statusCode,
-          'duration_ms': placesStopwatch.elapsedMilliseconds,
-          'for_destination': forDestination,
-        },
-      );
-
-      if (forDestination) {
-        log(
-          '[DESTINATION_API] Autocomplete response status: '
-          '${response.statusCode}',
-        );
-      }
-
-      if (response.statusCode < 200 || response.statusCode >= 300) {
-        throw Exception(
-          'Places autocomplete failed (${response.statusCode}): '
-          '${response.body}',
-        );
-      }
-
-      final decoded = jsonDecode(response.body) as Map<String, dynamic>;
-      final suggestions = decoded['suggestions'] as List<dynamic>? ?? const [];
-
-      searchList.value = suggestions
-          .map((item) {
-            final suggestion = item as Map<String, dynamic>;
-            final prediction =
-                suggestion['placePrediction'] as Map<String, dynamic>?;
-            if (prediction == null) return null;
-
-            final text = prediction['text'] as Map<String, dynamic>?;
-            final structured =
-                prediction['structuredFormat'] as Map<String, dynamic>?;
-            final mainText = structured?['mainText'] as Map<String, dynamic>?;
-            final secondaryText =
-                structured?['secondaryText'] as Map<String, dynamic>?;
-
-            return Prediction(
-              description: text?['text']?.toString() ?? '',
-              placeId: prediction['placeId']?.toString(),
-              structuredFormatting: StructuredFormatting(
-                mainText: mainText?['text']?.toString() ?? '',
-                secondaryText: secondaryText?['text']?.toString() ?? '',
-              ),
-              types: (prediction['types'] as List<dynamic>?)
-                  ?.map((type) => type.toString())
-                  .toList(),
-            );
-          })
-          .whereType<Prediction>()
-          .toList();
-
-      PassengerFlowDebug.send(
-        'places_autocomplete_parsed',
-        bookingId: AppConstant().bookingId,
-        data: <String, dynamic>{
-          'suggestion_count': searchList.length,
-          'for_destination': forDestination,
-        },
-      );
-      if (forDestination) {
-        log('[DESTINATION_API] Autocomplete suggestions: ${searchList.length}');
-      }
-    } catch (e, st) {
-      searchList.clear();
-      PassengerFlowDebug.runtimeError('places_autocomplete', e, st);
-      PassengerFlowDebug.send(
-        'places_autocomplete_error',
-        bookingId: AppConstant().bookingId,
-        data: <String, dynamic>{
-          'for_destination': forDestination,
-          'error_type': e.runtimeType.toString(),
-          'error': e.toString(),
-        },
-      );
-      LogUtils.printError('Places autocomplete error: $e, $st');
-      if (forDestination) {
-        log('[DESTINATION_API] Autocomplete error: $e');
-      }
-    } finally {
-      searchLoading(false);
-    }
-  }
-
-  String inPlace = "";
-  Map originAddress = {};
-  Map destinationAddress = {};
-
-  RxBool getLatLngLoading = false.obs;
-
-  Future<Map<String, dynamic>?> _getPlaceDetails(String placeId) async {
-    getLatLngLoading(true);
-    try {
-      final apiKey = placeApi?.trim() ?? '';
-      if (apiKey.isEmpty) {
-        throw Exception('Google Maps API key is missing');
-      }
-
-      final Stopwatch detailsStopwatch = Stopwatch()..start();
-      PassengerFlowDebug.send(
-        'place_details_request',
-        bookingId: AppConstant().bookingId,
-        data: <String, dynamic>{
-          'place_id_present': placeId.trim().isNotEmpty,
-          'place_id_length': placeId.trim().length,
-        },
-      );
-      final response = await http.get(
-        Uri.parse(
-          'https://places.googleapis.com/v1/places/'
-          '${Uri.encodeComponent(placeId)}?languageCode=hu&regionCode=HU',
-        ),
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Goog-Api-Key': apiKey,
-          'X-Goog-FieldMask': 'id,displayName,formattedAddress,location',
-        },
-      );
-
-      detailsStopwatch.stop();
-      PassengerFlowDebug.send(
-        'place_details_response',
-        bookingId: AppConstant().bookingId,
-        data: <String, dynamic>{
-          'status_code': response.statusCode,
-          'duration_ms': detailsStopwatch.elapsedMilliseconds,
-        },
-      );
-      if (response.statusCode < 200 || response.statusCode >= 300) {
-        throw Exception(
-          'Place details failed (${response.statusCode}): ${response.body}',
-        );
-      }
-
-      final data = jsonDecode(response.body) as Map<String, dynamic>;
-      final location = data['location'] as Map<String, dynamic>?;
-      if (location == null ||
-          location['latitude'] == null ||
-          location['longitude'] == null) {
-        throw Exception('Place details response does not contain coordinates');
-      }
-
-      final displayName = data['displayName'] as Map<String, dynamic>?;
-      return {
-        'formatted_address': data['formattedAddress']?.toString() ?? '',
-        'name': displayName?['text']?.toString() ?? '',
-        'geometry': {
-          'location': {
-            'lat': (location['latitude'] as num).toDouble(),
-            'lng': (location['longitude'] as num).toDouble(),
-          },
-        },
-      };
-    } catch (e, st) {
-      PassengerFlowDebug.runtimeError('place_details', e, st);
-      PassengerFlowDebug.send(
-        'place_details_error',
-        bookingId: AppConstant().bookingId,
-        data: <String, dynamic>{
-          'error_type': e.runtimeType.toString(),
-          'error': e.toString(),
-        },
-      );
-      LogUtils.printError('Get place details error: $e, $st');
-      rethrow;
-    } finally {
-      getLatLngLoading(false);
-    }
-  }
-
-  Future<void> searchOrigin(String placeId, String name, String add) async {
-    try {
-      originAddress = {};
-      getLatLngLoading(true);
-
-      originAddress = (await _getPlaceDetails(placeId)) ?? {};
-
-      setSelectedLocation(
-        isOrigin: true,
-        address: add.isNotEmpty ? add : originAddress['formatted_address'],
-        latLng: LatLng(
-          originAddress['geometry']['location']['lat'],
-          originAddress['geometry']['location']['lng'],
-        ),
-        name: name,
-      );
-
-      if (originAddress.isNotEmpty) {
-        Navigation.pushNamed(Routes.searchSecoundScreen);
-      }
-    } catch (e) {
-      LogUtils.printAction("search origin :::$e");
-    }
-  }
-
-  Future<void> searchDestination(
-    String placeId,
-    int id,
-    String name,
-    String address,
-  ) async {
-    if (getLatLngLoading.value == true) {
-      return;
-    }
-    try {
-      destinationAddress = {};
-      getLatLngLoading(true);
-
-      log('[DESTINATION_API] Destination selected → $name ($address)');
-      log('[DESTINATION_API] placeId: $placeId');
-      log(
-        '[DESTINATION_API] Places API (New) Place Details → '
-        'https://places.googleapis.com/v1/places/$placeId',
-      );
-
-      destinationAddress = (await _getPlaceDetails(placeId)) ?? {};
-
-      setSelectedLocation(
-        isOrigin: false,
-        address: address.isNotEmpty
-            ? address
-            : destinationAddress['formatted_address'],
-        latLng: LatLng(
-          destinationAddress['geometry']['location']['lat'],
-          destinationAddress['geometry']['location']['lng'],
-        ),
-        name: name,
-      );
-
-      LogUtils.printAction("TAP ADSADSD>$destinationAddress>");
-      if (destinationAddress.isNotEmpty) {
-        log('[DESTINATION_API] Place Details success');
-        log(
-          '[DESTINATION_API] destination lat/lng: '
-          '${destinationAddress['geometry']?['location']?['lat']}, '
-          '${destinationAddress['geometry']?['location']?['lng']}',
-        );
-        log(
-          '[DESTINATION_API] No backend API on destination screen — '
-          'navigating to BookVehicleScreen',
-        );
-        log(
-          '[DESTINATION_API] Next backend API: POST ${ApiConstants.baseUrl}${ApiConstants.bookingEstimate}',
-        );
-        LogUtils.printAction(
-          "origin:${selectedLocationModel.oAddress}, ${selectedLocationModel.dAddress}, ${selectedLocationModel.oLatLng}, ${selectedLocationModel.dLatLng}",
-        );
-
-        Navigation.pushNamed(
-          Routes.bookVehicleScreen,
-          arg: OriginDestinationModel(
-            oAddress: selectedLocationModel.oAddress,
-            oLatLng: selectedLocationModel.oLatLng,
-            dAddress: selectedLocationModel.dAddress,
-            dLatLng: selectedLocationModel.dLatLng,
-            userNameId: id,
-            dName: selectedLocationModel.dName,
-            oName: selectedLocationModel.oName,
-          ),
-        );
-      }
-    } catch (e) {
-      LogUtils.printAction("search des errro :$e");
-    } finally {
-      getLatLngLoading(false);
-    }
-  }
-
-  void setSelectedLocation({
-    bool isOrigin = true,
-    required String name,
-    required String address,
-    required LatLng latLng,
-  }) {
-    if (isOrigin) {
-      selectedLocationModel = selectedLocationModel.copyWith(
-        oName: name,
-        oAddress: address,
-        oLatLng: latLng,
-      );
-    } else {
-      selectedLocationModel = selectedLocationModel.copyWith(
-        dName: name,
-        dAddress: address,
-        dLatLng: latLng,
-      );
-    }
-  }
-
-  // get user Addresss
-
-  RxList<AddressModel> userAddressList = <AddressModel>[].obs;
-
-  Future<bool> addAddress(String placeId, String name) async {
-    bool succes = false;
-
-    await processApi(
-      () async {
-        Map res = (await _getPlaceDetails(placeId)) ?? {};
-
-        if (res.isNotEmpty) {
-          return await HomeService.addAddress(
-            name: name,
-            address: res['formatted_address'],
-            latLng: LatLng(
-              res['geometry']['location']['lat'],
-              res['geometry']['location']['lng'],
-            ),
-          );
-        } else {
-          throw "Try Again";
-        }
-      },
-      result: (data) {
-        succes = true;
-
-        LogUtils.printAction("SUCCESS");
-        LogUtils.printAction("LENGTH::${userAddressList.length}");
-
-        try {
-          userAddressList.add(
-            AddressModel(
-              id: data['data']['id'],
-              name: data['data']['name'],
-              address: data['data']['address'],
-              latitude: data['data']['latitude'],
-              longitude: data['data']['longitude'],
-              type: data['data']['type'],
-              isDefault: data['data']['is_default'],
-            ),
-          );
-          LogUtils.printAction("LENGTH:1212:${userAddressList.length}");
-          userAddressList.refresh();
-        } catch (e, st) {
-          LogUtils.printAction("ERROR:::$e\n$st");
-        }
-      },
-      loading: handleLoading,
-      error: (error, stack) {
-        succes = false;
-      },
-    );
-
-    getLatLngLoading(false);
-    return succes;
-  }
-
-  Future<bool> addAddressFromPickUpScreen({
-    required String name,
-    required String address,
-    required LatLng latLng,
-  }) async {
-    bool succes = false;
-
-    LogUtils.printAction(":::$name::$address::$latLng");
-
-    await processApi(
-      () async {
-        return await HomeService.addAddress(
-          name: name,
-          address: address,
-          latLng: latLng,
-        );
-      },
-      result: (data) {
-        succes = true;
-
-        LogUtils.printAction("SUCCESS");
-        try {
-          userAddressList.add(
-            AddressModel(
-              id: data['data']['id'],
-              name: data['data']['name'],
-              address: data['data']['address'],
-              latitude: data['data']['latitude'],
-              longitude: data['data']['longitude'],
-              type: data['data']['type'],
-              isDefault: data['data']['is_default'],
-            ),
-          );
-          LogUtils.printAction("LENGTH:1212:${userAddressList.length}");
-          userAddressList.refresh();
-        } catch (e, st) {
-          LogUtils.printAction("ERROR:::$e\n$st");
-        }
-      },
-      loading: handleLoading,
-      error: (error, stack) {
-        handleLoading(false);
-        succes = false;
-      },
-    );
-
-    getLatLngLoading(false);
-    return succes;
-  }
-
-  Future<void> getAddress() async {
-    processApi(
-      () => HomeService.getAddress(),
-      result: (data) {
-        userAddressList.value = data.data ?? [];
-      },
-    );
-  }
-
-  RxBool bookRideLoading = false.obs;
-  Rxn<BookingCreateModel> bookingCreateModel = Rxn<BookingCreateModel>();
-
-  RxBool finalizingBooking = false.obs;
-
-  Future<String> estimateBooking({
-    required LatLng originLatLng,
-    required LatLng destinationLatLng,
-  }) async {
-    String errorMessage = "";
-    PassengerFlowDebug.send(
-      'booking_estimate_requested',
-      data: <String, dynamic>{
-        'pickup_latitude': PassengerFlowDebug.coordinate(originLatLng.latitude),
-        'pickup_longitude': PassengerFlowDebug.coordinate(originLatLng.longitude),
-        'dropoff_latitude': PassengerFlowDebug.coordinate(destinationLatLng.latitude),
-        'dropoff_longitude': PassengerFlowDebug.coordinate(destinationLatLng.longitude),
-      },
-    );
-    bookingCreateModel.value = null;
-    AppConstant().bookingId = "";
-    isDriverCome.value = false;
-    bookRideLoading(true);
-
-    await processApi(
-      () => HomeService.bookingEstimate(
-        originLatLng: originLatLng,
-        destinationLatLng: destinationLatLng,
-      ),
-      result: (data) {
-        bookingCreateModel.value = data;
-        riderBookingModel.value = null;
-        isDriverCome.value = false;
-        tripType.value = 0;
-
-        PassengerFlowDebug.send(
-          'booking_estimate_success',
-          data: <String, dynamic>{
-            'ride_option_count': (data.data?.rideOptions ?? []).length,
-            'estimated_distance':
-                data.data?.booking?.distance ??
-                data.data?.rideTypeEstimate?.distance ??
-                '',
-            'estimated_duration':
-                data.data?.booking?.duration ??
-                data.data?.rideTypeEstimate?.duration ??
-                '',
-          },
-        );
-        if ((data.data?.rideOptions ?? []).isEmpty) {
-          errorMessage = "Ehhez a felvételi ponthoz nincs elérhető járműtípus.";
-        }
-      },
-      error: (error, stack) {
-        handleLoading(false);
-        errorMessage = error.toString();
-        PassengerFlowDebug.send(
-          'booking_estimate_error',
-          data: <String, dynamic>{'error': '$error'},
-        );
-        LogUtils.printError("BOOKING ESTIMATE FAILED ==> $error, $stack");
-      },
-    );
-
-    bookRideLoading(false);
-    return errorMessage;
-  }
-
-  Future<bool> finalizePassengerBooking({
-    required String origin,
-    required String destination,
-    required LatLng originLatLng,
-    required LatLng destinationLatLng,
-    required int bookingContactId,
-    required String rideTypeId,
-    required String paymentMethod,
-  }) async {
-    if (finalizingBooking.value) {
-      return false;
-    }
-
-    finalizingBooking(true);
-    PassengerFlowDebug.send(
-      'finalize_booking_requested',
-      data: <String, dynamic>{
-        'ride_type_id': rideTypeId,
-        'payment_method': paymentMethod,
-        'booking_contact_id': bookingContactId,
-      },
-    );
-    try {
-      final bookingResponse = await HomeService.bookingCreate(
-        originAddress: origin,
-        destinationAddress: destination,
-        originLatLng: originLatLng,
-        destinationLatLng: destinationLatLng,
-        bookingContactId: bookingContactId,
-        rideTypeId: rideTypeId,
-        paymentMethod: paymentMethod,
-      );
-
-      final bookingId = bookingResponse.data?.booking?.id ?? "";
-      if (bookingId.isEmpty) {
-        throw Exception("A szerver nem adott vissza booking azonosítót.");
-      }
-
-      bookingCreateModel.value = bookingResponse;
-      AppConstant().bookingId = bookingId;
-      PassengerFlowDebug.send(
-        'booking_create_success',
+      final String verifiedStatus = _bookingStatusFromResponse(verifyResponse);
+      DriverFlowDebug.send(
+        'otp_verify_success',
         bookingId: bookingId,
         data: <String, dynamic>{
-          'status': bookingResponse.data?.booking?.status ?? '',
-          'ride_type_id': rideTypeId,
+          'booking_status': verifiedStatus,
+          'response_type': verifyResponse.runtimeType.toString(),
         },
       );
-      saveBookingFare(
-        bookingId,
-        bookingResponse.data?.booking?.estimatedFare ??
-            bookingResponse.data?.rideTypeEstimate?.fareBreakdown?.total,
-      );
 
-      final confirmation = await HomeService.confirmRide(bookingId);
-      final status = confirmation['data']?['status']?.toString() ?? "";
-      PassengerFlowDebug.send(
-        'booking_confirm_response',
-        bookingId: bookingId,
-        data: <String, dynamic>{'status': status},
-      );
-      if (status.isNotEmpty) {
-        bookingCreateModel.value?.data?.booking?.status = status;
-        bookingCreateModel.refresh();
+      if (const <String>{'started', 'in_progress', 'ongoing'}
+          .contains(verifiedStatus)) {
+        statusData(statusNo: 3, bookingId: bookingId, data: verifyResponse);
+        return true;
       }
 
-      if (status != "searching") {
-        throw Exception(
-          "A rendelés nem searching állapotban jött létre (állapot: $status).",
-        );
-      }
-
-      PassengerFlowDebug.send(
-        'search_driver_screen_open_requested',
+      final dynamic startResponse = await HomeServices.updateBookingRideStatus(
         bookingId: bookingId,
-        data: <String, dynamic>{'status': status},
+        status: 3,
+        address: dropAddress,
+        latLng: dropLatLng,
+        // A kódot a match-otp végpont már hitelesítette. A státuszváltásnál
+        // ezért nem küldjük újra, így nem fut bele a régi hibás OTP-validációba.
+        otp: '',
+        cancelReason: '',
+        totalDistance: 0,
       );
-      Navigation.pushNamed(
-        Routes.searchDriverScreen,
-        arg: {
-          "origin": originLatLng,
-          "destination": destinationLatLng,
+      statusData(statusNo: 3, bookingId: bookingId, data: startResponse);
+      DriverFlowDebug.send(
+        'trip_started_after_otp_verify',
+        bookingId: bookingId,
+        data: <String, dynamic>{
+          'response_status': _bookingStatusFromResponse(startResponse),
         },
       );
       return true;
     } catch (error, stack) {
-      PassengerFlowDebug.send(
-        'finalize_booking_error',
-        bookingId: AppConstant().bookingId,
-        data: <String, dynamic>{'error': '$error'},
+      DriverFlowDebug.send(
+        'otp_verify_or_start_failed',
+        bookingId: bookingId,
+        data: <String, dynamic>{
+          'error': error.toString(),
+          'stack': stack.toString(),
+        },
       );
-      LogUtils.printError("FINALIZE BOOKING FAILED ==> $error, $stack");
       AppSnackBar.showErrorSnackBar(
-        message: error.toString().replaceFirst('Exception: ', ''),
+        message: 'A kód nem fogadható el. Ellenőrizd az utasnál látható 6 számjegyet.',
         isError: true,
       );
       return false;
     } finally {
-      finalizingBooking(false);
+      handleLoading(false);
     }
   }
 
-  Future<bool> bookVehicle({
-    required String bookingId,
-    required String vehicleId,
-    required LatLng latLng,
-    required String paymentType,
+  Future<bool> driverReviewAdd({
+    required int bookingId,
+    required double rating,
+    required String comment,
   }) async {
-    bool res = false;
+    bool success = false;
     await processApi(
-      () => HomeService.vehicleBook(
+      () => HomeServices.driverReview(
         bookingId: bookingId,
-        vehicleId: vehicleId,
-        paymentType: paymentType,
+        rating: rating,
+        comment: comment,
       ),
       result: (data) {
-        res = true;
-        log("SUCCESS _vehicle Book -- $data");
-        LogUtils.printSuccess("DATA::::$data");
-
-        AppConstant().bookingId = bookingId;
-        bookingCreateModel.value?.data?.booking?.rideTypeId =
-            data['data']['booking']['ride_type_id'];
-
-        bookingCreateModel.value?.data?.fareBreakdown = FareBreakdown.fromJson(
-          data['data']['fare_breakdown'],
+        success = true;
+        DriverFlowDebug.send(
+          'customer_review_submitted',
+          bookingId: bookingId.toString(),
+          data: <String, dynamic>{'rating': rating},
         );
-
-        saveBookingFare(
-          bookingId,
-          bookingCreateModel.value?.data?.fareBreakdown?.total,
-        );
-
-        bookingCreateModel.refresh();
-        Navigation.pushNamed(
-          Routes.pickupScreen,
-          arg: {"pickUpLatLng": latLng},
-        );
+        finishPostRideFlow(reason: 'customer_review_submitted');
       },
-      loading: handleLoading,
       error: (error, stack) {
-        handleLoading(false);
-      },
-    );
-    return res;
-  }
-
-  Future<void> updatePickUpLocation({
-    required String bookingId,
-    required String address,
-    required LatLng latLng,
-  }) async {
-    processApi(
-      () async {
-        final response = await HomeService.updatePickUpLocation(
-          bookingId: bookingId,
-          address: address,
-          latLng: latLng,
+        DriverFlowDebug.send(
+          'customer_review_failed',
+          bookingId: bookingId.toString(),
+          data: <String, dynamic>{
+            'error': error.toString(),
+            'stack': stack.toString(),
+          },
         );
-
-        BookingModel booking = BookingModel.fromJson(
-          response['data']['booking'],
+        AppSnackBar.showErrorSnackBar(
+          message: 'Az utas értékelése nem menthető. Próbáld újra.',
+          isError: true,
         );
-        bookingCreateModel.value?.data?.booking = booking;
-        bookingCreateModel.value?.data?.fareBreakdown = FareBreakdown.fromJson(
-          response['data']['fare_breakdown'],
-        );
-        return await HomeService.confirmRide(bookingId);
-      },
-      result: (data) {
-        AppConstant().bookingId = bookingId;
-
-        try {
-          Navigation.pushNamed(
-            Routes.searchDriverScreen,
-            arg: {
-              "origin": latLng,
-              "destination": LatLng(
-                double.parse(
-                  bookingCreateModel.value?.data?.booking?.dropoffLatitude ??
-                      "0",
-                ),
-                double.parse(
-                  bookingCreateModel.value?.data?.booking?.dropoffLongitude ??
-                      "0",
-                ),
-              ),
-            },
-          );
-        } catch (e, st) {
-          LogUtils.printAction("ERROR:::$e \n $st");
-        }
-      },
-      loading: handleLoading,
-      error: (error, stack) {
-        handleLoading(false);
-      },
-    );
-  }
-
-  Future<void> confirmRide({
-    required String bookingId,
-    required LatLng latLng,
-  }) async {
-    processApi(
-      () => HomeService.confirmRide(bookingId),
-      result: (data) {
-        AppConstant().bookingId = bookingId;
-
-        LogUtils.printSuccess("DATA::::$data");
-
-        if (data['data']['status'] != "expired") {
-          LogUtils.printSuccess("Booking confirm");
-          Navigation.pushNamed(
-            Routes.searchDriverScreen,
-            arg: {
-              "origin": latLng,
-              "destination": LatLng(
-                double.parse(
-                  bookingCreateModel.value?.data?.booking?.dropoffLatitude ??
-                      "0",
-                ),
-                double.parse(
-                  bookingCreateModel.value?.data?.booking?.dropoffLongitude ??
-                      "0",
-                ),
-              ),
-            },
-          );
-        }
       },
       loading: handleLoading,
     );
+    return success;
   }
 
-  bool dialogOpen = false;
-
-  void _clearCancelledRideLocalState(String bookingId) {
-    AppConstant().bookingId = '';
-    clearSavedBookingFare();
-    riderBookingModel.value = null;
-    bookingCreateModel.value = null;
-    tripType.value = 0;
-    isDriverCome.value = false;
-    changePolyLine = false;
-    dialogOpen = false;
-    PassengerFlowDebug.send(
-      'passenger_cancel_local_state_cleared',
+  void finishPostRideFlow({required String reason}) {
+    final bookingId = rideCompleteModel.value?.booking?.id ?? '';
+    DriverFlowDebug.send(
+      'post_ride_flow_finished',
       bookingId: bookingId,
+      data: <String, dynamic>{'reason': reason},
     );
+    rideCompleteModel.value = null;
+    Constants.transactionId.value = '';
+    isRideAvailable.value = -1;
+    forceRideOfferRefresh(reason: reason);
+    Navigation.replaceAll(Routes.homeScreen);
   }
 
-  Future<void> cancelRide({
-    required String bookingId,
-    required String reason,
+  Future<void> driverPaymentAccept({
+    required double amount,
+    required int id,
   }) async {
     processApi(
-      () => HomeService.cancelRide(bookingId, reason),
+      () => HomeServices.driverAcceptPayment(amount: amount, paymentId: id),
       result: (data) {
-        _clearCancelledRideLocalState(bookingId);
-        Navigation.popupUtil(Routes.dashboardScreen);
-      },
-      error: (error, stack) {
-        PassengerFlowDebug.send(
-          'passenger_cancel_failed',
-          bookingId: bookingId,
-          data: <String, dynamic>{'error': error.toString()},
-        );
+        Navigation.pushNamed(Routes.reviewScreen);
       },
       loading: handleLoading,
     );
   }
 
-  // 0 - search driver / 1- driver get // trip destination
-  // trip
-  RxInt tripType = 0.obs;
+  RxInt waitingTime = 0.obs;
+  Timer? timer1;
+  Future<void> getSetting()async{
+    try{
 
-  RxBool isDriverCome = false.obs;
+      final response =await http.get(Uri.parse(ApiConstants.baseUrl+ApiConstants.setting));
+      if(response.statusCode ==200){
+        var data = jsonDecode(response.body);
+        Constants().iosLink= data['data']['appleShareLink']??"";
+        Constants().androidLink= data['data']['androidShareLink']??"";
+        Constants().appStoreId= data['data']['appstoreId']??"";
+        Constants().currency= data['data']['currency']??"";
 
-  RxInt freeWaintingTime = 0.obs;
-  Timer? timer;
+      }
 
-  void getRideTimer(int time) {
-    String lastTime = AppPreference.getString(AppPreference.RideTime);
+    }catch(e){
+
+    }
+  }
+
+  void getRideTimer1(int time) {
+    String lastTime = AppPreference.getString(AppPreference.driverRideTime);
     int diffSeconds = 0;
 
     if (lastTime.isNotEmpty) {
       Map getData = jsonDecode(lastTime);
-      if (getData['bookingId'] ==
-          "${riderBookingModel.value?.data?.booking?.id}") {
+      if (getData['bookingId'] == "${rideDataModel.value?.booking?.id}") {
         DateTime lastshowTime = DateTime.fromMillisecondsSinceEpoch(
           getData['time'],
         );
         ;
         DateTime now = DateTime.now();
         diffSeconds = now.difference(lastshowTime).inSeconds;
-        log(
-          "TIME::::::${getData['time']}>>>${lastshowTime}::::$now:::::::$diffSeconds:::::${time * 60}:::::::${(time * 60) - diffSeconds}",
-        );
       }
     }
 
     if (diffSeconds > time * 60) {
-      freeWaintingTime.value = 0;
+      waitingTime.value = 0;
     } else {
-      freeWaintingTime.value = (time * 60) - diffSeconds;
+      waitingTime.value = (time * 60) - diffSeconds;
       if (lastTime.isEmpty) {
         AppPreference.setString(
-          AppPreference.RideTime,
+          AppPreference.driverRideTime,
           jsonEncode({
-            'bookingId': "${riderBookingModel.value?.data?.booking?.id}",
+            'bookingId': "${rideDataModel.value?.booking?.id}",
             'time': DateTime.now().millisecondsSinceEpoch,
           }),
         );
       }
     }
 
-    // freeWaintingTime.value=time*60;
-    if (timer?.isActive ?? false) timer?.cancel();
-    timer = Timer.periodic(Duration(seconds: 1), (timer) {
-      if (freeWaintingTime.value > 0) {
-        freeWaintingTime.value--;
+    if (timer1?.isActive ?? false) timer1?.cancel();
+    timer1 = Timer.periodic(Duration(seconds: 1), (timer) {
+      if (waitingTime.value > 0) {
+        waitingTime.value--;
       } else {
         timer.cancel();
-        this.timer?.cancel();
-        AppPreference.removeKey(AppPreference.RideTime);
+        this.timer1?.cancel();
+        AppPreference.removeKey(AppPreference.driverRideTime);
       }
     });
   }
 
-  int pageNo = 1;
-  bool isMoreOfferList = true;
-  RxList<Offer> offerList = <Offer>[].obs;
-  RxBool offerLoading = false.obs;
-  RxBool offerPaginationLoading = false.obs;
-
-  Future<void> getOfferList({
-    bool isFirst = true,
-    required String rideType,
-  }) async {
-    if (isFirst) {
-      pageNo = 1;
-      isMoreOfferList = true;
-      if (offerList.isEmpty) {
-        offerLoading(true);
-      }
-    }
-
-    await processApi(
-      () => HomeService.getOfferList(
-        pageNo: pageNo,
-        bookingID: bookingCreateModel.value?.data?.booking?.id ?? "",
-        rideType: rideType,
-      ),
-      result: (data) {
-        LogUtils.printAction("DATA:::${data.toJson()}");
-        if (isFirst) {
-          offerList.value = data.data?.offers ?? [];
-        } else {
-          offerList.addAll(data.data?.offers ?? []);
-        }
-
-        if ((data.data?.offers ?? []).length != 10) {
-          isMoreOfferList = false;
-        }
-        pageNo++;
-      },
-      error: (error, stack) {
-        log("OFFER ERROR :$error, $stack");
-      },
-    );
-
-    offerPaginationLoading(false);
-    offerLoading(false);
-  }
-
-  Future<Map> applyCouponCode({
-    required String code,
-    required String bookingId,
-    required String rideTypeId,
-  }) async {
-    Map res = {};
-    await processApi(
-      () => HomeService.applyCode(
-        code: code,
-        bookingId: int.parse(bookingId),
-        rideTypeId: rideTypeId,
-      ),
-      result: (data) {
-        res = data;
-        LogUtils.printAction("data:::$data");
-      },
-      loading: handleLoading,
-    );
-
-    return res;
-  }
-
-  Future<List<String>> _getCityNames(double lat, double lng) async {
-    final cityNames = <String>[];
-
-    void addName(String? value) {
-      final normalized = value?.trim() ?? "";
-      if (normalized.isEmpty) return;
-      if (RegExp(r'^\d+$').hasMatch(normalized)) return;
-      if (cityNames.any((c) => c.toLowerCase() == normalized.toLowerCase())) {
-        return;
-      }
-      cityNames.add(normalized);
-    }
-
-    if ((placeApi ?? "").isNotEmpty) {
-      try {
-        final Stopwatch geocodeStopwatch = Stopwatch()..start();
-        PassengerFlowDebug.send(
-          'reverse_geocode_request',
-          bookingId: AppConstant().bookingId,
-          data: <String, dynamic>{
-            'latitude': PassengerFlowDebug.coordinate(lat),
-            'longitude': PassengerFlowDebug.coordinate(lng),
-          },
-        );
-        final response = await http.get(
-          Uri.parse(
-            "https://maps.googleapis.com/maps/api/geocode/json"
-            "?latlng=$lat,$lng&key=$placeApi",
-          ),
-        );
-        geocodeStopwatch.stop();
-        PassengerFlowDebug.send(
-          'reverse_geocode_response',
-          bookingId: AppConstant().bookingId,
-          data: <String, dynamic>{
-            'status_code': response.statusCode,
-            'duration_ms': geocodeStopwatch.elapsedMilliseconds,
-          },
-        );
-        if (response.statusCode == 200) {
-          final decoded = jsonDecode(response.body) as Map<String, dynamic>;
-          final results = decoded['results'] as List<dynamic>? ?? [];
-          for (final result in results) {
-            final components =
-                result['address_components'] as List<dynamic>? ?? [];
-            for (final component in components) {
-              final types = List<String>.from(component['types'] ?? []);
-              if (types.contains('locality')) {
-                addName(component['long_name'] as String?);
-              }
-            }
-          }
-
-          if (cityNames.isEmpty) {
-            for (final result in results) {
-              final components =
-                  result['address_components'] as List<dynamic>? ?? [];
-              for (final component in components) {
-                final types = List<String>.from(component['types'] ?? []);
-                if (types.contains('administrative_area_level_2') ||
-                    types.contains('administrative_area_level_3')) {
-                  addName(component['long_name'] as String?);
-                }
-              }
-            }
-          }
-        }
-      } catch (e, st) {
-        PassengerFlowDebug.runtimeError('reverse_geocode', e, st);
-        LogUtils.printAction("Google geocode error: $e");
-      }
-    }
-
-    try {
-      final placemarks = await placemarkFromCoordinates(lat, lng);
-      if (placemarks.isNotEmpty) {
-        final place = placemarks.first;
-        addName(place.locality);
-        addName(place.subAdministrativeArea);
-      }
-    } catch (e) {
-      LogUtils.printAction("Device geocode error: $e");
-    }
-
-    return cityNames;
-  }
-
-  bool _bannerHasCity(banner.Row element) {
-    final name = element.city?.name?.trim() ?? "";
-    final fullName = element.city?.fullName?.trim() ?? "";
-    return name.isNotEmpty || fullName.isNotEmpty || element.city?.id != null;
-  }
-
-  bool _bannerMatchesCity(banner.Row element, List<String> cityNames) {
-    if (cityNames.isEmpty) return !_bannerHasCity(element);
-
-    if (!_bannerHasCity(element)) return false;
-
-    final bannerCityNames = <String>{};
-
-    void addBannerName(String? value) {
-      final normalized = value?.trim() ?? "";
-      if (normalized.isEmpty) return;
-      bannerCityNames.add(normalized);
-      for (final part in normalized.split(',')) {
-        final piece = part.trim();
-        if (piece.isNotEmpty) bannerCityNames.add(piece);
-      }
-    }
-
-    addBannerName(element.city?.name);
-    addBannerName(element.city?.fullName);
-
-    for (final bannerCity in bannerCityNames) {
-      final bannerLower = bannerCity.toLowerCase();
-      for (final userCity in cityNames) {
-        if (bannerLower == userCity.toLowerCase().trim()) {
-          return true;
-        }
-      }
-    }
-    return false;
-  }
-
-  void _applyBannerFilter(banner.BannerModel data, List<String> cityNames) {
-    if (cityNames.isEmpty) {
-      final firstRow = (data.data?.firstRow ?? [])
-          .where((element) => !_bannerHasCity(element))
-          .toList();
-      final secondRow = (data.data?.secondRow ?? [])
-          .where((element) => !_bannerHasCity(element))
-          .toList();
-
-      LogUtils.printAction(
-        "Banner filter (no city resolved): first=${firstRow.length}, second=${secondRow.length}",
-      );
-
-      data.data?.firstRow = firstRow;
-      data.data?.secondRow = secondRow;
-      bannerModel.value = data;
-      bannerModel.refresh();
-      return;
-    }
-
-    final firstRow = (data.data?.firstRow ?? [])
-        .where((element) => _bannerMatchesCity(element, cityNames))
-        .toList();
-    final secondRow = (data.data?.secondRow ?? [])
-        .where((element) => _bannerMatchesCity(element, cityNames))
-        .toList();
-
-    LogUtils.printAction(
-      "Banner filter $cityNames: first=${firstRow.length}, second=${secondRow.length}",
-    );
-
-    data.data?.firstRow = firstRow;
-    data.data?.secondRow = secondRow;
-    bannerModel.value = data;
-    bannerModel.refresh();
-  }
-
-  int _bannerRequestId = 0;
-
-  RxBool bannerLoading = false.obs;
-  Rxn<banner.BannerModel> bannerModel = Rxn<banner.BannerModel>();
-
-  Future<void> getBanner({double? lat, double? lng}) async {
-    final latLong = AppPreference.getString(AppPreference.location);
-
-    final resolvedLat =
-        lat ??
-        LocationService().currentUserLatLg.value?.latitude ??
-        (latLong.isNotEmpty
-            ? double.tryParse(latLong.split("@").first) ?? 0
-            : 0);
-    final resolvedLng =
-        lng ??
-        LocationService().currentUserLatLg.value?.longitude ??
-        (latLong.isNotEmpty
-            ? double.tryParse(latLong.split("@").last) ?? 0
-            : 0);
-
-    if (resolvedLat == 0 && resolvedLng == 0) {
-      LogUtils.printAction("getBanner skipped: location not available");
-      return;
-    }
-
-    LogUtils.printAction("getBanner: lat=$resolvedLat, lng=$resolvedLng");
-
-    final requestId = ++_bannerRequestId;
-    bannerLoading(true);
-    await processApi(
-      () => HomeService.getBannerList(
-        latitude: resolvedLat,
-        longitude: resolvedLng,
-      ),
-      result: (data) async {
-        if (requestId != _bannerRequestId) return;
-
-        final cityNames = await _getCityNames(resolvedLat, resolvedLng);
-
-        LogUtils.printAction("Banner city names: $cityNames");
-
-        _applyBannerFilter(data, cityNames);
-      },
-    );
-    if (requestId == _bannerRequestId) {
-      bannerLoading(false);
-    }
-  }
-
-  Future<Map> removePromoCode(int bookingId) async {
-    Map res = {};
-    await processApi(
-      () => HomeService.removePromoCode(bookingId),
-      result: (data) {
-        res = data;
-      },
-      loading: handleLoading,
-    );
-    return res;
-  }
-
-  Future<Map> ratingDriver({
+  Future<Map> reportSubmit({
     required int bookingId,
-    required double rating,
-    required String comment,
+    required int selected,
+    required String description,
   }) async {
-    Map res = {};
-    await processApi(
-      () => HomeService.driverRating(
-        bookingId: bookingId,
-        rating: rating,
-        comment: comment,
-      ),
-      result: (data) {
-        res = data;
-      },
-      loading: handleLoading,
-    );
-    return res;
-  }
+    List<String> issueList = [
+      "rider_didnt_show_up",
+      "wrong_pickup",
+      "rider_delayed",
+      "traffic_issue",
+      "navigation_problem",
+      "custom",
+    ];
 
-  String transactionId = "";
-
-  Future paymentInt({
-    required String bookingId,
-    required double amount,
-    required String method,
-    required bool isSplit,
-    required String tip,
-  }) async {
-    if (method.trim().toLowerCase() == 'cash') {
-      PassengerFlowDebug.send(
-        'cash_payment_init_transaction_prevented',
-        bookingId: bookingId,
-        data: <String, dynamic>{'amount': amount},
-      );
-      await selectCashForCompletedRide(bookingId: bookingId);
-      return;
+    String issueType = "";
+    if (selected == -1) {
+      issueType = issueList.last;
+    } else {
+      issueType = issueList[selected];
     }
-    transactionId = "";
-    await processApi(
-      () => HomeService.paymentInt(
-        bookingId: bookingId,
-        amount: amount,
-        method: method,
-        isSplit: isSplit,
-        tip: tip,
-      ),
-      result: (data) async {
-        transactionId = data['data']['transaction_id'];
-        LogUtils.printAction("ID:::::::$transactionId");
 
-        if (method == "cash" || method == "wallet") {
-          Navigation.pushNamed(Routes.rateDriverScreen);
-          Get.find<WalletController>().getWalletData();
-          Get.find<TripController>().getTripHistory();
-        } else {
-          bool? result = await Get.to(
-            () => PaymentWebViewScreen(webUrl: data['data']['payment_link']),
-          );
-          if (result != null && result) {
-            paymentVerify(transactionId);
-          }
-        }
-      },
-      loading: handleLoading,
-    );
-  }
-
-  Future paymentVerify(String transactionId) async {
-    await processApi(
-      () => HomeService.verifyPayment(transactionID: transactionId),
-      result: (data) {
-        LogUtils.printAction(">>>>>>$data");
-
-        if (data['data']['status'] == "completed") {
-          AppSnackBar.showErrorSnackBar(message: data['message']);
-          Navigation.pushNamed(Routes.rateDriverScreen);
-          Get.find<TripController>().getTripHistory();
-        } else {
-          AppSnackBar.showErrorSnackBar(message: data['message']);
-        }
-      },
-      loading: handleLoading,
-    );
-  }
-
-  Future<Map> updatePaymentMode({
-    required String paymentMode,
-    required String bookingId,
-  }) async {
     Map res = {};
-
     await processApi(
-      () => HomeService.updatePaymentMode(
+      () => HomeServices.reportIssueSubmit(
         bookingId: bookingId,
-        paymentMode: paymentMode,
+        description: description,
+        issueType: issueType,
       ),
       result: (data) {
         res = data;
-        LogUtils.printAction("reult:::$data");
       },
       loading: handleLoading,
-      error: (error, stack) {
-        LogUtils.printAction("PAYMENT UPDATEW :ER :$error");
-      },
     );
+
     return res;
   }
 
-  RxList<ContactModel> userNameList = <ContactModel>[].obs;
-
-  Future<void> getUserNameList() async {
-    processApi(
-      () => HomeService.getUserNameList(),
-      result: (data) {
-        userNameList.value = data.data?.contacts ?? [];
-      },
-    );
-  }
-
-  Future<void> addUserName({
-    required String name,
-    required String phone,
-    required String imagePath,
+  Future<bool> confirmPaymentCollected({
+    required String bookingId,
+    required double cashAmount,
+    required double tipAmount,
   }) async {
-    processApi(
-      () => HomeService.addUserName(
-        name: name,
-        phone: phone,
-        imagePath: imagePath,
+    if (bookingId.trim().isEmpty) {
+      AppSnackBar.showErrorSnackBar(
+        message: 'A fuvar azonosítója hiányzik.',
+        isError: true,
+      );
+      return false;
+    }
+
+    bool success = false;
+    await processApi(
+      () => HomeServices.confirmCashCollected(
+        bookingId: bookingId.trim(),
+        cashAmount: cashAmount,
+        tipAmount: tipAmount,
       ),
       result: (data) {
-        handleLoading(false);
-        Get.back();
-        userNameList.add(
-          ContactModel(
-            id: data['data']['contact']['id'],
-            mobileNumber: data['data']['contact']['mobile_number'],
-            name: data['data']['contact']['name'],
-            profilePic: data['data']['contact']['profile_pic'],
-          ),
+        final dynamic payload = data is Map ? data['data'] : null;
+        final String paymentStatus = (
+          payload is Map
+              ? payload['payment_status']
+              : data is Map
+                  ? data['payment_status']
+                  : ''
+        )
+            .toString()
+            .toLowerCase()
+            .trim();
+
+        if (paymentStatus != 'paid') {
+          AppSnackBar.showErrorSnackBar(
+            message:
+                'A backend nem állította fizetettre a rendelést. Telepítsd a készpénzes fizetési patchet.',
+            isError: true,
+          );
+          return;
+        }
+
+        success = true;
+        final booking = rideCompleteModel.value?.booking;
+        if (booking != null) {
+          booking.paymentStatus = 'paid';
+          booking.paymentMethod = 'cash';
+          booking.cashAmount = cashAmount.toStringAsFixed(2);
+          rideCompleteModel.refresh();
+        }
+        DriverFlowDebug.send(
+          'cash_payment_marked_paid',
+          bookingId: bookingId,
+          data: <String, dynamic>{
+            'cash_amount': cashAmount,
+            'tip_amount': tipAmount,
+            'payment_status': paymentStatus,
+          },
         );
-        userNameList.refresh();
-        AppSnackBar.showErrorSnackBar(message: data['message']);
+        AppSnackBar.showErrorSnackBar(
+          message: 'A készpénzes fizetés rögzítve.',
+        );
+        clearTerminalRideState(
+          reason: 'cash_payment_paid',
+          bookingId: bookingId,
+          refreshOffers: false,
+        );
+        Navigation.replaceAll(Routes.reviewScreen);
+      },
+      error: (error, stack) {
+        DriverFlowDebug.send(
+          'cash_payment_mark_paid_failed',
+          bookingId: bookingId,
+          data: <String, dynamic>{
+            'error': error.toString(),
+            'stack': stack.toString(),
+          },
+        );
+        AppSnackBar.showErrorSnackBar(
+          message: 'A készpénzes fizetés nem rögzíthető. Próbáld újra.',
+          isError: true,
+        );
       },
       loading: handleLoading,
     );
+    return success;
+  }
+
+  Future<Map> driverConfirmCashPayment({
+    required String transactionId,
+    required String status,
+  }) async {
+    Map res = {};
+    await processApi(
+      () => HomeServices.driverConfirmCashPayment(
+        transactionId: transactionId,
+        status: status,
+      ),
+      result: (data) {
+        res = data;
+        Get.back();
+        Navigation.pushNamed(Routes.reviewScreen);
+        Constants.transactionId.value = "";
+        forceRideOfferRefresh(reason: 'cash_payment_confirmed');
+      },
+      loading: handleLoading,
+    );
+    return res;
   }
 
   RxList<rideType.RideType> rideTypeList = <rideType.RideType>[].obs;
 
   Future<void> getRideTypeList() async {
-    String dbData = AppPreference.getString(AppPreference.rideType);
+    final dbData = AppPreference.getString(AppPreference.driverRideType);
     if (dbData.isNotEmpty) {
       rideTypeList.value =
           rideType.RideTypeListModel.fromJson(
@@ -2202,14 +1907,12 @@ class HomeController extends GetxController with LoadingMixin, LoadingApiMixin {
           ).data?.rideTypes ??
           [];
     }
-
     processApi(
-      () => HomeService.getRideTypeList(),
+      () => HomeServices.getRideTypeList(),
       result: (data) {
         rideTypeList.value = data.data?.rideTypes ?? [];
-
         AppPreference.setString(
-          AppPreference.rideType,
+          AppPreference.driverRideType,
           jsonEncode(data.toJson()),
         );
       },

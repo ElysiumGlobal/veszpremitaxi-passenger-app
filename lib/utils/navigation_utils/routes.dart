@@ -1,78 +1,98 @@
-import 'package:e_taxi/feature/auth/page/location_screen.dart';
-import 'package:e_taxi/feature/auth/page/login_screen.dart';
-import 'package:e_taxi/feature/auth/page/otpverify_screen.dart';
-import 'package:e_taxi/feature/auth/page/phone_required_screen.dart';
-import 'package:e_taxi/feature/auth/page/register_screen.dart';
-import 'package:e_taxi/feature/auth/page/term_service_screen.dart';
-import 'package:e_taxi/feature/dashboard/page/dashboard_screen.dart';
-import 'package:e_taxi/feature/home/page/bookvehicle_screen.dart';
-import 'package:e_taxi/feature/home/page/cancel_request.dart';
-import 'package:e_taxi/feature/home/page/driver_details.dart';
-import 'package:e_taxi/feature/home/page/home_screen.dart';
-import 'package:e_taxi/feature/home/page/offer_screen.dart';
-import 'package:e_taxi/feature/home/page/pickup_point_screen.dart';
-import 'package:e_taxi/feature/home/page/rate_driver_screen.dart';
-import 'package:e_taxi/feature/home/page/repot_issue_screen.dart';
-import 'package:e_taxi/feature/home/page/search_driver.dart';
-import 'package:e_taxi/feature/home/page/search_screenfirst.dart';
-import 'package:e_taxi/feature/home/page/search_screen_secound.dart';
-import 'package:e_taxi/feature/home/page/trip_details.dart';
-import 'package:e_taxi/feature/onboarding/page/onboarding_scrreen.dart';
-import 'package:e_taxi/feature/profile/page/language_screen.dart';
-import 'package:e_taxi/feature/profile/page/notification_screen.dart';
-import 'package:e_taxi/feature/profile/page/profile_screen.dart';
-import 'package:e_taxi/feature/profile/page/refer_earn_screen.dart';
-import 'package:e_taxi/feature/profile/page/safety_screen.dart';
-import 'package:e_taxi/feature/trip/page/ride_details_screen.dart';
-import 'package:e_taxi/feature/trip/page/trip_screen.dart';
-import 'package:e_taxi/feature/wallet/page/wallet_screen.dart';
+import 'package:e_taxi/feature/account/pages/account_screen.dart';
+import 'package:e_taxi/feature/account/pages/edit_profile.dart';
+import 'package:e_taxi/feature/auth/pages/account_review.dart';
+import 'package:e_taxi/feature/auth/pages/auth/otp_verify_screen.dart';
+import 'package:e_taxi/feature/auth/pages/driver_login_screen.dart';
+import 'package:e_taxi/feature/auth/pages/document_screen.dart';
+import 'package:e_taxi/feature/auth/pages/location_setup/location_set_screen.dart';
+import 'package:e_taxi/feature/auth/pages/location_setup/manual_location_screen.dart';
+import 'package:e_taxi/feature/auth/pages/profile_setup_screen.dart';
+import 'package:e_taxi/feature/auth/pages/uploading_screen.dart';
+import 'package:e_taxi/feature/auth/pages/vehicle_setup_screen.dart';
+import 'package:e_taxi/feature/home/pages/account_deactive_screen.dart';
+import 'package:e_taxi/feature/home/pages/cash_collect.dart';
+import 'package:e_taxi/feature/home/pages/chat_screen.dart';
+import 'package:e_taxi/feature/home/pages/home_screen.dart';
+import 'package:e_taxi/feature/home/pages/review_screen.dart';
+import 'package:e_taxi/feature/onboarding/pages/onboarding_screen.dart';
+import 'package:e_taxi/feature/trip_activity/pages/trip_activity_screen.dart';
+import 'package:e_taxi/feature/wallet/page/earning_screen.dart';
 import 'package:get/get.dart';
 
-import '../../feature/auth/page/forgot_pasword.dart';
-import '../../feature/home/page/payment_selection_screen.dart';
-import '../../feature/home/widget/chat_screen.dart';
-import '../../feature/profile/page/edit_profile.dart';
+import '../../feature/account/pages/documentScreen.dart';
+import '../../feature/account/pages/driver_preference.dart';
+import '../../feature/account/pages/language_screen.dart';
+import '../../feature/account/pages/notification_screen.dart';
+import '../../feature/account/pages/preference_screen.dart';
+import '../../feature/account/pages/refer_earn_screen.dart';
+import '../../feature/account/pages/save_location_screen.dart';
+import '../../feature/account/widget/search_address.dart';
+import '../../feature/auth/pages/forgot_pasword.dart';
+import '../../feature/help_center/pages/helpcenter_screen.dart';
+import '../../feature/help_center/pages/raise_ticket.dart';
+import '../../feature/home/pages/cancel_requestScreen.dart';
+import '../../feature/home/pages/navigation_screen.dart';
+import '../../feature/home/pages/otp_verify_screen.dart';
+import '../../feature/home/pages/trip_confirmation_screen.dart';
+import '../../feature/incentive/page/incentive_screen.dart';
+import '../../feature/onboarding/binding.dart';
 import '../../feature/splace/page/splace_screen.dart';
-import '../../feature/trip/page/chat_support.dart';
+import '../../feature/trip_activity/pages/trip_activity_details.dart';
+import '../../feature/trip_activity/pages/trip_support.dart';
+import '../../feature/wallet/page/add_bank_account.dart';
+import '../../feature/wallet/page/earning_transaction_details_screen.dart';
+import '../../feature/wallet/page/earning_transaction_screen.dart';
+import '../../feature/wallet/page/wallet_report.dart';
+import '../../feature/wallet/page/wallet_transaction_details_screen.dart';
+import '../../feature/wallet/page/wallet_transaction_screen.dart';
 
 mixin Routes {
   static const defaultTransition = Transition.fadeIn;
 
   static const String splash = '/splash';
-  static const String onboarding = '/OnboardingScrreen';
-  static const String loginScreen = '/LoginScreen';
-  static const String otpVerifyScreen = '/OtpverifyScreen';
-  static const String phoneRequiredScreen = '/PhoneRequiredScreen';
-  static const String locationScreen = '/LocationScreen';
-  static const String registerScreen = '/RegisterScreen';
-  static const String termServiceScreen = '/TermServiceScreen';
-  static const String dashboardScreen = '/DashboardScreen';
+  static const String onboardingScreen = '/OnboardingScreen';
+  static const String registerScreen = '/RegisteSrcreen';
+  static const String otpVerifyScreen = '/OtpVerifyScreen';
+  static const String locationSetScreen = '/LocationSetScreen';
+  static const String manualLocationScreen = '/ManualLocationScreen';
+  static const String profileSetUpScreen = '/ProfileSetUpScreen';
+  static const String vehicleSetupScreen = '/VehicleSetupScreen';
+  static const String accountReview = '/AccountReviewScreen';
+  static const String documentScreen = '/DocumentScreen';
+  static const String uploadScreen = '/UploadScreen';
+  static const String tripActivityScreen = '/TripActivityScreen';
   static const String homeScreen = '/HomeScreen';
-  static const String walletScreen = '/WalletScreen';
-  static const String tripScreen = '/TripScreen';
-  static const String profileScreen = '/profileScreen';
-  static const String searchSecoundScreen = '/SearchSecoundScreen';
-  static const String searchFirstScreen = '/SearchFirstScreen';
-  static const String bookVehicleScreen = '/BookVehicleScreen';
-  static const String paymentSelectScreen = '/PaymentSelectScreen';
-  static const String pickupScreen = '/PickupPointScreen';
-  static const String offerScreen = '/OfferScreen';
-  static const String searchDriverScreen = '/SearchDriverScreen';
-  static const String driverDetailsScreen = '/DriverDetailsScreen';
-  static const String tripDetailsScreen = '/TripDetailsScreen';
-  static const String cancelRequestScreen = '/CancelRequestScreen';
-  static const String rateDriverScreen = '/RateDriverScreen';
-  static const String reportIssueScreen = '/ReportIssueScreen';
-  static const String rideDetailsScreen = '/RideDetailsScreen';
-  static const String chatSupportScreen = '/ChatSupportScreen';
-  static const String safetyScreen = '/SafetyScreen';
-  static const String languageScreen = '/LanguageScreen';
-  static const String notificationScreen = '/NotificationScreen';
-  static const String referScreen = '/ReferScreen';
-  static const String termScreen = '/TermScreen';
+  static const String accountDeActiveScreen = '/AccountDeactiveScreen';
+  static const String tripActivityDetailScreen = '/TripActivityDetails';
+  static const String tripSupportScreen = '/TripSupportScreen';
+  static const String earningScreen = '/EarningScreen';
+  static const String accountScreen = '/AccountScreen';
+  static const String cancelRequestScreen = '/CancelRequestscreen';
+  static const String mapNavigationScreen = '/MapNavigationScreen';
+  static const String customerOtpVerify = '/CustomerOtpVerify';
+  static const String cashCollectScreen = '/CashCollectScreen';
+  static const String reviewScreen = '/ReviewScreen';
+  static const String tripConfirmationScreen = '/TripConfirmationScreen';
   static const String editProfileScreen = '/EditProfileScreen';
+  static const String referEarnScreen = '/ReferEarnScreen';
+  static const String languageScreen = '/LanguageScreen';
+  static const String documentProfileScreen = '/DocumentProfileScreen';
+  static const String bankAccountAddScreen = '/BankAccountAddScreen';
+  static const String walletTransactionScreen = '/WalletTransactionScreen';
+  static const String earningTransactionScreen = '/EarningTransactionScreen';
+  static const String earningDetailsScreen = '/EarningDetailsScreen';
+  static const String walletDetailsScreen = '/WalletDetailsScreen';
+  static const String walletReportScreen = '/WalletReportScreen';
+  static const String searchAddressScreen = '/SearchAddressScreen';
+  static const String saveLocationScreen = '/SaveLocationScreen';
+  static const String helpCenterScreen = '/HelpCenterScreen';
+  static const String driverPreference = '/DriverPreference';
+  static const String preferenceScreen = '/PreferenceScreen';
+  static const String notificationScreen = '/NotificationScreen';
   static const String chatScreen = '/ChatScreen';
   static const String forgotPasswordScreen = '/ForgotPasswordScreen';
+  static const String incentiveScreen = '/IncentiveScreen';
+  static const String raiseTickerScreen = '/RaiseTickerScreen';
 
   static List<GetPage<dynamic>> pages = [
     GetPage<dynamic>(
@@ -81,186 +101,237 @@ mixin Routes {
       transition: defaultTransition,
     ),
     GetPage<dynamic>(
-      name: onboarding,
-      page: () => OnboardingScreens(),
+      name: onboardingScreen,
+      page: () => const OnboardingScreen(),
       transition: defaultTransition,
-    ),
-    GetPage<dynamic>(
-      name: loginScreen,
-      page: () => LoginScreen(),
-      transition: Transition.rightToLeft,
-    ),
-    GetPage<dynamic>(
-      name: otpVerifyScreen,
-      page: () => OtpverifyScreen(),
-      transition: Transition.rightToLeft,
-    ),
-    GetPage<dynamic>(
-      name: phoneRequiredScreen,
-      page: () => const PhoneRequiredScreen(),
-      transition: Transition.rightToLeft,
-    ),
-    GetPage<dynamic>(
-      name: locationScreen,
-      page: () => LocationScreen(),
-      transition: Transition.rightToLeft,
+      bindings: [OnboardingBinding()],
     ),
     GetPage<dynamic>(
       name: registerScreen,
-      page: () => RegisterScreen(),
-      transition: Transition.rightToLeft,
+      page: () => const DriverLoginScreen(),
+      transition: defaultTransition,
     ),
     GetPage<dynamic>(
-      name: termServiceScreen,
-      page: () => TermServiceScreen(),
-      transition: Transition.rightToLeft,
+      name: otpVerifyScreen,
+      page: () => const OtpVerifyScreen(),
+      transition: defaultTransition,
+    ),
+    GetPage<dynamic>(
+      name: locationSetScreen,
+      page: () => const LocationSetScreen(),
+      transition: defaultTransition,
+    ),
+    GetPage<dynamic>(
+      name: manualLocationScreen,
+      page: () => const ManualLocationScreen(),
+      transition: defaultTransition,
+    ),
+    GetPage<dynamic>(
+      name: profileSetUpScreen,
+      page: () => const ProfileSetupScreen(),
+      transition: defaultTransition,
+    ),
+    GetPage<dynamic>(
+      name: vehicleSetupScreen,
+      page: () => const VehicleSetupScreen(),
+      transition: defaultTransition,
+    ),
+    GetPage<dynamic>(
+      name: uploadScreen,
+      page: () => const UploadingScreen(),
+      transition: defaultTransition,
     ),
 
     GetPage<dynamic>(
-      name: dashboardScreen,
-      page: () => DashboardScreen(),
+      name: documentScreen,
+      page: () => const DocumentScreen(),
       transition: defaultTransition,
     ),
+
+    GetPage<dynamic>(
+      name: accountReview,
+      page: () => const AccountReviewScreen(),
+      transition: defaultTransition,
+    ),
+    GetPage<dynamic>(
+      name: tripActivityScreen,
+      page: () => const TripActivityScreen(),
+      transition: defaultTransition,
+    ),
+
     GetPage<dynamic>(
       name: homeScreen,
-      page: () => HomeScreen(),
-      transition: defaultTransition,
-    ),
-    GetPage<dynamic>(
-      name: walletScreen,
-      page: () => WalletScreen(),
+      page: () => const HomeScreen(),
       transition: defaultTransition,
     ),
 
     GetPage<dynamic>(
-      name: tripScreen,
-      page: () => TripScreen(),
+      name: accountDeActiveScreen,
+      page: () => const AccountDeactiveScreen(),
       transition: defaultTransition,
     ),
     GetPage<dynamic>(
-      name: profileScreen,
-      page: () => ProfileScreen(),
+      name: tripActivityDetailScreen,
+      page: () => const TripActivityDetails(),
+      transition: defaultTransition,
+    ),
+    GetPage<dynamic>(
+      name: tripSupportScreen,
+      page: () => const TripSupportScreen(),
+      transition: defaultTransition,
+    ),
+    GetPage<dynamic>(
+      name: earningScreen,
+      page: () => const EarningScreen(),
       transition: defaultTransition,
     ),
 
     GetPage<dynamic>(
-      name: searchFirstScreen,
-      page: () => SearchFirstScreen(),
-      transition: defaultTransition,
-    ),
-    GetPage<dynamic>(
-      name: searchSecoundScreen,
-      page: () => SearchSecoundScreen(),
-      transition: defaultTransition,
-    ),
-    GetPage<dynamic>(
-      name: bookVehicleScreen,
-      page: () => BookVehicleScreen(),
-      transition: defaultTransition,
-    ),
-    GetPage<dynamic>(
-      name: paymentSelectScreen,
-      page: () => PaymentSelectScreen(),
-      transition: defaultTransition,
-    ),
-    GetPage<dynamic>(
-      name: pickupScreen,
-      page: () => PickupPointScreen(),
-      transition: defaultTransition,
-    ),
-    GetPage<dynamic>(
-      name: offerScreen,
-      page: () => OfferScreen(
-        offerCode: Get.parameters['offerCode'] ?? "",
-        vehicleId: Get.parameters['vehicleId'] ?? "",
-      ),
-      transition: defaultTransition,
-    ),
-    GetPage<dynamic>(
-      name: searchDriverScreen,
-      page: () => SearchDriverScreen(),
-      transition: defaultTransition,
-    ),
-    GetPage<dynamic>(
-      name: driverDetailsScreen,
-      page: () => DriverDetailsScreen(),
-      transition: defaultTransition,
-    ),
-    GetPage<dynamic>(
-      name: tripDetailsScreen,
-      page: () => TripDetailsScreen(),
+      name: accountScreen,
+      page: () => const AccountScreen(),
       transition: defaultTransition,
     ),
     GetPage<dynamic>(
       name: cancelRequestScreen,
-      page: () => CancelRequestScreen(),
-      transition: defaultTransition,
-    ),
-    GetPage<dynamic>(
-      name: rateDriverScreen,
-      page: () => RateDriverScreen(),
-      transition: defaultTransition,
-    ),
-    GetPage<dynamic>(
-      name: reportIssueScreen,
-      page: () => ReportIssueScreen(),
-      transition: defaultTransition,
-    ),
-    GetPage<dynamic>(
-      name: rideDetailsScreen,
-      page: () => RideDetailsScreen(index: Get.parameters['index'] ?? "0"),
+      page: () => const CancelRequestscreen(),
       transition: defaultTransition,
     ),
 
     GetPage<dynamic>(
-      name: chatSupportScreen,
-      page: () => ChatSupportScreen(
+      name: mapNavigationScreen,
+      page: () => const MapNavigationScreen(),
+      transition: defaultTransition,
+    ),
+    GetPage<dynamic>(
+      name: customerOtpVerify,
+      page: () => const CustomerOtpVerify(),
+      transition: defaultTransition,
+    ),
+    GetPage<dynamic>(
+      name: cashCollectScreen,
+      page: () => const CashCollectScreen(),
+      transition: defaultTransition,
+    ),
+    GetPage<dynamic>(
+      name: reviewScreen,
+      page: () => const ReviewScreen(),
+      transition: defaultTransition,
+    ),
+    GetPage<dynamic>(
+      name: tripConfirmationScreen,
+      page: () => const TripConfirmationScreen(),
+      transition: defaultTransition,
+    ),
+    GetPage<dynamic>(
+      name: editProfileScreen,
+      page: () => const EditProfileScreen(),
+      transition: defaultTransition,
+    ),
+    GetPage<dynamic>(
+      name: referEarnScreen,
+      page: () => const ReferEarnScreen(),
+      transition: defaultTransition,
+    ),
+    GetPage<dynamic>(
+      name: languageScreen,
+      page: () => const LanguageScreen(),
+      transition: defaultTransition,
+    ),
+    GetPage<dynamic>(
+      name: documentProfileScreen,
+      page: () => const DocumentProfileScreen(),
+      transition: defaultTransition,
+    ),
+    GetPage<dynamic>(
+      name: bankAccountAddScreen,
+      page: () => const BankAccountAddScreen(),
+      transition: defaultTransition,
+    ),
+    GetPage<dynamic>(
+      name: walletTransactionScreen,
+      page: () => const WalletTransactionScreen(),
+      transition: defaultTransition,
+    ),
+    GetPage<dynamic>(
+      name: earningTransactionScreen,
+      page: () => const EarningTransactionScreen(),
+      transition: defaultTransition,
+    ),
+    GetPage<dynamic>(
+      name: earningDetailsScreen,
+      page: () => const EarningDetailsScreen(),
+      transition: defaultTransition,
+    ),
+    GetPage<dynamic>(
+      name: walletDetailsScreen,
+      page: () => const WalletDetailsScreen(),
+      transition: defaultTransition,
+    ),
+    GetPage<dynamic>(
+      name: walletReportScreen,
+      page: () => WalletReportScreen(
         bookingId: Get.parameters['bookingId'] ?? "",
-        title: Get.parameters['title'] ?? "",
+        tranactionId: Get.parameters['transactionId'] ?? "",
       ),
       transition: defaultTransition,
     ),
 
     GetPage<dynamic>(
-      name: safetyScreen,
-      page: () => SafetyScreen(),
-      transition: defaultTransition,
-    ),
-    GetPage<dynamic>(
-      name: languageScreen,
-      page: () => LanguageScreen(),
+      name: searchAddressScreen,
+      page: () => const SearchAddressScreen(),
       transition: defaultTransition,
     ),
 
     GetPage<dynamic>(
-      name: referScreen,
-      page: () => ReferEarnScreen(),
+      name: saveLocationScreen,
+      page: () => const SaveLocationScreen(),
       transition: defaultTransition,
     ),
     GetPage<dynamic>(
-      name: termScreen,
-      page: () => TermServiceScreen(),
+      name: helpCenterScreen,
+      page: () => const HelpCenterScreen(),
       transition: defaultTransition,
     ),
-
+    GetPage<dynamic>(
+      name: driverPreference,
+      page: () => const DriverPreference(),
+      transition: defaultTransition,
+    ),
+    GetPage<dynamic>(
+      name: preferenceScreen,
+      page: () => const PreferenceScreen(),
+      transition: defaultTransition,
+    ),
     GetPage<dynamic>(
       name: notificationScreen,
-      page: () => NotificationScreen(),
+      page: () => const NotificationScreen(),
       transition: defaultTransition,
     ),
-    GetPage<dynamic>(
-      name: editProfileScreen,
-      page: () => EditProfileScreen(),
-      transition: defaultTransition,
-    ),
+
     GetPage<dynamic>(
       name: chatScreen,
       page: () => ChatScreen(bookingId: Get.parameters['bookingId'] ?? ""),
       transition: defaultTransition,
     ),
+
     GetPage<dynamic>(
       name: forgotPasswordScreen,
       page: () => ForgotPasswordScreen(),
+      transition: defaultTransition,
+    ),
+
+    GetPage<dynamic>(
+      name: incentiveScreen,
+      page: () => IncentiveScreen(),
+      transition: defaultTransition,
+    ),
+
+    GetPage<dynamic>(
+      name: raiseTickerScreen,
+      page: () => RaiseTickerScreen(
+        title: Get.parameters['title'] ?? "",
+        subject: Get.parameters['subject'] ?? "",
+      ),
       transition: defaultTransition,
     ),
   ];

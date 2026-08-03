@@ -1,0 +1,28 @@
+VESZPREMI TAXI - 2026-07-29 NAGY P0 TESZTCSOMAG
+
+Tartalom:
+1. Sofor app 1.0.21+27 teljes forrasa.
+2. Utas app 1.0.13+22 teljes forrasa.
+3. Backend P0 megjegyzes a lemondasi tranzakciohoz.
+
+FONTOS GOOGLE KULCS:
+A Codemagic feluleten mar beallitott GOOGLE_MAPS_API_KEY es a meglevo pre-build script helyesen letrehozza az assets/.env fajlt. Ezt a csomag nem irja felul es nem tartalmaz beagyazott API-kulcsot.
+
+A most engedelyezett API-k elegendok a teszthez:
+- Maps SDK for Android
+- Routes API
+- Directions API
+- Places API (New)
+- Geocoding API
+- Geolocation API
+- Maps JavaScript API (nem szukseges a mobil belso utvonalhoz, de maradhat)
+
+A Flutter buildet ebben a helyi kornyezetben nem lehetett lefuttatni, mert nincs telepitett Flutter/Dart SDK. Elvegzett ellenorzesek:
+- Dart fajlok zarojel-, string- es komment-szerkezeti ellenorzese
+- helyi Dart importok letezese
+- pubspec.yaml es codemagic.yaml YAML parse
+- Android XML parse
+- verziok es ures forrasbeli assets/.env ellenorzese
+- ZIP integritasteszt
+
+A tenyleges build bizonyiteka a Codemagic android-debug workflow sikeres APK-ja lesz.

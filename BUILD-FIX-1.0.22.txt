@@ -1,0 +1,6 @@
+Javított fordítási hiba:
+lib/feature/home/service/home_service.dart - No named parameter with the name 'showToast'
+
+Megoldás:
+Az opcionális showToast argumentum eltávolítva minden hívási helyről.
+Verzió: 1.0.22+28

@@ -42,7 +42,7 @@ class CountryPickerWidget extends StatelessWidget {
               child: CountryPickerUtils.getDefaultFlagImage(country),
             ),
             4.horizontalSpace,
-            Image.asset(IconAsset.arrowDownIcon, height: 16.w, width: 16.w),
+            Image.asset(IconAsset.arrowDown, height: 16.w, width: 16.w),
             12.horizontalSpace,
             Container(
               width: 2,
@@ -133,15 +133,18 @@ class CountryPickerWidget extends StatelessWidget {
 }
 
 class CountryPickerWidget1 extends StatelessWidget {
-  const CountryPickerWidget1({
+  CountryPickerWidget1({
     super.key,
     required this.phoneController,
     required this.country,
     required this.onTap,
+    this.padding,
   });
 
   final TextEditingController phoneController;
   final Country country;
+  final double? padding;
+
   final Function(dynamic) onTap;
 
   @override
@@ -155,7 +158,7 @@ class CountryPickerWidget1 extends StatelessWidget {
         _openCountryPickerDialog(context);
       },
       child: Padding(
-        padding: EdgeInsets.only(left: 20.w),
+        padding: EdgeInsets.only(left: padding ?? 20.w),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -164,7 +167,7 @@ class CountryPickerWidget1 extends StatelessWidget {
               child: CountryPickerUtils.getDefaultFlagImage(country),
             ),
             4.horizontalSpace,
-            Image.asset(IconAsset.arrowDownIcon, height: 16.w, width: 16.w),
+            Image.asset(IconAsset.arrowDown, height: 16.w, width: 16.w),
             12.horizontalSpace,
             Container(
               width: 2,
@@ -216,7 +219,6 @@ class CountryPickerWidget1 extends StatelessWidget {
       onValuePicked: (Country country) {
         country = country;
         phoneController.text = "+${country.phoneCode}";
-
         onTap(country);
         log("selectedDialogCountry ${country.phoneCode}");
       },

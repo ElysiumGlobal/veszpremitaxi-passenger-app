@@ -1,25 +1,10 @@
-# Veszprémi Taxi UTASAPP 1.0.20+29
+# 1.0.20+26 – Codemagic memóriajavítás
 
-## Firebase belépés – Android első ütem
+- A Gradle build párhuzamos végrehajtása kikapcsolva.
+- A Gradle worker száma 1-re korlátozva.
+- A Gradle heap 4 GB, a Kotlin daemon heap 1,5 GB.
+- A szükségtelen Jetifier kikapcsolva, mert a projekt AndroidX alapú.
+- A debug APK csak ARM64 célra készül, ami megfelel a Blackview Tab 60 Pro és a BrowserStack teszttablet architektúrájának.
+- A build parancs a már lefuttatott `flutter pub get` után `--no-pub` kapcsolót használ.
 
-- A Veszprémi Taxi saját Firebase projektje bekerült az Android UTASAPP-ba.
-- Csomagnév: `hu.veszpremitaxi.passenger`.
-- Firebase projekt: `vtaxi-503221`.
-- Az Android Google OAuth kliens és a Codemagic debug SHA-1 konfigurálva.
-- Az Email/Password és a Google belépés aktív.
-- A vendég mód nincs engedélyezve.
-- A térkép és a rendelési felület csak Firebase + Laravel belépés után nyílik meg.
-- A korábbi debug teszt e-mail/jelszó előtöltés megszűnt.
-- Új e-mail-címnél a Firebase-fiók automatikusan létrejön.
-- A megerősítő e-mail elküldésre kerül, de az első belépést nem blokkolja.
-- Meglévő Laravel-fióknál a régi jelszó ellenőrzése megelőzi a Firebase-fiók létrehozását.
-- A Firebase UID és ID token bekerül a Laravel login kérésbe.
-- Kijelentkezéskor és 401-es munkamenethibánál a Firebase munkamenet is törlődik.
-- Az új felhasználó profilkiegészítése nem blokkolja a belépést; a telefonszám és a fizetési adatok az első fizetés előtti folyamatba kerülnek.
-- Push értesítési engedélykérés ebben a verzióban még nincs bekapcsolva, hogy a belépési teszt külön kezelhető legyen.
-- Apple és Facebook belépés ebben az Android első ütemben még nincs aktiválva.
-
-## Verzió
-
-- App: `1.0.20+29`
-- Debug logger: `1.0.20+29`
+Ez a verzió nem változtatja meg az alkalmazás üzleti logikáját vagy felületét; kizárólag a Codemagic build stabilitását javítja.

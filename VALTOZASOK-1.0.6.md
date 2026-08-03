@@ -1,6 +1,7 @@
-# Veszprémi Taxi Passenger 1.0.6
+# Veszprémi Taxi Driver 1.0.6
 
-- Android launcher ikon teljes képe biztonságos margóval, adaptív réteg miatti vágás nélkül.
-- Az első indítókép 1,5 másodpercig, a második további 1,5 másodpercig látható.
-- A sofőrkereső képernyőn a „Trip Details” felirat: „Utazás részletei”.
-- A P0 booking-flow javítások változatlanul megmaradtak.
+- Teljesen új, VAP arculatú „Munkába állok” képernyő.
+- Teljes szélességű, töltésjelzős és dupla koppintás ellen védett műszakindító gomb.
+- A sikeres 200-as attendance válasz után a teljes sofőrprofil újratöltődik.
+- Null userModel esetén sem marad bent tévesen az offline képernyő.
+- Sikeres munkába állás után azonnali helyzetfrissítés történik.

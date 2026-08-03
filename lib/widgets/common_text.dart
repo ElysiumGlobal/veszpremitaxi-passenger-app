@@ -8,7 +8,7 @@ class CommonText extends StatelessWidget {
   final double? fontSize;
   final bool? softWrap;
   final String? fontFamily;
-  final FontWeight? fontWeight;
+  final FontWeight fontWeight;
   final Color? color;
   final double? letterSpacing;
   final double? height;
@@ -27,7 +27,7 @@ class CommonText extends StatelessWidget {
     this.height,
     this.fontFamily,
     this.textAlign,
-    this.fontWeight,
+    this.fontWeight = FontWeight.w400,
     this.fontSize,
     this.letterSpacing,
     this.overflow,
@@ -44,7 +44,6 @@ class CommonText extends StatelessWidget {
       maxLines: maxLines,
       overflow: overflow,
       softWrap: softWrap ?? false,
-      textAlign: textAlign,
       style: TextStyle(
         fontStyle: fontStyle,
         fontSize: fontSize,
@@ -56,6 +55,7 @@ class CommonText extends StatelessWidget {
         decoration: textDecoration,
         decorationColor: decorationColor,
       ),
+      textAlign: textAlign,
     );
   }
 }
