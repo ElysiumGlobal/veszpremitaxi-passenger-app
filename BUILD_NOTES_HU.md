@@ -1,8 +1,7 @@
-# Build megjegyzések – sofőrapp 1.0.32+38
+# Build megjegyzések – utasapp 1.0.24+33
 
-- Android application ID változatlan: `com.netsofters.etaxidriver`.
-- Elsődleges céleszköz: Blackview Tab 60 Pro, 1280×800, landscape.
-- A belépés öt fix Laravel-sofőrfiók + 8 számjegyű PIN; nincs Firebase Auth.
-- A gyári forrásból megmaradt értesítési/Firebase csomagokat ez a kör nem nevezte át és nem cserélte le.
+- Android application ID változatlan: `hu.veszpremitaxi.passenger`.
+- A meglévő saját Firebase-konfiguráció, Google-belépés, e-mailes belépés/regisztráció és e-mail-verifikáció fájljai változatlanul a forrásban maradtak.
+- A javítás nem cserélte le a Firebase projektet és nem nyúlt a hitelesítési folyamat üzleti logikájához.
 - Fordítás Linux/macOS: `./BUILD_DEBUG_APK.sh`
 - Fordítás Windows PowerShell: `./BUILD_DEBUG_APK.ps1`

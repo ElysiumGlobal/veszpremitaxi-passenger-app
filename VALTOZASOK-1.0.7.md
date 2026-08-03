@@ -1,8 +1,6 @@
-# Veszprémi Taxi Driver 1.0.7
+# Veszprémi Taxi utasapp 1.0.7+16
 
-- Bejelentkező képernyő gyári logója VAP Driver ikonra cserélve.
-- A Munkába állok gomb azonnali vizuális visszajelzést ad.
-- A munkába állás a már ismert vagy mentett GPS-koordinátát használja, ezért nem akad el csendben új GPS-fixre várva.
-- A sikeres attendance válasz után a felület közvetlenül online módra vált.
-- A /user/profile végpont hibája már nem blokkolja az online állapotot.
-- A helyzetfrissítés hibája nem fordítja vissza a már sikeres munkába állást.
+- A főoldali Google térkép már nem épül újra a GPS-koordináta első beérkezésekor.
+- Megszűnt a kezdéskor látható kétszeri térképbetöltés/villanás.
+- A térkép egyetlen stabil példány marad, a kamera animációval áll át a valós pozícióra.
+- A korábbi P0 rendelési és arculati javítások változatlanul megmaradtak.

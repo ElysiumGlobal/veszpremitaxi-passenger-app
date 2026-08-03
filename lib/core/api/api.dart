@@ -1,32 +1,28 @@
-import 'dart:async';
-import 'dart:convert';
-import 'dart:developer';
-import 'dart:io';
+import "dart:convert";
+import "dart:developer";
 
-import 'package:e_taxi/utils/loading_mixin.dart';
-import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
-import 'package:http_interceptor/http_interceptor.dart';
+import "package:e_taxi/utils/log_utils.dart";
+import "package:http/http.dart" as http;
+import "package:http_interceptor/http/intercepted_client.dart";
 
-import '../debug/driver_flow_debug.dart';
-import '../../utils/api_constants.dart';
-import '../../utils/app_preferences.dart';
-import '../../utils/log_utils.dart';
-import 'exception/app_exception.dart';
-import 'logger_interceptor.dart';
+import "../../utils/api_constants.dart";
+import "../debug/passenger_flow_debug.dart";
+import "../../utils/app_preferences.dart";
+import "logger_interceptor.dart";
 
-Map<String, String> headers() {
+Future<Map<String, String>> headers() async {
   final Map<String, String> headers = <String, String>{};
-  headers["Content-Type"] = "application/json";
   headers["accept"] = "*/*";
-  String authorizationToken = AppPreference.getString(AppPreference.userToken);
-  if (authorizationToken.isNotEmpty) {
-    headers["Authorization"] = "Bearer $authorizationToken";
+  headers["Content-Type"] = "application/json";
+  if ((AppPreference.getString(AppPreference.userToken)).isNotEmpty) {
+    headers["Authorization"] =
+        "Bearer ${AppPreference.getString(AppPreference.userToken)}";
   }
+
   return headers;
 }
 
-class Api with LoadingMixin {
+class Api {
   static Api? _instance;
 
   static http.Client get dio =>
@@ -46,19 +42,16 @@ class Api with LoadingMixin {
   Future<http.Response> post(
     String url, {
     Map<String, dynamic>? queryData,
-    Map<String, dynamic>? bodyData,
-    Map<String, String>? headerData,
-    bool checkAuthorization = true,
-    String? baseUrl,
-    bool showToast = true,
+    Map<String, dynamic>? bodyData = const <String, dynamic>{},
+    Map<String, String>? header,
   }) async {
-    LogUtils.printAction("post  $bodyData");
-    final String bookingId = DriverFlowDebug.bookingIdFrom(
+    LogUtils.showLogs(message: "POST $url");
+    final String bookingId = PassengerFlowDebug.bookingIdFrom(
       query: queryData,
       body: bodyData,
     );
     final Stopwatch stopwatch = Stopwatch()..start();
-    DriverFlowDebug.apiRequest(
+    PassengerFlowDebug.apiRequest(
       method: 'POST',
       endpoint: url,
       bookingId: bookingId,
@@ -67,185 +60,14 @@ class Api with LoadingMixin {
     );
 
     try {
-      final http.Response response = await dio
-          .post(
-            getUrl(url, queryParameters: queryData, baseUrl: baseUrl),
-            body: jsonEncode(bodyData),
-            headers: headerData ?? headers(),
-          )
-          .timeout(const Duration(seconds: 60));
-      stopwatch.stop();
-      DriverFlowDebug.apiResponse(
-        method: 'POST',
-        endpoint: url,
-        statusCode: response.statusCode,
-        durationMs: stopwatch.elapsedMilliseconds,
-        responseBody: response.body,
-        bookingId: bookingId,
-      );
-      return response;
-    } on SocketException catch (error) {
-      stopwatch.stop();
-      DriverFlowDebug.apiError(
-        method: 'POST',
-        endpoint: url,
-        error: error,
-        durationMs: stopwatch.elapsedMilliseconds,
-        bookingId: bookingId,
-      );
-      LogUtils.printError("SOCKET ERROR $error");
-      handleLoading(false);
-      final AppException exception = AppException(
-        message: "Nincs megfelelő internetkapcsolat.",
-        errorCode: -1,
-      );
-      if (showToast) exception.show();
-      throw exception;
-    } on TimeoutException catch (error) {
-      stopwatch.stop();
-      DriverFlowDebug.apiError(
-        method: 'POST',
-        endpoint: url,
-        error: error,
-        durationMs: stopwatch.elapsedMilliseconds,
-        bookingId: bookingId,
-      );
-      handleLoading(false);
-      final AppException exception = AppException(
-        message: "A kapcsolat időtúllépés miatt megszakadt.",
-        errorCode: -2,
-      );
-      if (showToast) exception.show();
-      throw exception;
-    } catch (error) {
-      stopwatch.stop();
-      DriverFlowDebug.apiError(
-        method: 'POST',
-        endpoint: url,
-        error: error,
-        durationMs: stopwatch.elapsedMilliseconds,
-        bookingId: bookingId,
-      );
-      if (error is AppException) rethrow;
-      throw AppException(message: "Váratlan hiba történt.", errorCode: -3);
-    }
-  }
-
-  Future<http.Response> get(
-    String url, {
-    Map<String, dynamic>? queryData,
-    Map<String, String>? headerData,
-    bool checkAuthorization = true,
-    String? baseUrl,
-    bool showToast = true,
-  }) async {
-    log("GET kérés: $url");
-    final String bookingId = DriverFlowDebug.bookingIdFrom(query: queryData);
-    final Stopwatch stopwatch = Stopwatch()..start();
-    DriverFlowDebug.apiRequest(
-      method: 'GET',
-      endpoint: url,
-      bookingId: bookingId,
-      query: queryData,
-    );
-
-    try {
-      final http.Response response = await dio
-          .get(
-            getUrl(url, queryParameters: queryData, baseUrl: baseUrl),
-            headers: headerData ?? headers(),
-          )
-          .timeout(const Duration(seconds: 60));
-      stopwatch.stop();
-      DriverFlowDebug.apiResponse(
-        method: 'GET',
-        endpoint: url,
-        statusCode: response.statusCode,
-        durationMs: stopwatch.elapsedMilliseconds,
-        responseBody: response.body,
-        bookingId: bookingId,
-      );
-      return response;
-    } on SocketException catch (error) {
-      stopwatch.stop();
-      DriverFlowDebug.apiError(
-        method: 'GET',
-        endpoint: url,
-        error: error,
-        durationMs: stopwatch.elapsedMilliseconds,
-        bookingId: bookingId,
-      );
-      handleLoading(false);
-      final AppException exception = AppException(
-        message: "Nincs megfelelő internetkapcsolat.",
-        errorCode: -1,
-      );
-      if (showToast) exception.show();
-      throw exception;
-    } on TimeoutException catch (error) {
-      stopwatch.stop();
-      DriverFlowDebug.apiError(
-        method: 'GET',
-        endpoint: url,
-        error: error,
-        durationMs: stopwatch.elapsedMilliseconds,
-        bookingId: bookingId,
-      );
-      handleLoading(false);
-      final AppException exception = AppException(
-        message: "A kapcsolat időtúllépés miatt megszakadt.",
-        errorCode: -2,
-      );
-      if (showToast) exception.show();
-      throw exception;
-    } catch (error) {
-      stopwatch.stop();
-      DriverFlowDebug.apiError(
-        method: 'GET',
-        endpoint: url,
-        error: error,
-        durationMs: stopwatch.elapsedMilliseconds,
-        bookingId: bookingId,
-      );
-      handleLoading(false);
-      if (error is AppException) rethrow;
-      final AppException exception = AppException(
-        message: "Váratlan hiba történt.",
-        errorCode: -3,
-      );
-      if (showToast) exception.show();
-      throw exception;
-    }
-  }
-
-  Future<http.Response> delete(
-    String url, {
-    Map<String, dynamic>? queryData,
-    Map<String, dynamic>? bodyData,
-    Map<String, String>? headerData,
-    String? baseUrl,
-  }) async {
-    final String bookingId = DriverFlowDebug.bookingIdFrom(
-      query: queryData,
-      body: bodyData,
-    );
-    final Stopwatch stopwatch = Stopwatch()..start();
-    DriverFlowDebug.apiRequest(
-      method: 'DELETE',
-      endpoint: url,
-      bookingId: bookingId,
-      query: queryData,
-      body: bodyData,
-    );
-    try {
-      final http.Response response = await dio.delete(
-        getUrl(url, queryParameters: queryData, baseUrl: baseUrl),
+      final http.Response response = await dio.post(
+        getUrl(url, queryParameters: queryData),
         body: jsonEncode(bodyData),
-        headers: headerData ?? headers(),
+        headers: header ?? await headers(),
       );
       stopwatch.stop();
-      DriverFlowDebug.apiResponse(
-        method: 'DELETE',
+      PassengerFlowDebug.apiResponse(
+        method: 'POST',
         endpoint: url,
         statusCode: response.statusCode,
         durationMs: stopwatch.elapsedMilliseconds,
@@ -255,62 +77,14 @@ class Api with LoadingMixin {
       return response;
     } catch (error) {
       stopwatch.stop();
-      DriverFlowDebug.apiError(
-        method: 'DELETE',
+      PassengerFlowDebug.apiError(
+        method: 'POST',
         endpoint: url,
         error: error,
         durationMs: stopwatch.elapsedMilliseconds,
         bookingId: bookingId,
       );
       rethrow;
-    }
-  }
-
-  Future<dynamic> sendMultipartRequestPost(
-    String url, {
-    Map<String, String>? queryData,
-    Map<String, String>? bodyData,
-
-    String? profileImage,
-    required String imageName,
-  }) async {
-    var client = http.Client();
-
-    print("BODY::$bodyData");
-    try {
-      var request = http.MultipartRequest(
-        'POST',
-        getUrl(url, queryParameters: queryData),
-      );
-      request.headers.addAll(headers());
-      try {
-        if ((profileImage?.isNotEmpty ?? false)) {
-          request.files.addAll([
-            if (profileImage != null)
-              await http.MultipartFile.fromPath(
-                imageName,
-                profileImage.isNotEmpty ? profileImage : "",
-              ),
-          ]);
-        }
-      } catch (e, st) {
-        client.close();
-        log("image upload error $e :$st");
-      }
-
-      if (bodyData != null) request.fields.addAll(bodyData);
-      http.StreamedResponse response = await request.send();
-      String jsonDataString = await response.stream.bytesToString();
-      client.close();
-      final jsonData = jsonDecode(jsonDataString);
-      LogUtils.printSuccess(
-        "API RESPONSE~MULTIPART~~~~~~${response.statusCode}_____${jsonData}",
-      );
-
-      return jsonData;
-    } catch (exception) {
-      print("ERROR:::$exception");
-      client.close();
     }
   }
 
@@ -324,18 +98,16 @@ class Api with LoadingMixin {
   }) async {
     var client = http.Client();
 
-    print("::${url}:BODY::$bodyData");
+    LogUtils.printWhite("BODY::$bodyData");
     try {
       var request = http.MultipartRequest(
         'POST',
         getUrl(url, queryParameters: queryData),
       );
-      request.headers.addAll(headers());
-
+      request.headers.addAll(await headers());
       try {
         if ((profileImage?.isNotEmpty ?? false)) {
           for (int i = 0; i < imageName.length; i++) {
-            debugPrint("NAME :::${imageName[i]}:::${profileImage?[i]}");
             request.files.addAll([
               if (profileImage != null)
                 await http.MultipartFile.fromPath(
@@ -351,68 +123,115 @@ class Api with LoadingMixin {
       }
 
       if (bodyData != null) request.fields.addAll(bodyData);
-      http.StreamedResponse response = await request.send().timeout(
-        Duration(seconds: 130),
-      );
+      http.StreamedResponse response = await request.send();
       String jsonDataString = await response.stream.bytesToString();
       client.close();
       final jsonData = jsonDecode(jsonDataString);
       LogUtils.printSuccess(
-        "API RESPONSE~MULTIPART~~~~~~${response.statusCode}_____${jsonData}",
+        "API RESPONSE~MULTIPART~~~~~~${response.statusCode}_____$jsonData",
       );
 
       return jsonData;
     } catch (exception) {
-      print("ERROR:::$exception");
+      LogUtils.printError("ERROR:::$exception");
       client.close();
     }
   }
 
-  Future<dynamic> multiPartRequest(
-    String url,
-    List<String> files, {
-    Map<String, String> mapBodyData = const {},
-    required String fieldName,
+  Future<http.Response> delete(
+    String url, {
+    Map<String, dynamic>? queryData,
+    Map<String, dynamic>? bodyData = const <String, dynamic>{},
+    Map<String, String>? header,
   }) async {
-    final multiPartRequest = http.MultipartRequest("POST", getUrl(url));
-    if (mapBodyData.isNotEmpty) {
-      multiPartRequest.fields.addAll(mapBodyData);
-    }
-    multiPartRequest.headers.addAll(headers());
-    print("BODY DATA:::$mapBodyData:::::${multiPartRequest.headers}");
-    try {
-      if (files.isNotEmpty) {
-        for (int i = 0; i < files.length; i++) {
-          multiPartRequest.files.addAll([
-            await http.MultipartFile.fromPath(fieldName, files[i]),
-          ]);
-        }
-      }
-    } catch (e, st) {
-      log("image upload error $e :$st");
-    }
-
-    print(
-      "object multiPartRequest ${multiPartRequest.fields} --- ${multiPartRequest.files}",
+    final String bookingId = PassengerFlowDebug.bookingIdFrom(
+      query: queryData,
+      body: bodyData,
     );
-    final request = await multiPartRequest.send();
+    final Stopwatch stopwatch = Stopwatch()..start();
+    PassengerFlowDebug.apiRequest(
+      method: 'DELETE',
+      endpoint: url,
+      bookingId: bookingId,
+      query: queryData,
+      body: bodyData,
+    );
 
-    var bytes = await request.stream.bytesToString();
+    try {
+      final http.Response response = await dio.delete(
+        getUrl(url, queryParameters: queryData),
+        body: jsonEncode(bodyData),
+        headers: header ?? await headers(),
+      );
+      stopwatch.stop();
+      PassengerFlowDebug.apiResponse(
+        method: 'DELETE',
+        endpoint: url,
+        statusCode: response.statusCode,
+        durationMs: stopwatch.elapsedMilliseconds,
+        responseBody: response.body,
+        bookingId: bookingId,
+      );
+      return response;
+    } catch (error) {
+      stopwatch.stop();
+      PassengerFlowDebug.apiError(
+        method: 'DELETE',
+        endpoint: url,
+        error: error,
+        durationMs: stopwatch.elapsedMilliseconds,
+        bookingId: bookingId,
+      );
+      rethrow;
+    }
+  }
 
-    print("STATES CODE:::::${request.statusCode}");
-    final jsonData = jsonDecode(bytes);
-    print("response $jsonData");
-    print("response1 ${request.statusCode}");
-    return jsonData;
+  Future<http.Response> get(
+    String url, {
+    Map<String, dynamic>? queryData,
+    Map<String, String>? getHeaders,
+  }) async {
+    LogUtils.showLogs(message: "GET $url");
+    final String bookingId = PassengerFlowDebug.bookingIdFrom(query: queryData);
+    final Stopwatch stopwatch = Stopwatch()..start();
+    PassengerFlowDebug.apiRequest(
+      method: 'GET',
+      endpoint: url,
+      bookingId: bookingId,
+      query: queryData,
+    );
+
+    try {
+      final http.Response response = await dio.get(
+        getUrl(url, queryParameters: queryData),
+        headers: getHeaders ?? await headers(),
+      );
+      stopwatch.stop();
+      PassengerFlowDebug.apiResponse(
+        method: 'GET',
+        endpoint: url,
+        statusCode: response.statusCode,
+        durationMs: stopwatch.elapsedMilliseconds,
+        responseBody: response.body,
+        bookingId: bookingId,
+      );
+      return response;
+    } catch (error) {
+      stopwatch.stop();
+      PassengerFlowDebug.apiError(
+        method: 'GET',
+        endpoint: url,
+        error: error,
+        durationMs: stopwatch.elapsedMilliseconds,
+        bookingId: bookingId,
+      );
+      rethrow;
+    }
   }
 }
 
-Uri getUrl(
-  String endpoint, {
-  Map<String, dynamic>? queryParameters,
-  String? baseUrl,
-}) {
-  String url = "${baseUrl ?? ApiConstants.baseUrl}$endpoint";
+Uri getUrl(String endpoint, {Map<String, dynamic>? queryParameters}) {
+  String url = "${ApiConstants.baseUrl}$endpoint";
   if (queryParameters != null && queryParameters.isNotEmpty) {
     url = "$url?";
     for (int i = 0; i < queryParameters.entries.length; i++) {
@@ -423,11 +242,11 @@ Uri getUrl(
       }
     }
   }
-  log(Uri.parse(url).toString());
+  LogUtils.showLogs(message: Uri.parse(url).toString());
   return Uri.parse(url);
 }
 
 Uri parseUrl(String url) {
-  log(Uri.parse(url).toString());
+  LogUtils.showLogs(message: Uri.parse(url).toString());
   return Uri.parse(url);
 }

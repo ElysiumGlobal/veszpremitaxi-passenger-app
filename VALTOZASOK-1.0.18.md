@@ -1,9 +1,8 @@
-# Veszprémi Taxi Sofőr 1.0.18+24
+# Veszprémi Taxi UTASAPP 1.0.18+27
 
-- Az utas felvételi pontja GPS nélkül is azonnal megjelenik a térképen.
-- A marker információs buborékában látható az utas neve.
-- A Navigate gomb valódi Google Maps navigációt indít.
-- A Mark Reached nem kér újra háttér-helyengedélyt, ezért nem fagy végtelen töltésbe.
-- A Mark Reached 10 másodperces GPS-időkorlátot és részletes debug eseményeket kapott.
-- A távolság egyértelműen külön jelzi az utasig és a teljes fuvarra vonatkozó értéket.
-- Directions API tiltás esetén a rendszer nem küld végtelen hibás kéréseket, hanem helyi távolságbecslésre vált.
+## Buildjavítás
+
+- A `HomeController.socketData()` most `Future<void>` visszatérési típusú és `async`.
+- Így a fuvar befejezésekor az utazási előzmények frissítése szabályosan várható meg az `await` kulcsszóval.
+- Javítva a Codemagic fordítási hiba: `await can only be used in async or async* methods`.
+- Az 1.0.17 összes funkcionális javítása változatlanul megmaradt.

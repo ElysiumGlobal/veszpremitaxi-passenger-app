@@ -35,13 +35,14 @@ class NetworkInfo {
     _connectivity.onConnectivityChanged.listen((
       List<ConnectivityResult> result,
     ) {
-      log("onConnectivityChanged: $result");
       if ((result.contains(ConnectivityResult.wifi)) ||
           (result.contains(ConnectivityResult.mobile))) {
         if (Get.currentRoute == '/NoInternetScreen') {
           Get.back();
         }
       } else {
+        log("onConnectivityChanged: $result");
+
         if (Get.currentRoute != '/NoInternetScreen') {
           Get.to(() => NoInternetScreen(), transition: Transition.fadeIn);
         }
@@ -51,13 +52,15 @@ class NetworkInfo {
 }
 
 class NoInternetScreen extends StatelessWidget {
+  const NoInternetScreen({super.key});
+
   @override
   Widget build(BuildContext context) {
     return PopScope(
       canPop: false,
       child: Scaffold(
         backgroundColor: AppColors.whiteGrey,
-        body: Container(
+        body: SizedBox(
           width: double.infinity,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.center,

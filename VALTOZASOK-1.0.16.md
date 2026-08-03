@@ -1,7 +1,6 @@
-# Veszpremi Taxi Driver 1.0.16+22
+# Veszprémi Taxi utasapp 1.0.16+25
 
-- A flow debug kliens a tenylegesen telepitett, onallo gyujto vegpontot hasznalja:
-  `https://api.veszpremitaxi.hu/vtaxi-driver-flow-debug-29c7.php`
-- Nem hasznal Laravel route modositast vagy kulon event PHP fajlt.
-- A telemetria tovabbra is nem blokkolja a fuvarfolyamatot.
-- Az 1.0.13 navigacios/ikon/splash javitasai es az 1.0.15 celzott flow esemenyei benne maradtak.
+- A sofőrnek megadandó utazási kód 6 számjegyű, a backend kompatibilitása érdekében balról nullákkal kiegészítve jelenik meg.
+- A rajzfilm sofőr illusztráció eltávolítva; helyette VAP-színű, letisztult taxi-keresési animáció látható.
+- A 1.0.15 rendelési állapot- és zöld útvonaljavításai változatlanul megmaradtak.
+- Debug verziószám frissítve.

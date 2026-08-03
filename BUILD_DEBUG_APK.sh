@@ -6,5 +6,5 @@ flutter --version
 flutter pub get
 flutter analyze
 flutter build apk --debug
-cp -f build/app/outputs/flutter-apk/app-debug.apk VeszpremiTaxi-Driver-1.0.32-debug.apk
-echo "Kész: $(pwd)/VeszpremiTaxi-Driver-1.0.32-debug.apk"
+cp -f build/app/outputs/flutter-apk/app-debug.apk VeszpremiTaxi-Passenger-1.0.24-debug.apk
+echo "Kész: $(pwd)/VeszpremiTaxi-Passenger-1.0.24-debug.apk"

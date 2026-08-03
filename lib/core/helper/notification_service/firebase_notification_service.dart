@@ -26,7 +26,10 @@ class FireBaseNotification {
 
   FireBaseNotification._();
 
-  late FirebaseMessaging firebaseMessaging;
+  FirebaseMessaging? _firebaseMessaging;
+
+  FirebaseMessaging get firebaseMessaging =>
+      _firebaseMessaging ??= FirebaseMessaging.instance;
   late AndroidNotificationChannel channel = const AndroidNotificationChannel(
     'high_importance_channel',
     'High Importance Notifications',
@@ -48,7 +51,6 @@ class FireBaseNotification {
   Future<void> firebaseCloudMessagingLSetup() async {
     if (!BuildConfig.firebaseEnabled) return;
 
-    firebaseMessaging = FirebaseMessaging.instance;
     await flutterLocalNotificationsPlugin
         .resolvePlatformSpecificImplementation<
           AndroidFlutterLocalNotificationsPlugin
@@ -131,7 +133,10 @@ class FireBaseNotification {
   }
 
   Future<void> notificationPermission() async {
-    if (!BuildConfig.firebaseEnabled) return;
+    if (!BuildConfig.firebaseEnabled ||
+        !BuildConfig.pushNotificationsEnabled) {
+      return;
+    }
 
     if (Platform.isIOS) {
       await flutterLocalNotificationsPlugin
@@ -146,7 +151,7 @@ class FireBaseNotification {
           >()
           ?.requestNotificationsPermission();
     }
-    iOSPermission(firebaseMessaging);
+    await iOSPermission(firebaseMessaging);
   }
 
   Future<void> iOSPermission(firebaseMessaging) async {

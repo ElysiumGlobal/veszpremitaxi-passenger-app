@@ -20,6 +20,7 @@ import 'package:get/get.dart';
 import '../../../core/helper/notification_service/firebase_notification_service.dart';
 import '../../../core/location_utils.dart';
 import '../../../utils/app_colors.dart';
+import '../../../utils/build_config.dart';
 import '../../../utils/app_string.dart';
 import '../../../utils/log_utils.dart';
 import '../../../utils/navigation_utils/navigation.dart';
@@ -70,7 +71,9 @@ class _DashboardScreenState extends State<DashboardScreen>
     profileController.getUserData(isRedirect: true);
 
     Future.delayed(const Duration(seconds: 2), () {
-      FireBaseNotification().notificationPermission();
+      if (BuildConfig.pushNotificationsEnabled) {
+        FireBaseNotification().notificationPermission();
+      }
     });
   }
 

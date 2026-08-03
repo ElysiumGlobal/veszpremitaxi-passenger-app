@@ -5,9 +5,15 @@ import 'package:get/get.dart';
 
 import '../core/api/exception/app_exception.dart';
 import 'app_string.dart';
+import 'log_utils.dart';
 
 extension Validator on String {
   bool isValidEmail() {
+
+
+
+
+
     final RegExp regex = RegExp(
       r'^[a-zA-Z0-9]+(\.[a-zA-Z0-9]+)*@'
       r'[a-zA-Z0-9]+(\.[a-zA-Z0-9]+)+$',
@@ -65,22 +71,14 @@ extension Validator on String {
   bool phoneValid(String phoneNumber, String dialCode) {
     bool valid = CountryUtils.validatePhoneNumber(phoneNumber, dialCode);
 
+    LogUtils.printAction("VALIDAT::$valid ::$phoneNumber $dialCode");
+
     if (valid) {
       return true;
     } else {
       showError(AppString.pleaseEnterValidMobileNumber.tr);
       return false;
     }
-  }
-
-  bool isValidIndianVehicle() {
-    if (isEmpty) {
-
-      showError(AppString.pleaseEnterValidRegisterNumber.tr);
-
-      return true;
-    }
-    return false;
   }
 }
 

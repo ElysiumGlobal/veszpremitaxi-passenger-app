@@ -1,8 +1,6 @@
-# Veszprémi Taxi Driver 1.0.10+16
+# Veszprémi Taxi Utas 1.0.10+19
 
-- A tesztbelépési adatok továbbra is előre ki vannak töltve.
-- Új, 3 másodperces HTTP polling fallback érkezett a fuvarajánlatokhoz.
-- A fuvarajánlat akkor is megjelenik, ha a Pusher broadcast nincs beállítva.
-- Csak online, aktív járművel rendelkező sofőr kérhet ajánlatot.
-- Az elfogadás továbbra is kézi, az existing update-status végponton történik.
-- Elavult current_booking_id nem blokkolja az új ajánlatot.
+- Javítva a Codemagic buildet blokkoló hibás debug mezőhivatkozás.
+- A booking estimate naplózása a modellben ténylegesen létező `distance` és `duration` mezőket használja.
+- Ha ezek hiányoznak, a `ride_type_estimate` távolság- és időtartamadataira vált vissza.
+- Egyéb alkalmazáslogika nem változott az 1.0.9+18 verzióhoz képest.

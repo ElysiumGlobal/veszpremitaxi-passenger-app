@@ -4,6 +4,7 @@ import 'dart:developer';
 import 'dart:math' as Math;
 import 'package:dotted_line/dotted_line.dart';
 import 'package:e_taxi/core/debug/passenger_flow_debug.dart';
+import 'package:e_taxi/core/service/google_route_service.dart';
 import 'package:e_taxi/core/location_utils.dart';
 import 'package:e_taxi/feature/home/controller/home_controller.dart';
 import 'package:e_taxi/feature/home/model/get_socket_model.dart';
@@ -16,7 +17,6 @@ import 'package:e_taxi/utils/assets.dart';
 import 'package:e_taxi/utils/utils.dart';
 import 'package:e_taxi/widgets/custome_img.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_polyline_points/flutter_polyline_points.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:get/get.dart';
@@ -736,43 +736,20 @@ class _SearchDriverScreenState extends State<SearchDriverScreen> {
     LatLng originLatLng,
     LatLng destinationLatLng,
   ) async {
-    final polylinePoints = PolylinePoints(
-      apiKey: homeController.placeApi ?? "",
-    );
-    final origin = PointLatLng(
-      originLatLng.latitude,
-      originLatLng.longitude,
-    );
-    final destination = PointLatLng(
-      destinationLatLng.latitude,
-      destinationLatLng.longitude,
-    );
-
-    final result = await polylinePoints.getRouteBetweenCoordinatesV2(
-      request: RoutesApiRequest(
-        origin: origin,
-        destination: destination,
-        travelMode: TravelMode.driving,
-      ),
-    );
-
-    List<PointLatLng> routePoints = [];
-    if (result.primaryRoute?.polylinePoints case List<PointLatLng> points) {
-      routePoints = points;
-    } else {
-      final legacyResult = await polylinePoints.getRouteBetweenCoordinates(
-        request: PolylineRequest(
-          origin: origin,
-          destination: destination,
-          mode: TravelMode.driving,
-        ),
+    final String apiKey = homeController.placeApi?.trim() ?? '';
+    if (apiKey.isEmpty) return <LatLng>[];
+    try {
+      final GoogleRouteResult route =
+          await GoogleRouteService.bestDrivingRoute(
+        apiKey: apiKey,
+        origin: originLatLng,
+        destination: destinationLatLng,
       );
-      routePoints = legacyResult.points;
+      return route.points;
+    } catch (error, stack) {
+      PassengerFlowDebug.runtimeError('search_driver_route', error, stack);
+      return <LatLng>[];
     }
-
-    return routePoints
-        .map((point) => LatLng(point.latitude, point.longitude))
-        .toList();
   }
 
   Future<void> drawPoliLine() async {

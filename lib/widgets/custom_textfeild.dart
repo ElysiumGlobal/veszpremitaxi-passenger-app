@@ -3,6 +3,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:get/get.dart';
 
 import '../utils/app_colors.dart';
@@ -15,7 +16,6 @@ class CustomTextField extends StatelessWidget {
   final int minLine;
   final Function(String)? onChanged;
   final Function(String?)? onSaved;
-  final String? Function(String?)? validation;
   final TextInputType keyboardType;
   final int? maxLength;
   final double? radius;
@@ -44,12 +44,13 @@ class CustomTextField extends StatelessWidget {
   final TextStyle? hintTextStyle;
   final VoidCallback? onSendTap;
   final double? textfielHeight;
-  final bool? isShowError;
   final bool autoFocus;
+  final TextAlignVertical? textAlignVertical;
 
   CustomTextField({
     super.key,
     this.onChanged,
+    this.autoFocus = false,
     this.maxLine = 1,
     this.minLine = 1,
     this.maxLength,
@@ -84,9 +85,7 @@ class CustomTextField extends StatelessWidget {
     this.showSend = false,
     this.hintTextStyle,
     this.onSendTap,
-    this.validation,
-    this.isShowError,
-    this.autoFocus = false,
+    this.textAlignVertical,
   });
 
   final ValueNotifier<bool> _isObscure = ValueNotifier(true);
@@ -122,14 +121,14 @@ class CustomTextField extends StatelessWidget {
                 height: textfielHeight ?? 56.h,
                 child: IntrinsicHeight(
                   child: TextFormField(
-                    autofocus: autoFocus,
-                    validator: validation,
+                    textAlignVertical: textAlignVertical,
                     readOnly: readOnly,
                     style: TextStyle(
                       fontWeight: FontWeight.w500,
                       fontSize: 15.sp,
                       color: AppColors.titleTextColor,
                     ),
+                    autofocus: autoFocus,
                     onTap: onTap,
                     obscureText: isPasswordField ? _isObscure.value : false,
                     obscuringCharacter: '*',
@@ -161,48 +160,54 @@ class CustomTextField extends StatelessWidget {
                           ? Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                CustomImage(
-                                  image: prefixIcon ?? "",
-                                  ht: 24.h,
-                                  wt: 24.h,
-                                  fit: BoxFit.cover,
+                                SvgPicture.asset(
+                                  prefixIcon ?? "",
+                                  height: 24.h,
+                                  width: 24.h,
                                 ).paddingOnly(left: 12.w, right: 7.w),
+                                Container(
+                                  color: AppColors.hintTextColor,
+                                  width: 1,
+                                  height: 18.h,
+                                ).paddingSymmetric(vertical: 14.h),
                               ],
                             )
                           : null,
-                      suffixIcon: suffixWidget != null
-                          ? suffixWidget
-                          : isPasswordField
-                          ? Row(
-                              mainAxisSize: MainAxisSize.min,
-                              mainAxisAlignment: MainAxisAlignment.end,
-                              children: [
-                                GestureDetector(
-                                  onTap: () {
-                                    _isObscure.value = !isObscure;
-                                  },
-                                  child: Icon(
-                                    _isObscure.value
-                                        ? CupertinoIcons.eye
-                                        : CupertinoIcons.eye_slash,
-                                    size: 24.h,
-                                  ),
-                                ).paddingOnly(right: 12.w),
-                              ],
-                            )
-                          : ((suffixIcon?.isNotEmpty ?? false)
-                                ? Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      CustomImage(
-                                        image: suffixIcon ?? "",
-                                        ht: 24.h,
-                                        wt: 24.h,
-                                      ).paddingOnly(left: 10.w, right: 12.w),
-                                    ],
-                                  )
-                                : null),
-
+                      suffixIcon:
+                          suffixWidget ??
+                          (isPasswordField
+                              ? Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  mainAxisAlignment: MainAxisAlignment.end,
+                                  children: [
+                                    GestureDetector(
+                                      onTap: () {
+                                        _isObscure.value = !isObscure;
+                                      },
+                                      child: Icon(
+                                        _isObscure.value
+                                            ? CupertinoIcons.eye
+                                            : CupertinoIcons.eye_slash,
+                                        size: 24.h,
+                                      ),
+                                    ).paddingOnly(right: 12.w),
+                                  ],
+                                )
+                              : ((suffixIcon?.isNotEmpty ?? false)
+                                    ? Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          CustomImage(
+                                            image: suffixIcon ?? "",
+                                            ht: 40.h,
+                                            wt: 40.h,
+                                          ).paddingOnly(
+                                            left: 10.w,
+                                            right: 12.w,
+                                          ),
+                                        ],
+                                      )
+                                    : null)),
                       hintText: hintText,
                       hintStyle:
                           hintTextStyle ??

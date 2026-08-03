@@ -1,7 +1,6 @@
 import '../../../widgets/app_snackbar.dart';
 
 class AppException implements Exception {
-
   late final String message;
   final String? tag;
   final int errorCode;

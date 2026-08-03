@@ -1,1 +1,21 @@
-{"flutter":{"platforms":{"android":{"default":{"projectId":"e-taxi-649bb","appId":"1:59887336692:android:154356566626dfc8ccf2a1","fileOutput":"android/app/google-services.json"}},"ios":{"default":{"projectId":"e-taxi-649bb","appId":"1:59887336692:ios:5552cb6fea7ec848ccf2a1","uploadDebugSymbols":false,"fileOutput":"ios/Runner/GoogleService-Info.plist"}},"dart":{"lib/firebase_options.dart":{"projectId":"e-taxi-649bb","configurations":{"android":"1:59887336692:android:154356566626dfc8ccf2a1","ios":"1:59887336692:ios:5552cb6fea7ec848ccf2a1"}}}}}}
+{
+  "flutter": {
+    "platforms": {
+      "android": {
+        "default": {
+          "projectId": "vtaxi-503221",
+          "appId": "1:938558243123:android:113dc1a612779946207e46",
+          "fileOutput": "android/app/google-services.json"
+        }
+      },
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "vtaxi-503221",
+          "configurations": {
+            "android": "1:938558243123:android:113dc1a612779946207e46"
+          }
+        }
+      }
+    }
+  }
+}

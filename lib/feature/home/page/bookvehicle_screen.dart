@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:ui' as ui;
 import 'package:e_taxi/core/debug/passenger_flow_debug.dart';
+import 'package:e_taxi/core/service/google_route_service.dart';
 import 'package:e_taxi/feature/home/controller/home_controller.dart';
 import 'package:e_taxi/feature/home/model/create_booking_model.dart';
 import 'package:e_taxi/feature/home/widget/select_vehicle.dart';
@@ -12,7 +13,6 @@ import 'package:e_taxi/widgets/common_text.dart';
 import 'package:e_taxi/widgets/custom_button.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_polyline_points/flutter_polyline_points.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
@@ -69,7 +69,9 @@ class _BookVehicleScreenState extends State<BookVehicleScreen> {
         message: error.split(":").last.trim(),
         isError: true,
       );
+      return;
     }
+    _applySelectedRouteMetrics();
   }
 
   OriginDestinationModel? originDestinationModel;
@@ -77,47 +79,22 @@ class _BookVehicleScreenState extends State<BookVehicleScreen> {
   Set<Marker> markers = {};
   Set<Polyline> _polyLines = <Polyline>{};
 
-  void setMapMarkerPoliline() async {
-    final polylinePoints = PolylinePoints(
-      apiKey: homeController.placeApi ?? "",
-    );
-    final origin = PointLatLng(
-      sourceLatLog!.latitude,
-      sourceLatLog!.longitude,
-    );
-    final destination = PointLatLng(
-      destinationLatLog!.latitude,
-      destinationLatLog!.longitude,
-    );
+  GoogleRouteResult? _selectedRoute;
 
-    List<PointLatLng> routePoints = [];
+  Future<void> setMapMarkerPoliline() async {
+    final LatLng? origin = sourceLatLog;
+    final LatLng? destination = destinationLatLog;
+    final String apiKey = homeController.placeApi?.trim() ?? '';
+    if (origin == null || destination == null || apiKey.isEmpty) return;
 
-    final result = await polylinePoints.getRouteBetweenCoordinatesV2(
-      request: RoutesApiRequest(
+    try {
+      final GoogleRouteResult route =
+          await GoogleRouteService.bestDrivingRoute(
+        apiKey: apiKey,
         origin: origin,
         destination: destination,
-        travelMode: TravelMode.driving,
-      ),
-    );
-
-    if (result.primaryRoute?.polylinePoints case List<PointLatLng> points) {
-      routePoints = points;
-    } else {
-      final legacyResult = await polylinePoints.getRouteBetweenCoordinates(
-        request: PolylineRequest(
-          origin: origin,
-          destination: destination,
-          mode: TravelMode.driving,
-        ),
       );
-      routePoints = legacyResult.points;
-    }
-
-    if (routePoints.isNotEmpty) {
-      final polylineCoordinates = routePoints
-          .map((point) => LatLng(point.latitude, point.longitude))
-          .toList();
-
+      _selectedRoute = route;
       _polyLines
         ..clear()
         ..add(
@@ -128,7 +105,7 @@ class _BookVehicleScreenState extends State<BookVehicleScreen> {
             width: 9,
             zIndex: 1,
             color: AppColors.routeOutline,
-            points: polylineCoordinates,
+            points: route.points,
             endCap: Cap.roundCap,
             startCap: Cap.roundCap,
             jointType: JointType.round,
@@ -142,15 +119,60 @@ class _BookVehicleScreenState extends State<BookVehicleScreen> {
             width: 5,
             zIndex: 2,
             color: AppColors.routeGreen,
-            points: polylineCoordinates,
+            points: route.points,
             endCap: Cap.roundCap,
             startCap: Cap.roundCap,
             jointType: JointType.round,
           ),
         );
+      _applySelectedRouteMetrics();
+      if (mounted) setState(() {});
+    } catch (error, stack) {
+      PassengerFlowDebug.runtimeError('book_vehicle_route', error, stack);
+      PassengerFlowDebug.send(
+        'book_vehicle_route_failed',
+        data: <String, dynamic>{'error': error.toString()},
+      );
     }
+  }
 
-    setState(() {});
+  void _applySelectedRouteMetrics() {
+    final GoogleRouteResult? route = _selectedRoute;
+    final model = homeController.bookingCreateModel.value;
+    if (route == null || model?.data == null) return;
+
+    final String correctedDistance =
+        (route.distanceMeters / 1000).toStringAsFixed(3);
+    final String correctedDuration =
+        (route.durationSeconds / 60).toStringAsFixed(2);
+    final String previousDistance = model?.data?.booking?.distance ??
+        model?.data?.rideTypeEstimate?.distance ??
+        '';
+    final String previousDuration = model?.data?.booking?.duration ??
+        model?.data?.rideTypeEstimate?.duration ??
+        '';
+
+    model?.data?.booking?.distance = correctedDistance;
+    model?.data?.booking?.duration = correctedDuration;
+    model?.data?.rideTypeEstimate?.distance = correctedDistance;
+    model?.data?.rideTypeEstimate?.duration = correctedDuration;
+    for (final RideOption option in
+        model?.data?.rideOptions ?? <RideOption>[]) {
+      option.estimatedTime = '${(route.durationSeconds / 60).ceil()} perc';
+    }
+    homeController.bookingCreateModel.refresh();
+
+    PassengerFlowDebug.send(
+      'booking_estimate_route_corrected',
+      data: <String, dynamic>{
+        'previous_distance': previousDistance,
+        'previous_duration': previousDuration,
+        'corrected_distance': correctedDistance,
+        'corrected_duration': correctedDuration,
+        'route_source': route.source,
+        'detour_ratio': route.detourRatio,
+      },
+    );
   }
 
   LatLng? sourceLatLog;
