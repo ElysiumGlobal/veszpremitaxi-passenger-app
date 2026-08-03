@@ -7,6 +7,9 @@ import '../feature/auth/model/register_model.dart';
 
 class AppPreference {
   static late SharedPreferences _prefs;
+  static bool _initialized = false;
+
+  static bool get isInitialized => _initialized;
 
   static const String _languageKey = 'languageKey1';
   static const String onboardingDone = "VapPassengerOnboardingV3";
@@ -28,6 +31,7 @@ class AppPreference {
 
   static Future initMySharedPreferences() async {
     _prefs = await SharedPreferences.getInstance();
+    _initialized = true;
   }
 
   static Future<void> clearSharedPreferences() async {

@@ -46,9 +46,15 @@ class _ChatScreenState extends State<ChatScreen> {
   @override
   void initState() {
     super.initState();
+    final activeBookingId = AppConstant().bookingId.trim();
     PassengerFlowDebug.send(
       'passenger_chat_opened',
       bookingId: widget.bookingId,
+      data: <String, dynamic>{
+        'active_booking_id': activeBookingId,
+        'booking_matches': activeBookingId.isEmpty ||
+            activeBookingId == widget.bookingId.trim(),
+      },
     );
     unawaited(getMsgHistory());
     unawaited(socketAuthConnection());
@@ -79,6 +85,19 @@ class _ChatScreenState extends State<ChatScreen> {
         if (rawChat is! Map) return;
 
         final chat = Chat.fromJson(Map<String, dynamic>.from(rawChat));
+        final incomingBookingId = (chat.bookingId ?? '').trim();
+        if (incomingBookingId.isNotEmpty &&
+            incomingBookingId != widget.bookingId.trim()) {
+          PassengerFlowDebug.send(
+            'passenger_chat_foreign_message_ignored',
+            bookingId: widget.bookingId,
+            data: <String, dynamic>{
+              'incoming_booking_id': incomingBookingId,
+              'message_id': chat.id ?? '',
+            },
+          );
+          return;
+        }
         _upsertChat(chat);
         PassengerFlowDebug.send(
           'passenger_chat_socket_received',
@@ -220,7 +239,16 @@ class _ChatScreenState extends State<ChatScreen> {
 
   Future<void> sendMessage(String msg) async {
     final String message = msg.trim();
+    final bookingId = widget.bookingId.trim();
     if (message.isEmpty || isSending.value) return;
+    if (bookingId.isEmpty || bookingId == 'null') {
+      PassengerFlowDebug.send('passenger_chat_send_blocked_missing_booking');
+      AppSnackBar.showErrorSnackBar(
+        message: 'A chat nem nyitható meg fuvarazonosító nélkül.',
+        isError: true,
+      );
+      return;
+    }
 
     isSending.value = true;
     PassengerFlowDebug.send(

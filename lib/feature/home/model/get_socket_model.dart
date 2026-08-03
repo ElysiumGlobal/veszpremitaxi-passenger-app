@@ -1,5 +1,16 @@
 import 'dart:convert';
 
+String? _stringValue(dynamic value) {
+  if (value == null) return null;
+  final String text = value.toString().trim();
+  return text.isEmpty ? null : text;
+}
+
+int? _intValue(dynamic value) {
+  if (value is int) return value;
+  return int.tryParse(value?.toString() ?? '');
+}
+
 class NewRideModel {
   String? event;
   SocketDataModel? data;
@@ -52,6 +63,8 @@ class SocketDataModel {
   String? status;
   List<dynamic>? data;
   String? timestamp;
+  int? driverEtaMinutes;
+  String? driverExpectedArrivalAt;
 
   SocketDataModel({
     this.success,
@@ -73,6 +86,8 @@ class SocketDataModel {
     this.status,
     this.data,
     this.timestamp,
+    this.driverEtaMinutes,
+    this.driverExpectedArrivalAt,
   });
 
   SocketDataModel copyWith({
@@ -95,6 +110,8 @@ class SocketDataModel {
     String? status,
     List<dynamic>? data,
     String? timestamp,
+    int? driverEtaMinutes,
+    String? driverExpectedArrivalAt,
   }) => SocketDataModel(
     success: success ?? this.success,
     type: type ?? this.type,
@@ -115,6 +132,9 @@ class SocketDataModel {
     status: status ?? this.status,
     data: data ?? this.data,
     timestamp: timestamp ?? this.timestamp,
+    driverEtaMinutes: driverEtaMinutes ?? this.driverEtaMinutes,
+    driverExpectedArrivalAt:
+        driverExpectedArrivalAt ?? this.driverExpectedArrivalAt,
   );
 
   factory SocketDataModel.fromJson(
@@ -146,7 +166,10 @@ class SocketDataModel {
     data: json["data"] == null
         ? []
         : List<dynamic>.from(json["data"]!.map((x) => x)),
-    timestamp: json["timestamp"],
+    timestamp: _stringValue(json["timestamp"]),
+    driverEtaMinutes: _intValue(json["driver_eta_minutes"]),
+    driverExpectedArrivalAt:
+        _stringValue(json["driver_expected_arrival_at"]),
   );
 
   Map<String, dynamic> toJson() => {
@@ -169,6 +192,8 @@ class SocketDataModel {
     "status": status,
     "data": data == null ? [] : List<dynamic>.from(data!.map((x) => x)),
     "timestamp": timestamp,
+    "driver_eta_minutes": driverEtaMinutes,
+    "driver_expected_arrival_at": driverExpectedArrivalAt,
   };
 }
 
@@ -223,6 +248,9 @@ class Booking {
   String? onlinePaidAmount;
   String? cashAmount;
   String? scheduledAt;
+  String? acceptedAt;
+  String? driverEtaMinutes;
+  String? driverExpectedArrivalAt;
   String? startedAt;
   String? completedAt;
   String? cancelledAt;
@@ -301,6 +329,9 @@ class Booking {
     this.onlinePaidAmount,
     this.cashAmount,
     this.scheduledAt,
+    this.acceptedAt,
+    this.driverEtaMinutes,
+    this.driverExpectedArrivalAt,
     this.startedAt,
     this.completedAt,
     this.cancelledAt,
@@ -378,6 +409,9 @@ class Booking {
     String? onlinePaidAmount,
     String? cashAmount,
     String? scheduledAt,
+    String? acceptedAt,
+    String? driverEtaMinutes,
+    String? driverExpectedArrivalAt,
     String? startedAt,
     String? completedAt,
     String? cancelledAt,
@@ -453,6 +487,10 @@ class Booking {
     onlinePaidAmount: onlinePaidAmount ?? this.onlinePaidAmount,
     cashAmount: cashAmount ?? this.cashAmount,
     scheduledAt: scheduledAt ?? this.scheduledAt,
+    acceptedAt: acceptedAt ?? this.acceptedAt,
+    driverEtaMinutes: driverEtaMinutes ?? this.driverEtaMinutes,
+    driverExpectedArrivalAt:
+        driverExpectedArrivalAt ?? this.driverExpectedArrivalAt,
     startedAt: startedAt ?? this.startedAt,
     completedAt: completedAt ?? this.completedAt,
     cancelledAt: cancelledAt ?? this.cancelledAt,
@@ -530,8 +568,12 @@ class Booking {
     walletAmount: json["wallet_amount"],
     onlinePaidAmount: json["online_paid_amount"],
     cashAmount: json["cash_amount"],
-    scheduledAt: json["scheduled_at"],
-    startedAt: json["started_at"],
+    scheduledAt: _stringValue(json["scheduled_at"]),
+    acceptedAt: _stringValue(json["accepted_at"]),
+    driverEtaMinutes: _stringValue(json["driver_eta_minutes"]),
+    driverExpectedArrivalAt:
+        _stringValue(json["driver_expected_arrival_at"]),
+    startedAt: _stringValue(json["started_at"]),
     completedAt: json["completed_at"],
     cancelledAt: json["cancelled_at"],
     cancellationReason: json["cancellation_reason"],
@@ -610,6 +652,9 @@ class Booking {
     "online_paid_amount": onlinePaidAmount,
     "cash_amount": cashAmount,
     "scheduled_at": scheduledAt,
+    "accepted_at": acceptedAt,
+    "driver_eta_minutes": driverEtaMinutes,
+    "driver_expected_arrival_at": driverExpectedArrivalAt,
     "started_at": startedAt,
     "completed_at": completedAt,
     "cancelled_at": cancelledAt,

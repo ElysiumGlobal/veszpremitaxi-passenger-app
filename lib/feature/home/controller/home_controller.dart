@@ -141,6 +141,31 @@ void persistBookingFareFromModel(SocketDataModel? data) {
 }
 
 class HomeController extends GetxController with LoadingMixin, LoadingApiMixin {
+  final RxBool awaitingRidePayment = false.obs;
+  final RxString awaitingRidePaymentBookingId = ''.obs;
+  final Set<String> _finalizedCompletedBookingIds = <String>{};
+  String _paymentSelectionShownForBooking = '';
+
+  bool _isPaymentSettled(String? value) {
+    final normalized = (value ?? '').trim().toLowerCase();
+    return const <String>{
+      'paid',
+      'completed',
+      'complete',
+      'success',
+      'successful',
+      'settled',
+      '1',
+      'true',
+    }.contains(normalized);
+  }
+
+  String _currentPaymentStatus() {
+    return (riderBookingModel.value?.data?.booking?.paymentStatus ?? '')
+        .trim()
+        .toLowerCase();
+  }
+
   String? placeApi = Platform.isAndroid
       ? dotenv.env['GOOGLE_MAPS_API_KEY_Android']
       : dotenv.env['GOOGLE_MAPS_API_KEY_Ios'];
@@ -450,9 +475,55 @@ class HomeController extends GetxController with LoadingMixin, LoadingApiMixin {
         tripType.value = 2;
         AppPreference.removeKey(AppPreference.RideTime);
       } else if (terminalStatuses.contains(status)) {
-        final paymentMethod = booking?.paymentMethod ?? '';
-        final finalAmount =
-            riderBookingModel.value?.data?.tripDetails?.fare ?? '0';
+        final paymentMethod = (booking?.paymentMethod ?? '').trim().toLowerCase();
+        final paymentStatus = (booking?.paymentStatus ?? '').trim().toLowerCase();
+        final finalAmount = resolveTotalAmount(riderBookingModel.value?.data);
+
+        PassengerFlowDebug.send(
+          'terminal_booking_payment_evaluated',
+          bookingId: bookingId,
+          data: <String, dynamic>{
+            'status': status,
+            'payment_method': paymentMethod,
+            'payment_status': paymentStatus,
+            'payment_settled': _isPaymentSettled(paymentStatus),
+            'is_first_time': isFirstTime,
+          },
+        );
+
+        if (status == 'completed') {
+          AppConstant().reportString.value = '';
+          if (Get.isRegistered<TripController>()) {
+            unawaited(Get.find<TripController>().getTripHistory());
+          }
+
+          if (_isPaymentSettled(paymentStatus)) {
+            await _finalizeCompletedRide(
+              bookingId: bookingId,
+              paymentMethod: paymentMethod,
+              paymentStatus: paymentStatus,
+            );
+          } else {
+            awaitingRidePayment.value = true;
+            awaitingRidePaymentBookingId.value = bookingId;
+            tripType.value = 3;
+            PassengerFlowDebug.send(
+              'completed_ride_waiting_for_payment',
+              bookingId: bookingId,
+              data: <String, dynamic>{
+                'payment_method': paymentMethod,
+                'payment_status': paymentStatus,
+                'final_amount': finalAmount,
+              },
+            );
+            await _openCompletedRidePaymentSelection(
+              bookingId: bookingId,
+              paymentMethod: paymentMethod,
+              finalAmount: finalAmount,
+            );
+          }
+          return;
+        }
 
         _clearCurrentBookingState(
           bookingId: bookingId,
@@ -472,52 +543,7 @@ class HomeController extends GetxController with LoadingMixin, LoadingApiMixin {
           return;
         }
 
-        if (status == 'completed') {
-          AppConstant().reportString.value = '';
-          if (Get.isRegistered<TripController>()) {
-            unawaited(Get.find<TripController>().getTripHistory());
-          }
-          Navigation.pushNamed(
-            Routes.paymentSelectScreen,
-            arg: <String, dynamic>{
-              'method': paymentMethod,
-              'finalAmount': finalAmount,
-            },
-          );
-
-          Future<void>.delayed(const Duration(milliseconds: 300), () {
-            AppDialog.commonDialog(
-              childs: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  CustomImage(
-                    image: ImagesAsset.tripComplete,
-                    wt: 200.w,
-                    ht: 110.h,
-                  ),
-                  16.verticalSpace,
-                  CommonText(
-                    string: AppString.tripCompleteSuccessfully.tr,
-                    fontSize: 16.sp,
-                    fontWeight: FontWeight.w600,
-                  ),
-                  12.verticalSpace,
-                  CommonText(
-                    string: AppString.yourTripSummaryRecord.tr,
-                    softWrap: true,
-                    color: AppColors.textCaptionColor,
-                  ),
-                  16.verticalSpace,
-                  CustomButton(
-                    text: AppString.done.tr,
-                    onTap: () => Get.back(),
-                  ),
-                ],
-              ),
-            );
-          });
-        } else if (status == 'cancelled') {
+        if (status == 'cancelled') {
           AppDialog.commonDialog(
             barrierDismissible: false,
             childs: Column(
@@ -604,7 +630,7 @@ class HomeController extends GetxController with LoadingMixin, LoadingApiMixin {
                   height: 48.h,
                   width: double.infinity,
                   onTap: () {
-                    Navigator.pop(context);
+                    Get.back();
                     Navigation.popupUtil(Routes.dashboardScreen);
                   },
                 ),
@@ -624,6 +650,183 @@ class HomeController extends GetxController with LoadingMixin, LoadingApiMixin {
     }
   }
 
+  Future<void> _openCompletedRidePaymentSelection({
+    required String bookingId,
+    required String paymentMethod,
+    required String finalAmount,
+  }) async {
+    if (bookingId.isEmpty || bookingId == 'null') {
+      PassengerFlowDebug.send(
+        'completed_payment_screen_blocked',
+        data: <String, dynamic>{'reason': 'missing_booking_id'},
+      );
+      return;
+    }
+    if (_paymentSelectionShownForBooking == bookingId) return;
+    if (Get.currentRoute == Routes.paymentSelectScreen) return;
+
+    _paymentSelectionShownForBooking = bookingId;
+    PassengerFlowDebug.send(
+      'completed_payment_screen_open_requested',
+      bookingId: bookingId,
+      data: <String, dynamic>{
+        'payment_method': paymentMethod,
+        'final_amount': finalAmount,
+      },
+    );
+    await Navigation.pushNamed(
+      Routes.paymentSelectScreen,
+      arg: <String, dynamic>{
+        'method': paymentMethod,
+        'finalAmount': finalAmount,
+        'bookingId': bookingId,
+        'completedRide': true,
+      },
+    );
+  }
+
+  Future<bool> selectCashForCompletedRide({
+    required String bookingId,
+  }) async {
+    final activeBookingId =
+        '${riderBookingModel.value?.data?.booking?.id ?? AppConstant().bookingId}'
+            .trim();
+    if (bookingId.isEmpty ||
+        bookingId == 'null' ||
+        activeBookingId.isEmpty ||
+        activeBookingId != bookingId) {
+      PassengerFlowDebug.send(
+        'completed_cash_selection_blocked',
+        bookingId: bookingId,
+        data: <String, dynamic>{
+          'reason': 'booking_mismatch',
+          'active_booking_id': activeBookingId,
+        },
+      );
+      AppSnackBar.showErrorSnackBar(
+        message: 'A fuvar azonosítása sikertelen. Frissítsd az oldalt.',
+        isError: true,
+      );
+      return false;
+    }
+
+    PassengerFlowDebug.send(
+      'completed_cash_selection_requested',
+      bookingId: bookingId,
+    );
+    final result = await updatePaymentMode(
+      paymentMode: 'cash',
+      bookingId: bookingId,
+    );
+    if (result.isEmpty) {
+      PassengerFlowDebug.send(
+        'completed_cash_selection_failed',
+        bookingId: bookingId,
+      );
+      return false;
+    }
+
+    riderBookingModel.value?.data?.booking?.paymentMethod = 'cash';
+    awaitingRidePayment.value = true;
+    awaitingRidePaymentBookingId.value = bookingId;
+    PassengerFlowDebug.send(
+      'completed_cash_selection_saved',
+      bookingId: bookingId,
+      data: <String, dynamic>{'awaiting_driver_confirmation': true},
+    );
+    AppSnackBar.showErrorSnackBar(
+      message: 'Készpénzes fizetés kiválasztva. Várjuk a sofőr visszaigazolását.',
+    );
+    return true;
+  }
+
+  Future<void> _finalizeCompletedRide({
+    required String bookingId,
+    required String paymentMethod,
+    required String paymentStatus,
+  }) async {
+    if (bookingId.isEmpty || bookingId == 'null') return;
+    if (_finalizedCompletedBookingIds.contains(bookingId)) return;
+    _finalizedCompletedBookingIds.add(bookingId);
+
+    awaitingRidePayment.value = false;
+    awaitingRidePaymentBookingId.value = '';
+    _paymentSelectionShownForBooking = '';
+    AppConstant().bookingId = '';
+    clearSavedBookingFare();
+    tripType.value = 0;
+    isDriverCome.value = false;
+    changePolyLine = false;
+    AppPreference.removeKey(AppPreference.RideTime);
+
+    PassengerFlowDebug.send(
+      'completed_ride_payment_settled',
+      bookingId: bookingId,
+      data: <String, dynamic>{
+        'payment_method': paymentMethod,
+        'payment_status': paymentStatus,
+        'route': Get.currentRoute,
+      },
+    );
+
+    if (Get.currentRoute == Routes.paymentSelectScreen) {
+      Get.back();
+      await Future<void>.delayed(const Duration(milliseconds: 150));
+    }
+
+    AppDialog.commonDialog(
+      barrierDismissible: false,
+      childs: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          CustomImage(
+            image: ImagesAsset.tripComplete,
+            wt: 200.w,
+            ht: 110.h,
+          ),
+          16.verticalSpace,
+          CommonText(
+            string: 'Köszönjük, hogy a Veszprémi Taxit választottad!',
+            fontSize: 16.sp,
+            fontWeight: FontWeight.w600,
+            textAlign: TextAlign.center,
+            softWrap: true,
+          ),
+          12.verticalSpace,
+          CommonText(
+            string: 'A fizetés rendezve, a fuvar sikeresen lezárult.',
+            softWrap: true,
+            color: AppColors.textCaptionColor,
+            textAlign: TextAlign.center,
+          ),
+          16.verticalSpace,
+          CustomButton(
+            text: AppString.done.tr,
+            onTap: () {
+              Get.back();
+              Navigation.popupUtil(Routes.rateDriverScreen);
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  void finishCompletedRideUi({String reason = 'rating_flow_finished'}) {
+    final bookingId =
+        '${riderBookingModel.value?.data?.booking?.id ?? ''}'.trim();
+    riderBookingModel.value = null;
+    awaitingRidePayment.value = false;
+    awaitingRidePaymentBookingId.value = '';
+    _paymentSelectionShownForBooking = '';
+    PassengerFlowDebug.send(
+      'completed_ride_ui_released',
+      bookingId: bookingId,
+      data: <String, dynamic>{'reason': reason},
+    );
+  }
+
   void _clearCurrentBookingState({
     required String bookingId,
     required String reason,
@@ -635,6 +838,9 @@ class HomeController extends GetxController with LoadingMixin, LoadingApiMixin {
     tripType.value = 0;
     isDriverCome.value = false;
     changePolyLine = false;
+    awaitingRidePayment.value = false;
+    awaitingRidePaymentBookingId.value = '';
+    _paymentSelectionShownForBooking = '';
     AppPreference.removeKey(AppPreference.RideTime);
 
     PassengerFlowDebug.send(
@@ -1865,6 +2071,15 @@ class HomeController extends GetxController with LoadingMixin, LoadingApiMixin {
     required bool isSplit,
     required String tip,
   }) async {
+    if (method.trim().toLowerCase() == 'cash') {
+      PassengerFlowDebug.send(
+        'cash_payment_init_transaction_prevented',
+        bookingId: bookingId,
+        data: <String, dynamic>{'amount': amount},
+      );
+      await selectCashForCompletedRide(bookingId: bookingId);
+      return;
+    }
     transactionId = "";
     await processApi(
       () => HomeService.paymentInt(

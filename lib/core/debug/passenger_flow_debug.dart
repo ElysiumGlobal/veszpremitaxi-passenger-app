@@ -18,15 +18,22 @@ import '../../utils/app_preferences.dart';
 class PassengerFlowDebug {
   PassengerFlowDebug._();
 
-  static const String appVersion = '1.0.20+29';
+  static const String appVersion = '1.0.24+33';
   static const String expectedCollectorVersion =
       '2026-07-29-role2-role3-v2';
   static final String sessionId =
       'psg-${DateTime.now().millisecondsSinceEpoch}-${Random().nextInt(999999)}';
 
+  static const String _queueStorageKey = 'vtaxi_passenger_debug_queue_v2';
+  static const int _maxQueueLength = 1500;
+
   static int _sequence = 0;
   static bool _draining = false;
+  static bool _hydrated = false;
+  static bool _persisting = false;
+  static bool _persistDirty = false;
   static Timer? _retryTimer;
+  static Timer? _persistTimer;
   static final List<Map<String, dynamic>> _queue = <Map<String, dynamic>>[];
 
   static void send(
@@ -48,10 +55,11 @@ class PassengerFlowDebug {
 
     log('VTAXI_PASSENGER_FLOW ${jsonEncode(payload)}');
 
-    if (_queue.length >= 300) {
+    if (_queue.length >= _maxQueueLength) {
       _queue.removeAt(0);
     }
     _queue.add(payload);
+    _schedulePersist();
     unawaited(_drainQueue());
   }
 
@@ -131,6 +139,89 @@ class PassengerFlowDebug {
     );
   }
 
+  /// Betölti az előző appfolyamatból megmaradt, még el nem küldött
+  /// eseményeket. Így appbezárás, összeomlás vagy átmeneti hálózathiba sem
+  /// szakítja meg a folyamatnaplót.
+  static Future<void> initialize() async {
+    if (!AppPreference.isInitialized) return;
+    _hydratePersistedQueue();
+    _schedulePersist();
+    kick();
+  }
+
+  static void _hydratePersistedQueue() {
+    if (_hydrated || !AppPreference.isInitialized) return;
+    _hydrated = true;
+
+    final String raw = AppPreference.getString(_queueStorageKey).trim();
+    if (raw.isEmpty) return;
+
+    try {
+      final dynamic decoded = jsonDecode(raw);
+      if (decoded is! List) return;
+
+      final Set<String> existingKeys = _queue
+          .map<String>((Map<String, dynamic> item) =>
+              '${item['session_id'] ?? ''}:${item['sequence'] ?? ''}')
+          .toSet();
+      final List<Map<String, dynamic>> restored = <Map<String, dynamic>>[];
+
+      for (final dynamic item in decoded) {
+        if (item is! Map) continue;
+        final Map<String, dynamic> event = item.map<String, dynamic>(
+          (dynamic key, dynamic value) =>
+              MapEntry<String, dynamic>(key.toString(), value),
+        );
+        final String eventKey =
+            '${event['session_id'] ?? ''}:${event['sequence'] ?? ''}';
+        if (existingKeys.add(eventKey)) restored.add(event);
+      }
+
+      if (restored.isNotEmpty) {
+        _queue.insertAll(0, restored);
+        if (_queue.length > _maxQueueLength) {
+          _queue.removeRange(0, _queue.length - _maxQueueLength);
+        }
+        log(
+          'VTAXI_PASSENGER_FLOW_QUEUE_RESTORED '
+          'count=${restored.length} total=${_queue.length}',
+        );
+      }
+    } catch (error) {
+      log('VTAXI_PASSENGER_FLOW_QUEUE_RESTORE_FAILED error=${error.runtimeType}');
+      AppPreference.removeKey(_queueStorageKey);
+    }
+  }
+
+  static void _schedulePersist() {
+    if (!AppPreference.isInitialized) return;
+    _persistDirty = true;
+    if (_persisting || (_persistTimer?.isActive ?? false)) return;
+    _persistTimer = Timer(const Duration(milliseconds: 300), () {
+      _persistTimer = null;
+      unawaited(_persistQueueLoop());
+    });
+  }
+
+  static Future<void> _persistQueueLoop() async {
+    if (_persisting || !AppPreference.isInitialized) return;
+    _persisting = true;
+    try {
+      while (_persistDirty) {
+        _persistDirty = false;
+        final String snapshot = jsonEncode(_queue);
+        await AppPreference.setString(_queueStorageKey, snapshot);
+      }
+    } catch (error) {
+      log('VTAXI_PASSENGER_FLOW_QUEUE_PERSIST_FAILED error=${error.runtimeType}');
+    } finally {
+      _persisting = false;
+      if (_persistDirty && AppPreference.isInitialized) {
+        _schedulePersist();
+      }
+    }
+  }
+
   static void kick() {
     _retryTimer?.cancel();
     _retryTimer = null;
@@ -147,7 +238,12 @@ class PassengerFlowDebug {
 
   static Future<void> _drainQueue() async {
     if (_draining || _queue.isEmpty) return;
+    if (!AppPreference.isInitialized) {
+      _scheduleRetry(const Duration(seconds: 1));
+      return;
+    }
 
+    _hydratePersistedQueue();
     final String token =
         AppPreference.getString(AppPreference.userToken).trim();
     if (token.isEmpty) {
@@ -196,7 +292,7 @@ class PassengerFlowDebug {
             // Rossz payloadot vagy nem létező végpontot nem tartunk a sor
             // elején örökké. Hitelesítési, rate-limit és szerverhibánál viszont
             // megőrizzük, mert ezek tipikusan átmeneti állapotok.
-            if (<int>{400, 404, 405, 413, 422}.contains(response.statusCode)) {
+            if (<int>{400, 413, 422}.contains(response.statusCode)) {
               break;
             }
           } catch (error) {
@@ -215,8 +311,9 @@ class PassengerFlowDebug {
 
         if (delivered ||
             (lastStatusCode != null &&
-                <int>{400, 404, 405, 413, 422}.contains(lastStatusCode))) {
+                <int>{400, 413, 422}.contains(lastStatusCode))) {
           _queue.removeAt(0);
+          _schedulePersist();
           continue;
         }
 
@@ -226,11 +323,13 @@ class PassengerFlowDebug {
           'status=${lastStatusCode ?? 'network'} '
           'error=${lastError?.runtimeType ?? ''}',
         );
+        _schedulePersist();
         _scheduleRetry(const Duration(seconds: 3));
         return;
       }
     } finally {
       _draining = false;
+      _schedulePersist();
       if (_queue.isNotEmpty && !(_retryTimer?.isActive ?? false)) {
         _scheduleRetry();
       }

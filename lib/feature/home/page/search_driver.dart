@@ -161,6 +161,110 @@ class _SearchDriverScreenState extends State<SearchDriverScreen> {
     return "${riderBookingModel.value?.data?.booking?.id ?? riderBookingModel.value?.data?.bookingId ?? homeController.bookingCreateModel.value?.data?.booking?.id ?? AppConstant().bookingId}";
   }
 
+  int? _driverCommitmentMinutes() {
+    final bookingValue = int.tryParse(
+      riderBookingModel.value?.data?.booking?.driverEtaMinutes ?? '',
+    );
+    return bookingValue ?? riderBookingModel.value?.data?.driverEtaMinutes;
+  }
+
+  double? _driverDistanceToPickupKm() {
+    final driver = riderBookingModel.value?.data?.driver;
+    final pickup = riderBookingModel.value?.data?.pickup;
+    final driverLat = double.tryParse(
+      driver?.currentLocation?.latitude ?? driver?.lastLatitude ?? '',
+    );
+    final driverLng = double.tryParse(
+      driver?.currentLocation?.longitude ?? driver?.lastLongitude ?? '',
+    );
+    final pickupLat = double.tryParse(pickup?.latitude ?? '');
+    final pickupLng = double.tryParse(pickup?.longitude ?? '');
+    if (driverLat == null ||
+        driverLng == null ||
+        pickupLat == null ||
+        pickupLng == null) {
+      return null;
+    }
+    return Geolocator.distanceBetween(
+          driverLat,
+          driverLng,
+          pickupLat,
+          pickupLng,
+        ) /
+        1000;
+  }
+
+  int? _gpsArrivalEstimateMinutes() {
+    final distanceKm = _driverDistanceToPickupKm();
+    if (distanceKm == null) return null;
+    // Városi forgalomra konzervatív, folyamatosan frissülő helyi becslés.
+    return Math.max(1, (distanceKm / 28 * 60).ceil()).toInt();
+  }
+
+  Widget _buildArrivalInfoCard() {
+    final commitment = _driverCommitmentMinutes();
+    final gpsEstimate = _gpsArrivalEstimateMinutes();
+    final distanceKm = _driverDistanceToPickupKm();
+    return Container(
+      width: double.infinity,
+      margin: EdgeInsets.only(bottom: 12.h),
+      padding: EdgeInsets.all(12.w),
+      decoration: BoxDecoration(
+        color: AppColors.primaryContainer,
+        borderRadius: BorderRadius.circular(10.r),
+        border: Border.all(
+          color: AppColors.mainPrimaryColor.withValues(alpha: .35),
+        ),
+      ),
+      child: Wrap(
+        spacing: 16.w,
+        runSpacing: 8.h,
+        children: [
+          _arrivalMetric(
+            Icons.schedule_rounded,
+            'Sofőr vállalása',
+            commitment == null ? '–' : '$commitment perc',
+          ),
+          _arrivalMetric(
+            Icons.navigation_rounded,
+            'GPS-becslés',
+            gpsEstimate == null ? '–' : '$gpsEstimate perc',
+          ),
+          _arrivalMetric(
+            Icons.route_rounded,
+            'Távolság',
+            distanceKm == null ? '–' : '${distanceKm.toStringAsFixed(1)} km',
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _arrivalMetric(IconData icon, String label, String value) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 20.w, color: AppColors.mainPrimaryColor),
+        6.horizontalSpace,
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            CommonText(
+              string: label,
+              fontSize: 11.sp,
+              color: AppColors.textCaptionColor,
+            ),
+            CommonText(
+              string: value,
+              fontSize: 14.sp,
+              fontWeight: FontWeight.w600,
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
   Future<void> setDriverMarker(LatLng latLong) async {
     try {
       final BitmapDescriptor icon = await _resolveDriverMarkerIcon();
@@ -580,7 +684,12 @@ class _SearchDriverScreenState extends State<SearchDriverScreen> {
           (polledModel.data?.booking?.status ?? '').toLowerCase().trim();
       if (status.isEmpty) return;
 
-      final stateKey = '$polledBookingId:$status';
+      final paymentStatus =
+          (polledModel.data?.booking?.paymentStatus ?? '').toLowerCase().trim();
+      final paymentMethod =
+          (polledModel.data?.booking?.paymentMethod ?? '').toLowerCase().trim();
+      final stateKey =
+          '$polledBookingId:$status:$paymentStatus:$paymentMethod';
       if (stateKey == _lastAppliedBookingState) return;
       PassengerFlowDebug.send(
         'booking_status_poll_changed',
@@ -597,7 +706,12 @@ class _SearchDriverScreenState extends State<SearchDriverScreen> {
       homeController.socketData();
       await _showDriverMarkerIfAvailable();
 
-      if (status == 'completed' || status == 'cancelled' || status == 'expired') {
+      final bool paymentSettled = const <String>{
+        'paid', 'completed', 'complete', 'success', 'successful', 'settled', '1', 'true'
+      }.contains(paymentStatus);
+      if ((status == 'completed' && paymentSettled) ||
+          status == 'cancelled' ||
+          status == 'expired') {
         _bookingStatusPollingTimer?.cancel();
         PassengerFlowDebug.send(
           'booking_status_poll_terminal',
@@ -1153,6 +1267,7 @@ class _SearchDriverScreenState extends State<SearchDriverScreen> {
                               color: AppColors.textFieldBorderColor,
                             ),
                           ),
+                          _buildArrivalInfoCard(),
 
                           Row(
                             crossAxisAlignment: CrossAxisAlignment.start,
@@ -1290,7 +1405,7 @@ class _SearchDriverScreenState extends State<SearchDriverScreen> {
                                           Routes.chatScreen,
                                           params: {
                                             'bookingId':
-                                            '${riderBookingModel.value?.data?.bookingId}',
+                                            _activeBookingId(),
                                           },
                                         );
                                       },

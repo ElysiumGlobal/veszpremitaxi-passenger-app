@@ -42,6 +42,7 @@ Future<void> main() async {
   }
 
   await AppPreference.initMySharedPreferences();
+  await PassengerFlowDebug.initialize();
 
   FlutterError.onError = (FlutterErrorDetails details) {
     FlutterError.presentError(details);
@@ -63,6 +64,7 @@ Future<void> main() async {
       'push_enabled': BuildConfig.pushNotificationsEnabled,
       'expected_collector_version':
           PassengerFlowDebug.expectedCollectorVersion,
+      'durable_debug_queue': true,
     },
   );
 

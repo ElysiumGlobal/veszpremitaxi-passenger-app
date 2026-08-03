@@ -99,7 +99,22 @@ class ProfileController extends GetxController
           return;
         }
 
-        if (!activeStatuses.contains(status)) {
+        final paymentStatus =
+            (currentBooking.booking?.paymentStatus ?? '').trim().toLowerCase();
+        final bool paymentSettled = const <String>{
+          'paid',
+          'completed',
+          'complete',
+          'success',
+          'successful',
+          'settled',
+          '1',
+          'true',
+        }.contains(paymentStatus);
+        final bool completedAwaitingPayment =
+            status == 'completed' && !paymentSettled;
+
+        if (!activeStatuses.contains(status) && !completedAwaitingPayment) {
           _clearLocalBookingState(
             reason: 'profile_terminal_or_unknown_status',
             bookingId: bookingId,

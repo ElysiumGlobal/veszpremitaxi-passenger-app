@@ -1,3 +1,4 @@
+import 'package:e_taxi/core/debug/passenger_flow_debug.dart';
 import 'package:e_taxi/feature/home/controller/home_controller.dart';
 import 'package:e_taxi/feature/wallet/controller/wallet_controller.dart';
 import 'package:e_taxi/utils/app_colors.dart';
@@ -36,7 +37,8 @@ class _PaymentSelectScreenState extends State<PaymentSelectScreen> {
     if (Get.arguments != null) {
       arg = Get.arguments;
       isPaymentSelect = arg['paymentSelection'] ?? false;
-      amount = arg['amount'] ?? '0.0';
+      amount = arg['amount'] ?? arg['finalAmount'] ?? '0.0';
+      isCompletedRide = arg['completedRide'] == true;
 
       if (arg['method'] != null) {
         if (arg['isRideBook'] == null || arg['isRideBook'] == false) {
@@ -53,6 +55,7 @@ class _PaymentSelectScreenState extends State<PaymentSelectScreen> {
   }
 
   bool changePaymentMethod = false;
+  bool isCompletedRide = false;
   bool isPaymentSelect =
       false; // true then change selection & false then go for online payment
 
@@ -88,10 +91,10 @@ class _PaymentSelectScreenState extends State<PaymentSelectScreen> {
   @override
   Widget build(BuildContext context) {
     return PopScope(
-      canPop: isPaymentSelect,
+      canPop: isPaymentSelect || isCompletedRide,
       onPopInvokedWithResult: (didPop, result) {
         if (didPop == false) {
-          if (isPaymentSelect) {
+          if (isPaymentSelect || isCompletedRide) {
             Get.back();
           } else {
             Navigation.popupUtil(Routes.dashboardScreen);
@@ -106,7 +109,7 @@ class _PaymentSelectScreenState extends State<PaymentSelectScreen> {
               ? AppString.selectPayment.tr
               : AppString.payment.tr,
           onBackTap: () {
-            if (isPaymentSelect) {
+            if (isPaymentSelect || isCompletedRide) {
               Get.back();
             } else {
               Navigation.popupUtil(Routes.dashboardScreen);
@@ -465,11 +468,76 @@ class _PaymentSelectScreenState extends State<PaymentSelectScreen> {
             child: CustomButton(
               text: AppString.continueString.tr,
               onTap: () async {
+                final String bookingId =
+                    '${arg['bookingId'] ?? riderBookingModel.value?.data?.booking?.id ?? ''}'
+                        .trim();
+                final double finalAmount = double.tryParse(
+                      '${arg['finalAmount'] ?? amount ?? resolveTotalAmount()}'
+                          .replaceAll(',', ''),
+                    ) ??
+                    0;
+
+                if (isCompletedRide) {
+                  if (bookingId.isEmpty || bookingId == 'null') {
+                    PassengerFlowDebug.send(
+                      'completed_payment_submit_blocked',
+                      data: <String, dynamic>{'reason': 'missing_booking_id'},
+                    );
+                    AppSnackBar.showErrorSnackBar(
+                      message: 'A fuvar azonosítója hiányzik. Frissítsd az oldalt.',
+                      isError: true,
+                    );
+                    return;
+                  }
+                  if (selectedIndex.value == -1 && !selectWallet.value) {
+                    AppSnackBar.showErrorSnackBar(
+                      message: AppString.selectPaymentMethod.tr,
+                      isError: true,
+                    );
+                    return;
+                  }
+
+                  final String method = selectWallet.value
+                      ? 'wallet'
+                      : _payment[selectedIndex.value].toString();
+                  PassengerFlowDebug.send(
+                    'completed_payment_method_submitted',
+                    bookingId: bookingId,
+                    data: <String, dynamic>{
+                      'method': method,
+                      'amount': finalAmount,
+                    },
+                  );
+
+                  if (method == 'cash') {
+                    final bool saved = await homeController
+                        .selectCashForCompletedRide(bookingId: bookingId);
+                    if (saved && mounted) Get.back(result: 'cash');
+                    return;
+                  }
+
+                  if (finalAmount <= 0) {
+                    AppSnackBar.showErrorSnackBar(
+                      message: 'A fizetendő összeg hibás. Frissítsd az oldalt.',
+                      isError: true,
+                    );
+                    return;
+                  }
+                  await homeController.paymentInt(
+                    bookingId: bookingId,
+                    amount: finalAmount,
+                    method: method,
+                    isSplit: false,
+                    tip: tipController.text.trim(),
+                  );
+                  return;
+                }
+
                 if (isPaymentSelect) {
                   if (changePaymentMethod) {
                     String paymentMode = "wallet";
                     if (selectedIndex.value != -1) {
-                      paymentMode = paymentName[selectedIndex.value];
+                      paymentMode = _payment[selectedIndex.value].toString();
                     }
                     if (paymentMode == arg['method']) {
                       Get.back();
@@ -510,7 +578,7 @@ class _PaymentSelectScreenState extends State<PaymentSelectScreen> {
                   } else {
                     String paymentMode = "wallet";
                     if (selectedIndex.value != -1) {
-                      paymentMode = paymentName[selectedIndex.value];
+                      paymentMode = _payment[selectedIndex.value].toString();
                     }
                     Get.back(result: paymentMode);
                   }
