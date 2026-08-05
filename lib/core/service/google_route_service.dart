@@ -90,21 +90,32 @@ class GoogleRouteService {
       throw StateError('Nem érkezett használható autós útvonal a Google-től.');
     }
 
-    candidates.sort(
-      (GoogleRouteResult a, GoogleRouteResult b) =>
-          a.distanceMeters.compareTo(b.distanceMeters),
+    final GoogleRouteResult? selected = selectReasonableCandidate(
+      candidates: candidates,
+      straightLineMeters: straight,
     );
-
-    final double maxReasonable = math.max(
-      straight * 2.6,
-      straight + 2500.0,
-    );
-    final GoogleRouteResult selected = candidates.firstWhere(
-      (GoogleRouteResult route) =>
-          route.distanceMeters >= straight * .90 &&
-          route.distanceMeters <= maxReasonable,
-      orElse: () => candidates.first,
-    );
+    if (selected == null) {
+      PassengerFlowDebug.send(
+        'google_route_outlier_rejected',
+        data: <String, dynamic>{
+          'straight_line_meters': straight.round(),
+          'all_routes': candidates
+              .map(
+                (GoogleRouteResult route) => <String, dynamic>{
+                  'source': route.source,
+                  'distance_meters': route.distanceMeters,
+                  'duration_seconds': route.durationSeconds,
+                  'detour_ratio':
+                      double.parse(route.detourRatio.toStringAsFixed(3)),
+                },
+              )
+              .toList(),
+        },
+      );
+      throw StateError(
+        'A Google csak kirívóan hosszú autós útvonalat adott vissza.',
+      );
+    }
 
     PassengerFlowDebug.send('google_route_selected', data: <String, dynamic>{
       'source': selected.source,
@@ -126,6 +137,31 @@ class GoogleRouteService {
           .toList(),
     });
     return selected;
+  }
+
+  static GoogleRouteResult? selectReasonableCandidate({
+    required List<GoogleRouteResult> candidates,
+    required double straightLineMeters,
+  }) {
+    if (candidates.isEmpty || straightLineMeters <= 0) return null;
+
+    final double maxReasonable = math.max(
+      straightLineMeters * 2.6,
+      straightLineMeters + 2500.0,
+    );
+    final List<GoogleRouteResult> reasonable = candidates
+        .where(
+          (GoogleRouteResult route) =>
+              route.distanceMeters >= straightLineMeters * .90 &&
+              route.distanceMeters <= maxReasonable,
+        )
+        .toList()
+      ..sort(
+        (GoogleRouteResult a, GoogleRouteResult b) =>
+            a.distanceMeters.compareTo(b.distanceMeters),
+      );
+
+    return reasonable.isEmpty ? null : reasonable.first;
   }
 
   static Future<void> _loadRoutesV2Candidates({
