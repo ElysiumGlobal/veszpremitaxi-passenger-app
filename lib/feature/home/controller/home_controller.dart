@@ -261,11 +261,7 @@ class HomeController extends GetxController with LoadingMixin, LoadingApiMixin {
         }
       }
     } catch (error, stack) {
-      PassengerFlowDebug.runtimeError(
-        'home_socket_decode',
-        error,
-        stack,
-      );
+      PassengerFlowDebug.runtimeError('home_socket_decode', error, stack);
     }
     return null;
   }
@@ -314,12 +310,12 @@ class HomeController extends GetxController with LoadingMixin, LoadingApiMixin {
         }
 
         if (eventName == 'new.ride.request') {
-          final String socketUserId = '${booking?['user'] is Map
-                  ? (booking?['user'] as Map)['id']
-                  : booking?['user_id'] ?? ''}'
-              .trim();
-          final String currentUserId =
-              AppPreference.getString(AppPreference.userId).trim();
+          final String socketUserId =
+              '${booking?['user'] is Map ? (booking?['user'] as Map)['id'] : booking?['user_id'] ?? ''}'
+                  .trim();
+          final String currentUserId = AppPreference.getString(
+            AppPreference.userId,
+          ).trim();
           final String currentBookingId = AppConstant().bookingId.trim();
 
           final bool userMatches = socketUserId == currentUserId;
@@ -344,22 +340,20 @@ class HomeController extends GetxController with LoadingMixin, LoadingApiMixin {
 
         if (eventName == 'issue.reported') {
           final String issueUserId = '${booking?['user_id'] ?? ''}'.trim();
-          final String currentUserId =
-              AppPreference.getString(AppPreference.userId).trim();
+          final String currentUserId = AppPreference.getString(
+            AppPreference.userId,
+          ).trim();
           if (issueUserId == currentUserId &&
               bookingId == AppConstant().bookingId.trim()) {
-            final Map<String, dynamic>? issue =
-                _decodeSocketMap(eventData?['issue_report']);
+            final Map<String, dynamic>? issue = _decodeSocketMap(
+              eventData?['issue_report'],
+            );
             AppConstant().reportString.value =
                 '${issue?['issue_type_label'] ?? ''}@@${issue?['custom_issue'] ?? ''}';
           }
         }
       } catch (error, stack) {
-        PassengerFlowDebug.runtimeError(
-          'home_socket_listener',
-          error,
-          stack,
-        );
+        PassengerFlowDebug.runtimeError('home_socket_listener', error, stack);
         log('PASSENGER SOCKET LISTENER ERROR: $error, $stack');
       }
     });
@@ -384,17 +378,19 @@ class HomeController extends GetxController with LoadingMixin, LoadingApiMixin {
     final booking = riderBookingModel.value?.data?.booking;
     final status = (booking?.status ?? '').toLowerCase().trim();
     final bookingId = '${booking?.id ?? AppConstant().bookingId}'.trim();
+    final paymentMethod = (booking?.paymentMethod ?? '').trim().toLowerCase();
+    final paymentStatus = (booking?.paymentStatus ?? '').trim().toLowerCase();
+    final awaitsCashConfirmation =
+        status == 'completed' &&
+        paymentMethod == 'cash' &&
+        !_isPaymentSettled(paymentStatus);
     const activeStatuses = <String>{
       'searching',
       'accepted',
       'arrived',
       'started',
     };
-    const terminalStatuses = <String>{
-      'completed',
-      'cancelled',
-      'expired',
-    };
+    const terminalStatuses = <String>{'completed', 'cancelled', 'expired'};
 
     log('PASSENGER STATUS: $status / $bookingId / ${Get.currentRoute}');
     PassengerFlowDebug.send(
@@ -410,20 +406,25 @@ class HomeController extends GetxController with LoadingMixin, LoadingApiMixin {
       },
     );
 
-    if (isFirstTime && activeStatuses.contains(status)) {
-      final pickupLat = double.tryParse(
+    if (isFirstTime &&
+        (activeStatuses.contains(status) || awaitsCashConfirmation)) {
+      final pickupLat =
+          double.tryParse(
             riderBookingModel.value?.data?.pickup?.latitude ?? '',
           ) ??
           0;
-      final pickupLng = double.tryParse(
+      final pickupLng =
+          double.tryParse(
             riderBookingModel.value?.data?.pickup?.longitude ?? '',
           ) ??
           0;
-      final dropoffLat = double.tryParse(
+      final dropoffLat =
+          double.tryParse(
             riderBookingModel.value?.data?.dropoff?.latitude ?? '',
           ) ??
           0;
-      final dropoffLng = double.tryParse(
+      final dropoffLng =
+          double.tryParse(
             riderBookingModel.value?.data?.dropoff?.longitude ?? '',
           ) ??
           0;
@@ -466,19 +467,13 @@ class HomeController extends GetxController with LoadingMixin, LoadingApiMixin {
             'trip_auth_length': (booking?.otp ?? '').trim().length,
           },
         );
-        final waitingLimit = int.tryParse(
-              booking?.rideType?.waitingTimeLimit ?? '0',
-            ) ??
-            0;
+        final waitingLimit =
+            int.tryParse(booking?.rideType?.waitingTimeLimit ?? '0') ?? 0;
         getRideTimer(waitingLimit);
       } else if (status == 'started') {
         tripType.value = 2;
         AppPreference.removeKey(AppPreference.RideTime);
       } else if (terminalStatuses.contains(status)) {
-        final paymentMethod = (booking?.paymentMethod ?? '').trim().toLowerCase();
-        final paymentStatus = (booking?.paymentStatus ?? '').trim().toLowerCase();
-        final finalAmount = resolveTotalAmount(riderBookingModel.value?.data);
-
         PassengerFlowDebug.send(
           'terminal_booking_payment_evaluated',
           bookingId: bookingId,
@@ -492,36 +487,30 @@ class HomeController extends GetxController with LoadingMixin, LoadingApiMixin {
         );
 
         if (status == 'completed') {
+          if (awaitsCashConfirmation) {
+            awaitingRidePayment.value = true;
+            awaitingRidePaymentBookingId.value = bookingId;
+            PassengerFlowDebug.send(
+              'completed_cash_waiting_for_driver_confirmation',
+              bookingId: bookingId,
+              data: <String, dynamic>{
+                'payment_method': paymentMethod,
+                'payment_status': paymentStatus,
+              },
+            );
+            return;
+          }
+
           AppConstant().reportString.value = '';
           if (Get.isRegistered<TripController>()) {
             unawaited(Get.find<TripController>().getTripHistory());
           }
 
-          if (_isPaymentSettled(paymentStatus)) {
-            await _finalizeCompletedRide(
-              bookingId: bookingId,
-              paymentMethod: paymentMethod,
-              paymentStatus: paymentStatus,
-            );
-          } else {
-            awaitingRidePayment.value = true;
-            awaitingRidePaymentBookingId.value = bookingId;
-            tripType.value = 3;
-            PassengerFlowDebug.send(
-              'completed_ride_waiting_for_payment',
-              bookingId: bookingId,
-              data: <String, dynamic>{
-                'payment_method': paymentMethod,
-                'payment_status': paymentStatus,
-                'final_amount': finalAmount,
-              },
-            );
-            await _openCompletedRidePaymentSelection(
-              bookingId: bookingId,
-              paymentMethod: paymentMethod,
-              finalAmount: finalAmount,
-            );
-          }
+          await _finalizeCompletedRide(
+            bookingId: bookingId,
+            paymentMethod: paymentMethod,
+            paymentStatus: paymentStatus,
+          );
           return;
         }
 
@@ -685,9 +674,7 @@ class HomeController extends GetxController with LoadingMixin, LoadingApiMixin {
     );
   }
 
-  Future<bool> selectCashForCompletedRide({
-    required String bookingId,
-  }) async {
+  Future<bool> selectCashForCompletedRide({required String bookingId}) async {
     final activeBookingId =
         '${riderBookingModel.value?.data?.booking?.id ?? AppConstant().bookingId}'
             .trim();
@@ -735,7 +722,8 @@ class HomeController extends GetxController with LoadingMixin, LoadingApiMixin {
       data: <String, dynamic>{'awaiting_driver_confirmation': true},
     );
     AppSnackBar.showErrorSnackBar(
-      message: 'Készpénzes fizetés kiválasztva. Várjuk a sofőr visszaigazolását.',
+      message:
+          'Készpénzes fizetés kiválasztva. Várjuk a sofőr visszaigazolását.',
     );
     return true;
   }
@@ -760,7 +748,7 @@ class HomeController extends GetxController with LoadingMixin, LoadingApiMixin {
     AppPreference.removeKey(AppPreference.RideTime);
 
     PassengerFlowDebug.send(
-      'completed_ride_payment_settled',
+      'completed_ride_finalized',
       bookingId: bookingId,
       data: <String, dynamic>{
         'payment_method': paymentMethod,
@@ -780,11 +768,7 @@ class HomeController extends GetxController with LoadingMixin, LoadingApiMixin {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          CustomImage(
-            image: ImagesAsset.tripComplete,
-            wt: 200.w,
-            ht: 110.h,
-          ),
+          CustomImage(image: ImagesAsset.tripComplete, wt: 200.w, ht: 110.h),
           16.verticalSpace,
           CommonText(
             string: 'Köszönjük, hogy a Veszprémi Taxit választottad!',
@@ -795,7 +779,7 @@ class HomeController extends GetxController with LoadingMixin, LoadingApiMixin {
           ),
           12.verticalSpace,
           CommonText(
-            string: 'A fizetés rendezve, a fuvar sikeresen lezárult.',
+            string: 'A fuvar sikeresen lezárult.',
             softWrap: true,
             color: AppColors.textCaptionColor,
             textAlign: TextAlign.center,
@@ -814,8 +798,8 @@ class HomeController extends GetxController with LoadingMixin, LoadingApiMixin {
   }
 
   void finishCompletedRideUi({String reason = 'rating_flow_finished'}) {
-    final bookingId =
-        '${riderBookingModel.value?.data?.booking?.id ?? ''}'.trim();
+    final bookingId = '${riderBookingModel.value?.data?.booking?.id ?? ''}'
+        .trim();
     riderBookingModel.value = null;
     awaitingRidePayment.value = false;
     awaitingRidePaymentBookingId.value = '';
@@ -846,10 +830,7 @@ class HomeController extends GetxController with LoadingMixin, LoadingApiMixin {
     PassengerFlowDebug.send(
       'local_booking_state_cleared',
       bookingId: bookingId,
-      data: <String, dynamic>{
-        'reason': reason,
-        'status': status,
-      },
+      data: <String, dynamic>{'reason': reason, 'status': status},
     );
   }
 
@@ -1367,9 +1348,15 @@ class HomeController extends GetxController with LoadingMixin, LoadingApiMixin {
       'booking_estimate_requested',
       data: <String, dynamic>{
         'pickup_latitude': PassengerFlowDebug.coordinate(originLatLng.latitude),
-        'pickup_longitude': PassengerFlowDebug.coordinate(originLatLng.longitude),
-        'dropoff_latitude': PassengerFlowDebug.coordinate(destinationLatLng.latitude),
-        'dropoff_longitude': PassengerFlowDebug.coordinate(destinationLatLng.longitude),
+        'pickup_longitude': PassengerFlowDebug.coordinate(
+          originLatLng.longitude,
+        ),
+        'dropoff_latitude': PassengerFlowDebug.coordinate(
+          destinationLatLng.latitude,
+        ),
+        'dropoff_longitude': PassengerFlowDebug.coordinate(
+          destinationLatLng.longitude,
+        ),
       },
     );
     bookingCreateModel.value = null;
@@ -1500,10 +1487,7 @@ class HomeController extends GetxController with LoadingMixin, LoadingApiMixin {
       );
       Navigation.pushNamed(
         Routes.searchDriverScreen,
-        arg: {
-          "origin": originLatLng,
-          "destination": destinationLatLng,
-        },
+        arg: {"origin": originLatLng, "destination": destinationLatLng},
       );
       return true;
     } catch (error, stack) {

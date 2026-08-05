@@ -50,8 +50,7 @@ class _SearchDriverScreenState extends State<SearchDriverScreen> {
   Timer? _driverMarkerAnimationTimer;
 
   String _displayTripOtp() {
-    final raw =
-        riderBookingModel.value?.data?.booking?.otp?.toString() ?? '';
+    final raw = riderBookingModel.value?.data?.booking?.otp?.toString() ?? '';
     final digits = raw.replaceAll(RegExp(r'[^0-9]'), '');
     if (digits.isEmpty) return '000000';
     if (digits.length >= 6) return digits.substring(digits.length - 6);
@@ -78,8 +77,9 @@ class _SearchDriverScreenState extends State<SearchDriverScreen> {
             child: CircularProgressIndicator(
               strokeWidth: 5.w,
               color: AppColors.mainPrimaryColor,
-              backgroundColor:
-                  AppColors.mainPrimaryColor.withValues(alpha: .15),
+              backgroundColor: AppColors.mainPrimaryColor.withValues(
+                alpha: .15,
+              ),
             ),
           ),
           Container(
@@ -131,7 +131,8 @@ class _SearchDriverScreenState extends State<SearchDriverScreen> {
     final double toLat = to.latitude * 0.017453292519943295;
     final double toLng = to.longitude * 0.017453292519943295;
     final double y = Math.sin(toLng - fromLng) * Math.cos(toLat);
-    final double x = Math.cos(fromLat) * Math.sin(toLat) -
+    final double x =
+        Math.cos(fromLat) * Math.sin(toLat) -
         Math.sin(fromLat) * Math.cos(toLat) * Math.cos(toLng - fromLng);
     return (Math.atan2(y, x) * 57.29577951308232 + 360) % 360;
   }
@@ -294,8 +295,7 @@ class _SearchDriverScreenState extends State<SearchDriverScreen> {
           final double progress = step / steps;
           final double eased = 1 - Math.pow(1 - progress, 3).toDouble();
           final LatLng frame = LatLng(
-            previous.latitude +
-                (latLong.latitude - previous.latitude) * eased,
+            previous.latitude + (latLong.latitude - previous.latitude) * eased,
             previous.longitude +
                 (latLong.longitude - previous.longitude) * eased,
           );
@@ -390,11 +390,11 @@ class _SearchDriverScreenState extends State<SearchDriverScreen> {
   bool _bookingStatusPollInProgress = false;
   String _lastAppliedBookingState = '';
   int _missingCurrentBookingPolls = 0;
+  int _consecutiveExactServerReleasePolls = 0;
 
   bool driverReach = true;
   bool routLine = false;
   DateTime _lastApiCall = DateTime.now().subtract(Duration(seconds: 6));
-
 
   Map<String, dynamic>? _decodeSocketMap(dynamic raw) {
     try {
@@ -483,10 +483,9 @@ class _SearchDriverScreenState extends State<SearchDriverScreen> {
         }
 
         final String eventName = '${datas['event'] ?? ''}'.trim();
-        final Map<String, dynamic>? eventData =
-            _decodeSocketMap(datas['data']);
-        final String eventBookingId =
-            '${eventData?['booking_id'] ?? ''}'.trim();
+        final Map<String, dynamic>? eventData = _decodeSocketMap(datas['data']);
+        final String eventBookingId = '${eventData?['booking_id'] ?? ''}'
+            .trim();
 
         PassengerFlowDebug.send(
           'search_driver_socket_event',
@@ -497,7 +496,8 @@ class _SearchDriverScreenState extends State<SearchDriverScreen> {
             'event_name': eventName,
             'payload_keys': eventData?.keys.toList() ?? const <String>[],
             'booking_matches':
-                eventBookingId.isNotEmpty && eventBookingId == _activeBookingId(),
+                eventBookingId.isNotEmpty &&
+                eventBookingId == _activeBookingId(),
           },
         );
 
@@ -507,10 +507,12 @@ class _SearchDriverScreenState extends State<SearchDriverScreen> {
           return;
         }
 
-        final double? latitude =
-            double.tryParse('${eventData['latitude'] ?? ''}');
-        final double? longitude =
-            double.tryParse('${eventData['longitude'] ?? ''}');
+        final double? latitude = double.tryParse(
+          '${eventData['latitude'] ?? ''}',
+        );
+        final double? longitude = double.tryParse(
+          '${eventData['longitude'] ?? ''}',
+        );
         if (latitude == null || longitude == null) {
           PassengerFlowDebug.send(
             'driver_location_socket_invalid_coordinates',
@@ -558,7 +560,8 @@ class _SearchDriverScreenState extends State<SearchDriverScreen> {
         markers.add(
           Marker(
             markerId: const MarkerId('destination'),
-            icon: Utils().destinationMarkerIcon ??
+            icon:
+                Utils().destinationMarkerIcon ??
                 Utils().customIcon ??
                 BitmapDescriptor.defaultMarker,
             position: destinationLatLng,
@@ -648,29 +651,110 @@ class _SearchDriverScreenState extends State<SearchDriverScreen> {
       // előfordul, hogy a data.current_booking_id mezőt üresen küldi vissza
       // egy frissen létrehozott, searching állapotú rendelés mellett.
       // Emiatt csak a segédmező hiánya alapján tilos megszüntetni a rendelést.
-      final bool currentBookingMatches = currentBooking != null &&
+      final bool currentBookingMatches =
+          currentBooking != null &&
           responseBookingId.isNotEmpty &&
           responseBookingId == activeBookingId;
 
       if (!currentBookingMatches) {
         _missingCurrentBookingPolls++;
+        final localStatus =
+            (riderBookingModel.value?.data?.booking?.status ?? '')
+                .trim()
+                .toLowerCase();
+        final bool serverReleasedBooking =
+            currentBooking == null &&
+            serverCurrentBookingId.isEmpty &&
+            responseBookingId.isEmpty;
+        if (serverReleasedBooking) {
+          _consecutiveExactServerReleasePolls++;
+        } else {
+          _consecutiveExactServerReleasePolls = 0;
+        }
         PassengerFlowDebug.send(
           'booking_status_poll_profile_inconsistent',
           bookingId: activeBookingId,
           data: <String, dynamic>{
             'missing_poll_count': _missingCurrentBookingPolls,
+            'exact_release_poll_count': _consecutiveExactServerReleasePolls,
             'server_current_booking_id': serverCurrentBookingId,
             'response_booking_id': responseBookingId,
             'current_booking_present': currentBooking != null,
+            'local_status': localStatus,
+            'server_released_booking': serverReleasedBooking,
           },
         );
-        // Nem dobjuk vissza az utast a főképernyőre egy átmeneti vagy
-        // inkonzisztens profilválasz miatt. A socket és a következő polling
-        // továbbra is frissítheti a valódi booking állapotát.
+
+        if (currentBooking == null &&
+            const <String>{'cancelled', 'expired'}.contains(localStatus)) {
+          _bookingStatusPollingTimer?.cancel();
+          PassengerFlowDebug.send(
+            'booking_status_poll_terminal_without_profile_booking',
+            bookingId: activeBookingId,
+            data: <String, dynamic>{'status': localStatus},
+          );
+          await homeController.socketData();
+          return;
+        }
+
+        if (serverReleasedBooking &&
+            localStatus == 'completed' &&
+            _consecutiveExactServerReleasePolls >= 2) {
+          _bookingStatusPollingTimer?.cancel();
+          final localData = riderBookingModel.value?.data;
+          if (localData?.booking != null) {
+            localData!.booking!.paymentStatus = 'paid';
+          }
+          PassengerFlowDebug.send(
+            'completed_cash_released_by_server',
+            bookingId: activeBookingId,
+            data: <String, dynamic>{
+              'exact_release_poll_count': _consecutiveExactServerReleasePolls,
+            },
+          );
+          await homeController.socketData();
+          return;
+        }
+
+        // A backend searchingkor beállítja, completionkor pedig pontosan
+        // ugyanennek a bookingnak a pointerét üríti. Ha a fuvar lokálisan
+        // started, és két egymást követő sikeres profilválasz már üres
+        // pointert és üres current_booking objektumot ad, ez a completion
+        // szerveroldali bizonyítéka akkor is, ha a completed socket elveszett.
+        if (serverReleasedBooking &&
+            localStatus == 'started' &&
+            _consecutiveExactServerReleasePolls >= 2) {
+          _bookingStatusPollingTimer?.cancel();
+          final localData = riderBookingModel.value?.data;
+          if (localData?.booking != null) {
+            localData!.booking!.status = 'completed';
+            localData!.booking!.paymentStatus = 'paid';
+          }
+          if (localData != null) {
+            localData.status = 'completed';
+          }
+          _lastAppliedBookingState =
+              '$activeBookingId:completed:pointer_released';
+          PassengerFlowDebug.send(
+            'booking_status_poll_completed_by_pointer_release',
+            bookingId: activeBookingId,
+            data: <String, dynamic>{
+              'missing_poll_count': _missingCurrentBookingPolls,
+              'exact_release_poll_count': _consecutiveExactServerReleasePolls,
+              'previous_local_status': localStatus,
+            },
+          );
+          await homeController.socketData();
+          return;
+        }
+
+        // Egyetlen átmeneti vagy inkonzisztens profilválasz miatt aktív
+        // fuvart nem zárunk le.
         return;
       }
 
       _missingCurrentBookingPolls = 0;
+      _consecutiveExactServerReleasePolls = 0;
       final authoritativeBooking = currentBooking!;
       final polledModel = NewRideModel.fromJson({
         'data': jsonEncode(authoritativeBooking.toJson()),
@@ -680,16 +764,18 @@ class _SearchDriverScreenState extends State<SearchDriverScreen> {
               .trim();
       if (polledBookingId != activeBookingId) return;
 
-      final status =
-          (polledModel.data?.booking?.status ?? '').toLowerCase().trim();
+      final status = (polledModel.data?.booking?.status ?? '')
+          .toLowerCase()
+          .trim();
       if (status.isEmpty) return;
 
-      final paymentStatus =
-          (polledModel.data?.booking?.paymentStatus ?? '').toLowerCase().trim();
-      final paymentMethod =
-          (polledModel.data?.booking?.paymentMethod ?? '').toLowerCase().trim();
-      final stateKey =
-          '$polledBookingId:$status:$paymentStatus:$paymentMethod';
+      final paymentStatus = (polledModel.data?.booking?.paymentStatus ?? '')
+          .toLowerCase()
+          .trim();
+      final paymentMethod = (polledModel.data?.booking?.paymentMethod ?? '')
+          .toLowerCase()
+          .trim();
+      final stateKey = '$polledBookingId:$status:$paymentStatus:$paymentMethod';
       if (stateKey == _lastAppliedBookingState) return;
       PassengerFlowDebug.send(
         'booking_status_poll_changed',
@@ -706,10 +792,11 @@ class _SearchDriverScreenState extends State<SearchDriverScreen> {
       homeController.socketData();
       await _showDriverMarkerIfAvailable();
 
-      final bool paymentSettled = const <String>{
-        'paid', 'completed', 'complete', 'success', 'successful', 'settled', '1', 'true'
-      }.contains(paymentStatus);
-      if ((status == 'completed' && paymentSettled) ||
+      final bool awaitsCashConfirmation =
+          status == 'completed' &&
+          paymentMethod == 'cash' &&
+          paymentStatus != 'paid';
+      if ((status == 'completed' && !awaitsCashConfirmation) ||
           status == 'cancelled' ||
           status == 'expired') {
         _bookingStatusPollingTimer?.cancel();
@@ -726,7 +813,9 @@ class _SearchDriverScreenState extends State<SearchDriverScreen> {
         bookingId: activeBookingId,
         data: <String, dynamic>{'error': '$error'},
       );
-      LogUtils.printError('PASSENGER BOOKING STATUS POLL ERROR: $error, $stack');
+      LogUtils.printError(
+        'PASSENGER BOOKING STATUS POLL ERROR: $error, $stack',
+      );
     } finally {
       _bookingStatusPollInProgress = false;
     }
@@ -739,8 +828,7 @@ class _SearchDriverScreenState extends State<SearchDriverScreen> {
     final String apiKey = homeController.placeApi?.trim() ?? '';
     if (apiKey.isEmpty) return <LatLng>[];
     try {
-      final GoogleRouteResult route =
-          await GoogleRouteService.bestDrivingRoute(
+      final GoogleRouteResult route = await GoogleRouteService.bestDrivingRoute(
         apiKey: apiKey,
         origin: originLatLng,
         destination: destinationLatLng,
@@ -799,7 +887,7 @@ class _SearchDriverScreenState extends State<SearchDriverScreen> {
   Rxn<LatLng> userOrigin = Rxn<LatLng>();
 
   final Completer<GoogleMapController> _controller =
-  Completer<GoogleMapController>();
+      Completer<GoogleMapController>();
 
   Future<void> cameraPositionUpdate(LatLng post) async {
     GoogleMapController controller = await _controller.future;
@@ -853,7 +941,7 @@ class _SearchDriverScreenState extends State<SearchDriverScreen> {
                 child: Stack(
                   children: [
                     Obx(
-                          () => GoogleMap(
+                      () => GoogleMap(
                         initialCameraPosition: CameraPosition(
                           target: userOrigin.value != null
                               ? userOrigin.value!
@@ -911,83 +999,83 @@ class _SearchDriverScreenState extends State<SearchDriverScreen> {
                           16.horizontalSpace,
                           Expanded(
                             child: Obx(
-                                  () => AppConstant().reportString.value.isNotEmpty
+                              () => AppConstant().reportString.value.isNotEmpty
                                   ? Stack(
-                                clipBehavior: Clip.none,
-                                children: [
-                                  Container(
-                                    width: double.infinity,
-
-                                    padding: EdgeInsets.all(16.w),
-                                    decoration: BoxDecoration(
-                                      borderRadius: BorderRadius.circular(
-                                        12.r,
-                                      ),
-                                      color: AppColors.successColor,
-                                    ),
-                                    child: Row(
-                                      crossAxisAlignment:
-                                      CrossAxisAlignment.center,
+                                      clipBehavior: Clip.none,
                                       children: [
-                                        Expanded(
-                                          child: Column(
+                                        Container(
+                                          width: double.infinity,
+
+                                          padding: EdgeInsets.all(16.w),
+                                          decoration: BoxDecoration(
+                                            borderRadius: BorderRadius.circular(
+                                              12.r,
+                                            ),
+                                            color: AppColors.successColor,
+                                          ),
+                                          child: Row(
                                             crossAxisAlignment:
-                                            CrossAxisAlignment.start,
+                                                CrossAxisAlignment.center,
                                             children: [
-                                              CommonText(
-                                                string: AppConstant()
-                                                    .reportString
-                                                    .value
-                                                    .split("@@")
-                                                    .first,
-                                                color:
-                                                AppColors.whiteColor,
-                                                softWrap: true,
-                                                fontWeight:
-                                                FontWeight.w500,
+                                              Expanded(
+                                                child: Column(
+                                                  crossAxisAlignment:
+                                                      CrossAxisAlignment.start,
+                                                  children: [
+                                                    CommonText(
+                                                      string: AppConstant()
+                                                          .reportString
+                                                          .value
+                                                          .split("@@")
+                                                          .first,
+                                                      color:
+                                                          AppColors.whiteColor,
+                                                      softWrap: true,
+                                                      fontWeight:
+                                                          FontWeight.w500,
+                                                    ),
+                                                    CommonText(
+                                                      string: AppConstant()
+                                                          .reportString
+                                                          .value
+                                                          .split("@@")
+                                                          .last,
+                                                      color:
+                                                          AppColors.whiteColor,
+                                                      softWrap: true,
+                                                      fontSize: 12.sp,
+                                                    ),
+                                                  ],
+                                                ),
                                               ),
-                                              CommonText(
-                                                string: AppConstant()
-                                                    .reportString
-                                                    .value
-                                                    .split("@@")
-                                                    .last,
-                                                color:
-                                                AppColors.whiteColor,
-                                                softWrap: true,
-                                                fontSize: 12.sp,
+                                              4.horizontalSpace,
+                                              GestureDetector(
+                                                onTap: () {
+                                                  AppConstant()
+                                                          .reportString
+                                                          .value =
+                                                      "";
+                                                },
+                                                behavior:
+                                                    HitTestBehavior.translucent,
+                                                child: Container(
+                                                  height: 25.w,
+                                                  width: 25.w,
+                                                  decoration: BoxDecoration(
+                                                    color: AppColors.whiteColor,
+                                                    shape: BoxShape.circle,
+                                                  ),
+                                                  alignment: Alignment.center,
+                                                  child: CustomImage(
+                                                    image: IconAsset.close,
+                                                  ),
+                                                ),
                                               ),
                                             ],
                                           ),
                                         ),
-                                        4.horizontalSpace,
-                                        GestureDetector(
-                                          onTap: () {
-                                            AppConstant()
-                                                .reportString
-                                                .value =
-                                            "";
-                                          },
-                                          behavior:
-                                          HitTestBehavior.translucent,
-                                          child: Container(
-                                            height: 25.w,
-                                            width: 25.w,
-                                            decoration: BoxDecoration(
-                                              color: AppColors.whiteColor,
-                                              shape: BoxShape.circle,
-                                            ),
-                                            alignment: Alignment.center,
-                                            child: CustomImage(
-                                              image: IconAsset.close,
-                                            ),
-                                          ),
-                                        ),
                                       ],
-                                    ),
-                                  ),
-                                ],
-                              )
+                                    )
                                   : SizedBox.shrink(),
                             ),
                           ),
@@ -1000,97 +1088,97 @@ class _SearchDriverScreenState extends State<SearchDriverScreen> {
                       left: 0,
                       right: 16.w,
                       child: Obx(
-                            () => homeController.tripType.value != 0
+                        () => homeController.tripType.value != 0
                             ? Row(
-                          mainAxisAlignment: MainAxisAlignment.end,
-                          children: [
-                            GestureDetector(
-                              onTap: () {
-                                String title =
-                                    "Origin : ${riderBookingModel.value?.data?.pickup?.address ?? ""}\nDestination : ${riderBookingModel.value?.data?.dropoff?.address ?? ""}";
-                                title +=
-                                "\nUser last location : https://www.google.com/maps/search/?api=1&query=${LocationService().currentUserLatLg.value?.latitude},${LocationService().currentUserLatLg.value?.longitude}";
-                                title +=
-                                "\n\nhttps://www.google.com/maps/dir/?api=1&origin=${LocationService().currentUserLatLg.value?.latitude ?? riderBookingModel.value?.data?.pickup?.latitude},${LocationService().currentUserLatLg.value?.longitude ?? riderBookingModel.value?.data?.pickup?.longitude}&destination=${riderBookingModel.value?.data?.dropoff?.latitude},${riderBookingModel.value?.data?.dropoff?.longitude}&travelmode=driving";
+                                mainAxisAlignment: MainAxisAlignment.end,
+                                children: [
+                                  GestureDetector(
+                                    onTap: () {
+                                      String title =
+                                          "Origin : ${riderBookingModel.value?.data?.pickup?.address ?? ""}\nDestination : ${riderBookingModel.value?.data?.dropoff?.address ?? ""}";
+                                      title +=
+                                          "\nUser last location : https://www.google.com/maps/search/?api=1&query=${LocationService().currentUserLatLg.value?.latitude},${LocationService().currentUserLatLg.value?.longitude}";
+                                      title +=
+                                          "\n\nhttps://www.google.com/maps/dir/?api=1&origin=${LocationService().currentUserLatLg.value?.latitude ?? riderBookingModel.value?.data?.pickup?.latitude},${LocationService().currentUserLatLg.value?.longitude ?? riderBookingModel.value?.data?.pickup?.longitude}&destination=${riderBookingModel.value?.data?.dropoff?.latitude},${riderBookingModel.value?.data?.dropoff?.longitude}&travelmode=driving";
 
-                                final box =
-                                context.findRenderObject()
-                                as RenderBox?;
+                                      final box =
+                                          context.findRenderObject()
+                                              as RenderBox?;
 
-                                SharePlus.instance.share(
-                                  ShareParams(
-                                    text: title,
+                                      SharePlus.instance.share(
+                                        ShareParams(
+                                          text: title,
 
-                                    sharePositionOrigin:
-                                    box!.localToGlobal(Offset.zero) &
-                                    box.size,
+                                          sharePositionOrigin:
+                                              box!.localToGlobal(Offset.zero) &
+                                              box.size,
+                                        ),
+                                      );
+                                    },
+                                    child: Container(
+                                      padding: EdgeInsets.symmetric(
+                                        vertical: 10.w,
+                                        horizontal: 16.w,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        borderRadius: BorderRadius.circular(
+                                          4.r,
+                                        ),
+                                        color: AppColors.blackColor,
+                                      ),
+                                      child: Row(
+                                        children: [
+                                          CustomImage(
+                                            image: IconAsset.share1,
+                                            ht: 16.w,
+                                            wt: 16.w,
+                                            color: AppColors.whiteColor,
+                                          ),
+                                          10.horizontalSpace,
+                                          CommonText(
+                                            string: "Share location",
+                                            color: AppColors.whiteColor,
+                                          ),
+                                        ],
+                                      ),
+                                    ),
                                   ),
-                                );
-                              },
-                              child: Container(
-                                padding: EdgeInsets.symmetric(
-                                  vertical: 10.w,
-                                  horizontal: 16.w,
-                                ),
-                                decoration: BoxDecoration(
-                                  borderRadius: BorderRadius.circular(
-                                    4.r,
-                                  ),
-                                  color: AppColors.blackColor,
-                                ),
-                                child: Row(
-                                  children: [
-                                    CustomImage(
-                                      image: IconAsset.share1,
-                                      ht: 16.w,
-                                      wt: 16.w,
-                                      color: AppColors.whiteColor,
-                                    ),
-                                    10.horizontalSpace,
-                                    CommonText(
-                                      string: "Share location",
-                                      color: AppColors.whiteColor,
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                            8.horizontalSpace,
+                                  8.horizontalSpace,
 
-                            GestureDetector(
-                              onTap: () {
-                                Navigation.pushNamed(Routes.safetyScreen);
-                              },
-                              child: Container(
-                                padding: EdgeInsets.symmetric(
-                                  vertical: 10.w,
-                                  horizontal: 16.w,
-                                ),
-                                decoration: BoxDecoration(
-                                  borderRadius: BorderRadius.circular(
-                                    4.r,
+                                  GestureDetector(
+                                    onTap: () {
+                                      Navigation.pushNamed(Routes.safetyScreen);
+                                    },
+                                    child: Container(
+                                      padding: EdgeInsets.symmetric(
+                                        vertical: 10.w,
+                                        horizontal: 16.w,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        borderRadius: BorderRadius.circular(
+                                          4.r,
+                                        ),
+                                        color: AppColors.blackColor,
+                                      ),
+                                      child: Row(
+                                        children: [
+                                          CustomImage(
+                                            image: IconAsset.safety,
+                                            ht: 16.w,
+                                            wt: 16.w,
+                                            color: AppColors.whiteColor,
+                                          ),
+                                          10.horizontalSpace,
+                                          CommonText(
+                                            string: "Safety",
+                                            color: AppColors.whiteColor,
+                                          ),
+                                        ],
+                                      ),
+                                    ),
                                   ),
-                                  color: AppColors.blackColor,
-                                ),
-                                child: Row(
-                                  children: [
-                                    CustomImage(
-                                      image: IconAsset.safety,
-                                      ht: 16.w,
-                                      wt: 16.w,
-                                      color: AppColors.whiteColor,
-                                    ),
-                                    10.horizontalSpace,
-                                    CommonText(
-                                      string: "Safety",
-                                      color: AppColors.whiteColor,
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ],
-                        )
+                                ],
+                              )
                             : SizedBox.shrink(),
                       ),
                     ),
@@ -1124,478 +1212,482 @@ class _SearchDriverScreenState extends State<SearchDriverScreen> {
                     child: SingleChildScrollView(
                       child: homeController.tripType.value == 0
                           ? Column(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          // Title and Description
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              CommonText(
-                                string: AppString.searchingDriver.tr,
-                                fontSize: 20.sp,
-                                fontWeight: FontWeight.bold,
-                                color: AppColors.titleTextColor,
-                              ),
-                              SizedBox(height: 8.h),
-                              CommonText(
-                                string:
-                                AppString.weAreLookingForDriver.tr,
-                                softWrap: true,
-                                fontSize: 14.sp,
-                                color: AppColors.textCaptionColor,
-                              ),
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                // Title and Description
+                                Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    CommonText(
+                                      string: AppString.searchingDriver.tr,
+                                      fontSize: 20.sp,
+                                      fontWeight: FontWeight.bold,
+                                      color: AppColors.titleTextColor,
+                                    ),
+                                    SizedBox(height: 8.h),
+                                    CommonText(
+                                      string:
+                                          AppString.weAreLookingForDriver.tr,
+                                      softWrap: true,
+                                      fontSize: 14.sp,
+                                      color: AppColors.textCaptionColor,
+                                    ),
 
-                              Padding(
-                                padding: EdgeInsets.symmetric(
-                                  vertical: 24.h,
+                                    Padding(
+                                      padding: EdgeInsets.symmetric(
+                                        vertical: 24.h,
+                                      ),
+                                      child: Center(
+                                        child: _buildSearchingVisual(),
+                                      ),
+                                    ),
+                                  ],
                                 ),
-                                child: Center(
-                                  child: _buildSearchingVisual(),
-                                ),
-                              ),
-                            ],
-                          ),
 
-                          // Trip Details Button
-                          CustomButton(
-                            text: AppString.tripDetails.tr,
-                            buttonColor: AppColors.mainPrimaryColor,
-                            textColor: AppColors.whiteColor,
-                            height: 56.h,
-                            width: double.infinity,
-                            onTap: () {
-                              _showTripDetailsModal(context);
-                            },
-                          ),
-                        ],
-                      )
+                                // Trip Details Button
+                                CustomButton(
+                                  text: AppString.tripDetails.tr,
+                                  buttonColor: AppColors.mainPrimaryColor,
+                                  textColor: AppColors.whiteColor,
+                                  height: 56.h,
+                                  width: double.infinity,
+                                  onTap: () {
+                                    _showTripDetailsModal(context);
+                                  },
+                                ),
+                              ],
+                            )
                           : homeController.tripType.value == 1
                           ? Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Obx(
-                                () => Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                    CrossAxisAlignment.start,
+                                Obx(
+                                  () => Row(
                                     children: [
-                                      CommonText(
-                                        string:
-                                        homeController
-                                            .isDriverCome
-                                            .value
-                                            ? AppString.driverIsHere.tr
-                                            : AppString.driverIsComing.tr,
-                                        fontWeight: FontWeight.w600,
-                                        fontSize: 16.sp,
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            CommonText(
+                                              string:
+                                                  homeController
+                                                      .isDriverCome
+                                                      .value
+                                                  ? AppString.driverIsHere.tr
+                                                  : AppString.driverIsComing.tr,
+                                              fontWeight: FontWeight.w600,
+                                              fontSize: 16.sp,
+                                            ),
+                                            CommonText(
+                                              string:
+                                                  homeController
+                                                      .isDriverCome
+                                                      .value
+                                                  ? 'A sofőr megérkezett. A felvételhez add meg neki az alábbi kódot.'
+                                                  : 'A sofőr a felvételi ponthoz tart. Kövesd a térképen!',
+                                              fontWeight: FontWeight.w500,
+                                              fontSize: 14.sp,
+                                              color: AppColors.textCaptionColor,
+                                              softWrap: true,
+                                            ),
+                                          ],
+                                        ),
                                       ),
-                                      CommonText(
-                                        string: homeController
-                                                .isDriverCome
-                                                .value
-                                            ? 'A sofőr megérkezett. A felvételhez add meg neki az alábbi kódot.'
-                                            : 'A sofőr a felvételi ponthoz tart. Kövesd a térképen!',
+
+                                      8.horizontalSpace,
+                                      homeController.isDriverCome.value
+                                          ? Container(
+                                              padding: EdgeInsets.symmetric(
+                                                horizontal: 24.w,
+                                                vertical: 7.h,
+                                              ),
+                                              decoration: BoxDecoration(
+                                                borderRadius:
+                                                    BorderRadius.circular(4.r),
+                                                border: Border.all(
+                                                  color: AppColors
+                                                      .mainPrimaryColor,
+                                                ),
+                                                color:
+                                                    AppColors.primaryContainer,
+                                              ),
+                                              child: CommonText(
+                                                string: timeString(
+                                                  time: homeController
+                                                      .freeWaintingTime
+                                                      .value,
+                                                ),
+                                                fontSize: 16.sp,
+                                                fontWeight: FontWeight.w600,
+                                              ),
+                                            )
+                                          : SizedBox.shrink(),
+                                    ],
+                                  ),
+                                ),
+
+                                Padding(
+                                  padding: EdgeInsets.symmetric(vertical: 8.h),
+                                  child: Divider(
+                                    color: AppColors.textFieldBorderColor,
+                                  ),
+                                ),
+                                _buildArrivalInfoCard(),
+
+                                Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Expanded(
+                                      child: CommonText(
+                                        string:
+                                            homeController.isDriverCome.value
+                                            ? 'Utazási kód a sofőrnek'
+                                            : 'A fuvar azonosító kódja',
+                                        softWrap: true,
                                         fontWeight: FontWeight.w500,
                                         fontSize: 14.sp,
-                                        color: AppColors.textCaptionColor,
-                                        softWrap: true,
+                                      ),
+                                    ),
+
+                                    ...List.generate(6, (index) {
+                                      final otp = _displayTripOtp();
+                                      return Container(
+                                        margin: EdgeInsets.only(left: 5.w),
+                                        padding: EdgeInsets.symmetric(
+                                          horizontal: 8.w,
+                                          vertical: 4.w,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          borderRadius: BorderRadius.circular(
+                                            4.r,
+                                          ),
+                                          color: AppColors.textFieldBorderColor,
+                                        ),
+                                        child: CommonText(
+                                          string: otp[index],
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                      );
+                                    }),
+                                  ],
+                                ),
+                                16.verticalSpace,
+                                Container(
+                                  padding: EdgeInsets.all(8.w),
+                                  decoration: BoxDecoration(
+                                    color: AppColors.whiteGrey,
+                                    borderRadius: BorderRadius.circular(8.r),
+                                  ),
+                                  child: Column(
+                                    children: [
+                                      GestureDetector(
+                                        onTap: () {
+                                          Navigation.pushNamed(
+                                            Routes.driverDetailsScreen,
+                                          );
+                                        },
+                                        child: DriverDetailsWidget(
+                                          image:
+                                              riderBookingModel
+                                                  .value
+                                                  ?.data
+                                                  ?.driver
+                                                  ?.profilePhoto ??
+                                              "",
+                                          firstText:
+                                              riderBookingModel
+                                                  .value
+                                                  ?.data
+                                                  ?.driver
+                                                  ?.vehicle
+                                                  ?.numberPlate ??
+                                              "",
+                                          secoundText:
+                                              riderBookingModel
+                                                  .value
+                                                  ?.data
+                                                  ?.driver
+                                                  ?.name ??
+                                              "",
+                                          thirdText:
+                                              riderBookingModel
+                                                  .value
+                                                  ?.data
+                                                  ?.driver
+                                                  ?.vehicle
+                                                  ?.model ??
+                                              "",
+                                          rating:
+                                              riderBookingModel
+                                                  .value
+                                                  ?.data
+                                                  ?.driver
+                                                  ?.rating ??
+                                              "0",
+                                          radius: 100,
+                                        ),
+                                      ),
+                                      Padding(
+                                        padding: EdgeInsets.symmetric(
+                                          vertical: 8.h,
+                                        ),
+                                        child: Divider(
+                                          color: AppColors.textFieldBorderColor,
+                                        ),
+                                      ),
+
+                                      Row(
+                                        children: [
+                                          GestureDetector(
+                                            onTap: () {
+                                              Utils().launchDialer(
+                                                riderBookingModel
+                                                        .value
+                                                        ?.data
+                                                        ?.driver
+                                                        ?.phone ??
+                                                    "",
+                                              );
+                                            },
+                                            child: Container(
+                                              margin: EdgeInsets.only(
+                                                right: 8.w,
+                                              ),
+                                              padding: EdgeInsets.all(8.w),
+
+                                              decoration: BoxDecoration(
+                                                shape: BoxShape.circle,
+                                                border: Border.all(
+                                                  color: AppColors
+                                                      .textFieldBorderColor,
+                                                ),
+                                              ),
+                                              child: CustomImage(
+                                                image: IconAsset.call,
+                                              ),
+                                            ),
+                                          ),
+                                          GestureDetector(
+                                            onTap: () {
+                                              Navigation.pushNamed(
+                                                Routes.chatScreen,
+                                                params: {
+                                                  'bookingId':
+                                                      _activeBookingId(),
+                                                },
+                                              );
+                                            },
+                                            child: Container(
+                                              margin: EdgeInsets.only(
+                                                right: 8.w,
+                                              ),
+                                              padding: EdgeInsets.all(8.w),
+                                              decoration: BoxDecoration(
+                                                shape: BoxShape.circle,
+                                                border: Border.all(
+                                                  color: AppColors
+                                                      .textFieldBorderColor,
+                                                ),
+                                              ),
+                                              child: CustomImage(
+                                                image: IconAsset.message,
+                                              ),
+                                            ),
+                                          ),
+                                          GestureDetector(
+                                            onTap: () {
+                                              Navigation.pushNamed(
+                                                Routes.driverDetailsScreen,
+                                              );
+                                            },
+                                            child: Container(
+                                              margin: EdgeInsets.only(
+                                                right: 8.w,
+                                              ),
+                                              padding: EdgeInsets.all(8.w),
+                                              decoration: BoxDecoration(
+                                                borderRadius:
+                                                    BorderRadius.circular(8.r),
+                                                border: Border.all(
+                                                  color: AppColors
+                                                      .textFieldBorderColor,
+                                                ),
+                                              ),
+                                              child: CommonText(
+                                                string:
+                                                    AppString.driverDetails.tr,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
                                       ),
                                     ],
                                   ),
                                 ),
 
-                                8.horizontalSpace,
-                                homeController.isDriverCome.value
-                                    ? Container(
-                                  padding: EdgeInsets.symmetric(
-                                    horizontal: 24.w,
-                                    vertical: 7.h,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    borderRadius:
-                                    BorderRadius.circular(4.r),
-                                    border: Border.all(
-                                      color: AppColors
-                                          .mainPrimaryColor,
+                                SizedBox(
+                                  height: 42,
+                                  child: Center(
+                                    child: DottedLine(
+                                      direction: Axis.horizontal,
+                                      lineLength: double.infinity,
+                                      lineThickness: 2,
+                                      dashLength: 5,
+                                      dashColor: AppColors.textFieldBorderColor,
                                     ),
-                                    color:
-                                    AppColors.primaryContainer,
-                                  ),
-                                  child: CommonText(
-                                    string: timeString(
-                                      time: homeController
-                                          .freeWaintingTime
-                                          .value,
-                                    ),
-                                    fontSize: 16.sp,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                )
-                                    : SizedBox.shrink(),
-                              ],
-                            ),
-                          ),
-
-                          Padding(
-                            padding: EdgeInsets.symmetric(vertical: 8.h),
-                            child: Divider(
-                              color: AppColors.textFieldBorderColor,
-                            ),
-                          ),
-                          _buildArrivalInfoCard(),
-
-                          Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Expanded(
-                                child: CommonText(
-                                  string: homeController.isDriverCome.value
-                                      ? 'Utazási kód a sofőrnek'
-                                      : 'A fuvar azonosító kódja',
-                                  softWrap: true,
-                                  fontWeight: FontWeight.w500,
-                                  fontSize: 14.sp,
-                                ),
-                              ),
-
-                              ...List.generate(6, (index) {
-                                final otp = _displayTripOtp();
-                                return Container(
-                                  margin: EdgeInsets.only(left: 5.w),
-                                  padding: EdgeInsets.symmetric(
-                                    horizontal: 8.w,
-                                    vertical: 4.w,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    borderRadius: BorderRadius.circular(4.r),
-                                    color: AppColors.textFieldBorderColor,
-                                  ),
-                                  child: CommonText(
-                                    string: otp[index],
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                );
-                              }),
-                            ],
-                          ),
-                          16.verticalSpace,
-                          Container(
-                            padding: EdgeInsets.all(8.w),
-                            decoration: BoxDecoration(
-                              color: AppColors.whiteGrey,
-                              borderRadius: BorderRadius.circular(8.r),
-                            ),
-                            child: Column(
-                              children: [
-                                GestureDetector(
-                                  onTap: () {
-                                    Navigation.pushNamed(
-                                      Routes.driverDetailsScreen,
-                                    );
-                                  },
-                                  child: DriverDetailsWidget(
-                                    image:
-                                    riderBookingModel
-                                        .value
-                                        ?.data
-                                        ?.driver
-                                        ?.profilePhoto ??
-                                        "",
-                                    firstText:
-                                    riderBookingModel
-                                        .value
-                                        ?.data
-                                        ?.driver
-                                        ?.vehicle
-                                        ?.numberPlate ??
-                                        "",
-                                    secoundText:
-                                    riderBookingModel
-                                        .value
-                                        ?.data
-                                        ?.driver
-                                        ?.name ??
-                                        "",
-                                    thirdText:
-                                    riderBookingModel
-                                        .value
-                                        ?.data
-                                        ?.driver
-                                        ?.vehicle
-                                        ?.model ??
-                                        "",
-                                    rating:
-                                    riderBookingModel
-                                        .value
-                                        ?.data
-                                        ?.driver
-                                        ?.rating ??
-                                        "0",
-                                    radius: 100,
-                                  ),
-                                ),
-                                Padding(
-                                  padding: EdgeInsets.symmetric(
-                                    vertical: 8.h,
-                                  ),
-                                  child: Divider(
-                                    color: AppColors.textFieldBorderColor,
                                   ),
                                 ),
 
                                 Row(
+                                  crossAxisAlignment: CrossAxisAlignment.center,
                                   children: [
-                                    GestureDetector(
-                                      onTap: () {
-                                        Utils().launchDialer(
-                                          riderBookingModel
-                                              .value
-                                              ?.data
-                                              ?.driver
-                                              ?.phone ??
-                                              "",
-                                        );
-                                      },
-                                      child: Container(
-                                        margin: EdgeInsets.only(
-                                          right: 8.w,
-                                        ),
-                                        padding: EdgeInsets.all(8.w),
-
-                                        decoration: BoxDecoration(
-                                          shape: BoxShape.circle,
-                                          border: Border.all(
-                                            color: AppColors
-                                                .textFieldBorderColor,
-                                          ),
-                                        ),
-                                        child: CustomImage(
-                                          image: IconAsset.call,
-                                        ),
-                                      ),
-                                    ),
-                                    GestureDetector(
-                                      onTap: () {
-                                        Navigation.pushNamed(
-                                          Routes.chatScreen,
-                                          params: {
-                                            'bookingId':
-                                            _activeBookingId(),
-                                          },
-                                        );
-                                      },
-                                      child: Container(
-                                        margin: EdgeInsets.only(
-                                          right: 8.w,
-                                        ),
-                                        padding: EdgeInsets.all(8.w),
-                                        decoration: BoxDecoration(
-                                          shape: BoxShape.circle,
-                                          border: Border.all(
-                                            color: AppColors
-                                                .textFieldBorderColor,
-                                          ),
-                                        ),
-                                        child: CustomImage(
-                                          image: IconAsset.message,
+                                    Expanded(
+                                      child: GestureDetector(
+                                        onTap: () {
+                                          // tripType.value = 2;
+                                        },
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            CommonText(
+                                              string: AppString.pickupFrom.tr,
+                                              fontSize: 14.sp,
+                                            ),
+                                            CommonText(
+                                              string: Utils()
+                                                  .getString(
+                                                    riderBookingModel
+                                                            .value
+                                                            ?.data
+                                                            ?.pickup
+                                                            ?.address ??
+                                                        "",
+                                                  )
+                                                  .first,
+                                              fontSize: 14.sp,
+                                              fontWeight: FontWeight.w500,
+                                            ),
+                                          ],
                                         ),
                                       ),
                                     ),
+                                    16.horizontalSpace,
                                     GestureDetector(
                                       onTap: () {
                                         Navigation.pushNamed(
-                                          Routes.driverDetailsScreen,
+                                          Routes.tripDetailsScreen,
                                         );
                                       },
                                       child: Container(
-                                        margin: EdgeInsets.only(
-                                          right: 8.w,
+                                        padding: EdgeInsets.symmetric(
+                                          horizontal: 16.w,
+                                          vertical: 8.w,
                                         ),
-                                        padding: EdgeInsets.all(8.w),
                                         decoration: BoxDecoration(
-                                          borderRadius:
-                                          BorderRadius.circular(8.r),
+                                          borderRadius: BorderRadius.circular(
+                                            48.r,
+                                          ),
                                           border: Border.all(
-                                            color: AppColors
-                                                .textFieldBorderColor,
+                                            color:
+                                                AppColors.textFieldBorderColor,
                                           ),
                                         ),
                                         child: CommonText(
-                                          string:
-                                          AppString.driverDetails.tr,
+                                          string: AppString.tripDetails.tr,
+                                          fontSize: 16.sp,
+                                          fontWeight: FontWeight.w500,
                                         ),
                                       ),
                                     ),
                                   ],
                                 ),
                               ],
-                            ),
-                          ),
-
-                          SizedBox(
-                            height: 42,
-                            child: Center(
-                              child: DottedLine(
-                                direction: Axis.horizontal,
-                                lineLength: double.infinity,
-                                lineThickness: 2,
-                                dashLength: 5,
-                                dashColor: AppColors.textFieldBorderColor,
-                              ),
-                            ),
-                          ),
-
-                          Row(
-                            crossAxisAlignment: CrossAxisAlignment.center,
-                            children: [
-                              Expanded(
-                                child: GestureDetector(
-                                  onTap: () {
-                                    // tripType.value = 2;
-                                  },
-                                  child: Column(
-                                    crossAxisAlignment:
-                                    CrossAxisAlignment.start,
-                                    children: [
-                                      CommonText(
-                                        string: AppString.pickupFrom.tr,
-                                        fontSize: 14.sp,
-                                      ),
-                                      CommonText(
-                                        string: Utils()
-                                            .getString(
+                            )
+                          : Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    CommonText(
+                                      string: AppString.tripToDetination.tr,
+                                      fontSize: 16.sp,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                    CommonText(
+                                      string:
+                                          '${riderBookingModel.value?.data?.booking?.distance ?? ""} Km',
+                                      fontSize: 14.sp,
+                                    ),
+                                  ],
+                                ),
+                                Divider(color: AppColors.textFieldBorderColor),
+                                Container(
+                                  padding: EdgeInsets.all(8.w),
+                                  decoration: BoxDecoration(
+                                    borderRadius: BorderRadius.circular(8.r),
+                                    color: AppColors.whiteGrey,
+                                  ),
+                                  child: GestureDetector(
+                                    onTap: () {
+                                      // tripType.value=0;
+                                    },
+                                    child: DriverDetailsWidget(
+                                      image:
                                           riderBookingModel
                                               .value
                                               ?.data
-                                              ?.pickup
-                                              ?.address ??
-                                              "",
-                                        )
-                                            .first,
-                                        fontSize: 14.sp,
-                                        fontWeight: FontWeight.w500,
-                                      ),
-                                    ],
+                                              ?.driver
+                                              ?.profilePhoto ??
+                                          "",
+                                      firstText:
+                                          riderBookingModel
+                                              .value
+                                              ?.data
+                                              ?.driver
+                                              ?.vehicle
+                                              ?.numberPlate ??
+                                          "",
+                                      thirdText:
+                                          riderBookingModel
+                                              .value
+                                              ?.data
+                                              ?.driver
+                                              ?.vehicle
+                                              ?.model ??
+                                          "",
+                                      secoundText:
+                                          riderBookingModel
+                                              .value
+                                              ?.data
+                                              ?.driver
+                                              ?.name ??
+                                          "",
+                                      rating:
+                                          riderBookingModel
+                                              .value
+                                              ?.data
+                                              ?.driver
+                                              ?.rating ??
+                                          "",
+                                      radius: 100,
+                                    ),
                                   ),
                                 ),
-                              ),
-                              16.horizontalSpace,
-                              GestureDetector(
-                                onTap: () {
-                                  Navigation.pushNamed(
-                                    Routes.tripDetailsScreen,
-                                  );
-                                },
-                                child: Container(
-                                  padding: EdgeInsets.symmetric(
-                                    horizontal: 16.w,
-                                    vertical: 8.w,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    borderRadius: BorderRadius.circular(
-                                      48.r,
-                                    ),
-                                    border: Border.all(
-                                      color:
-                                      AppColors.textFieldBorderColor,
-                                    ),
-                                  ),
-                                  child: CommonText(
-                                    string: AppString.tripDetails.tr,
-                                    fontSize: 16.sp,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      )
-                          : Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            mainAxisAlignment:
-                            MainAxisAlignment.spaceBetween,
-                            children: [
-                              CommonText(
-                                string: AppString.tripToDetination.tr,
-                                fontSize: 16.sp,
-                                fontWeight: FontWeight.w600,
-                              ),
-                              CommonText(
-                                string:
-                                '${riderBookingModel.value?.data?.booking?.distance ?? ""} Km',
-                                fontSize: 14.sp,
-                              ),
-                            ],
-                          ),
-                          Divider(color: AppColors.textFieldBorderColor),
-                          Container(
-                            padding: EdgeInsets.all(8.w),
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(8.r),
-                              color: AppColors.whiteGrey,
-                            ),
-                            child: GestureDetector(
-                              onTap: () {
-                                // tripType.value=0;
-                              },
-                              child: DriverDetailsWidget(
-                                image:
-                                riderBookingModel
-                                    .value
-                                    ?.data
-                                    ?.driver
-                                    ?.profilePhoto ??
-                                    "",
-                                firstText:
-                                riderBookingModel
-                                    .value
-                                    ?.data
-                                    ?.driver
-                                    ?.vehicle
-                                    ?.numberPlate ??
-                                    "",
-                                thirdText:
-                                riderBookingModel
-                                    .value
-                                    ?.data
-                                    ?.driver
-                                    ?.vehicle
-                                    ?.model ??
-                                    "",
-                                secoundText:
-                                riderBookingModel
-                                    .value
-                                    ?.data
-                                    ?.driver
-                                    ?.name ??
-                                    "",
-                                rating:
-                                riderBookingModel
-                                    .value
-                                    ?.data
-                                    ?.driver
-                                    ?.rating ??
-                                    "",
-                                radius: 100,
-                              ),
-                            ),
-                          ),
-                          16.verticalSpace,
+                                16.verticalSpace,
 
-                          OriginDestinationWidget(
-                            destination:
-                            "${riderBookingModel.value?.data?.booking?.dropoffAddress}",
-                            origin:
-                            "${riderBookingModel.value?.data?.booking?.pickupAddress}",
-                            customImage: true,
-                          ),
-                        ],
-                      ),
+                                OriginDestinationWidget(
+                                  destination:
+                                      "${riderBookingModel.value?.data?.booking?.dropoffAddress}",
+                                  origin:
+                                      "${riderBookingModel.value?.data?.booking?.pickupAddress}",
+                                  customImage: true,
+                                ),
+                              ],
+                            ),
                     ),
                   );
                 }),
@@ -1627,30 +1719,30 @@ class _SearchDriverScreenState extends State<SearchDriverScreen> {
       backgroundColor: AppColors.transparent,
       builder: (context) => TripDetailsModal(
         destination:
-        homeController
-            .bookingCreateModel
-            .value
-            ?.data
-            ?.booking
-            ?.dropoffAddress ??
+            homeController
+                .bookingCreateModel
+                .value
+                ?.data
+                ?.booking
+                ?.dropoffAddress ??
             riderBookingModel.value?.data?.dropoff?.address ??
             "",
         origin:
-        homeController
-            .bookingCreateModel
-            .value
-            ?.data
-            ?.booking
-            ?.pickupAddress ??
+            homeController
+                .bookingCreateModel
+                .value
+                ?.data
+                ?.booking
+                ?.pickupAddress ??
             riderBookingModel.value?.data?.pickup?.address ??
             "",
         price:
-        homeController
-            .bookingCreateModel
-            .value
-            ?.data
-            ?.fareBreakdown
-            ?.total ??
+            homeController
+                .bookingCreateModel
+                .value
+                ?.data
+                ?.fareBreakdown
+                ?.total ??
             "",
         onTap: () {
           // tripType.value = 1;

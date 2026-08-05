@@ -33,22 +33,25 @@ class ProfileController extends GetxController
         userModel.value = data.data;
 
         final currentBooking = data.currentBooking;
-        final status = (currentBooking?.booking?.status ??
-                currentBooking?.status ??
-                '')
-            .toLowerCase()
-            .trim();
+        final status =
+            (currentBooking?.booking?.status ?? currentBooking?.status ?? '')
+                .toLowerCase()
+                .trim();
         final bookingId =
             '${currentBooking?.booking?.id ?? currentBooking?.bookingId ?? ''}'
                 .trim();
-        final serverCurrentBookingId =
-            (data.data?.currentBookingId ?? '').trim();
-        final String updatedAt =
-            (currentBooking?.booking?.updatedAt ?? '').trim();
-        final DateTime? parsedUpdatedAt = DateTime.tryParse(updatedAt);
-        final Duration? bookingAge = parsedUpdatedAt == null
-            ? null
-            : DateTime.now().difference(parsedUpdatedAt.toLocal()).abs();
+        final paymentMethod = (currentBooking?.booking?.paymentMethod ?? '')
+            .toLowerCase()
+            .trim();
+        final paymentStatus = (currentBooking?.booking?.paymentStatus ?? '')
+            .toLowerCase()
+            .trim();
+        final bool awaitsCashConfirmation =
+            status == 'completed' &&
+            paymentMethod == 'cash' &&
+            paymentStatus != 'paid';
+        final serverCurrentBookingId = (data.data?.currentBookingId ?? '')
+            .trim();
         const activeStatuses = <String>{
           'searching',
           'accepted',
@@ -59,16 +62,10 @@ class ProfileController extends GetxController
         // data.current_booking_id mezőt, miközben a current_booking objektum
         // friss és érvényes. Az üres segédmező önmagában nem teheti semmissé
         // a tényleges booking objektumot.
-        final bool bookingIdIsAuthoritative = bookingId.isNotEmpty &&
+        final bool bookingIdIsAuthoritative =
+            bookingId.isNotEmpty &&
             (serverCurrentBookingId.isEmpty ||
                 bookingId == serverCurrentBookingId);
-        final bool bookingTooOld = bookingAge != null &&
-            ((status == 'searching' && bookingAge > const Duration(minutes: 30)) ||
-                ((status == 'accepted' || status == 'arrived') &&
-                    bookingAge > const Duration(minutes: 90)) ||
-                (status == 'started' &&
-                    bookingAge > const Duration(hours: 12)));
-
         PassengerFlowDebug.send(
           'passenger_profile_loaded',
           bookingId: bookingId,
@@ -79,42 +76,39 @@ class ProfileController extends GetxController
             'is_cash': data.isCash ?? 0,
             'server_current_booking_id': serverCurrentBookingId,
             'booking_id_authoritative': bookingIdIsAuthoritative,
-            'booking_too_old': bookingTooOld,
-            'updated_at': updatedAt,
           },
         );
 
-        if (currentBooking == null ||
-            !bookingIdIsAuthoritative ||
-            bookingTooOld) {
+        final localStatus =
+            (riderBookingModel.value?.data?.booking?.status ?? '')
+                .trim()
+                .toLowerCase();
+        final bool completionReleasePendingOnTripScreen =
+            currentBooking == null &&
+            serverCurrentBookingId.isEmpty &&
+            localStatus == 'started';
+
+        if (completionReleasePendingOnTripScreen) {
+          PassengerFlowDebug.send(
+            'profile_pointer_release_deferred_to_trip_polling',
+            bookingId: AppConstant().bookingId,
+            data: <String, dynamic>{'local_status': localStatus},
+          );
+          return;
+        }
+
+        if (currentBooking == null || !bookingIdIsAuthoritative) {
           _clearLocalBookingState(
             reason: currentBooking == null
                 ? 'profile_has_no_current_booking'
-                : (!bookingIdIsAuthoritative
-                    ? 'profile_current_booking_id_mismatch'
-                    : 'profile_current_booking_too_old'),
+                : 'profile_current_booking_id_mismatch',
             bookingId: bookingId,
             status: status,
           );
           return;
         }
 
-        final paymentStatus =
-            (currentBooking.booking?.paymentStatus ?? '').trim().toLowerCase();
-        final bool paymentSettled = const <String>{
-          'paid',
-          'completed',
-          'complete',
-          'success',
-          'successful',
-          'settled',
-          '1',
-          'true',
-        }.contains(paymentStatus);
-        final bool completedAwaitingPayment =
-            status == 'completed' && !paymentSettled;
-
-        if (!activeStatuses.contains(status) && !completedAwaitingPayment) {
+        if (!activeStatuses.contains(status) && !awaitsCashConfirmation) {
           _clearLocalBookingState(
             reason: 'profile_terminal_or_unknown_status',
             bookingId: bookingId,
@@ -154,7 +148,6 @@ class ProfileController extends GetxController
     isCall = false;
   }
 
-
   void _clearLocalBookingState({
     required String reason,
     String bookingId = '',
@@ -163,8 +156,8 @@ class ProfileController extends GetxController
     final staleBookingId = bookingId.isNotEmpty
         ? bookingId
         : (AppConstant().bookingId.isNotEmpty
-            ? AppConstant().bookingId
-            : '${riderBookingModel.value?.data?.booking?.id ?? ''}');
+              ? AppConstant().bookingId
+              : '${riderBookingModel.value?.data?.booking?.id ?? ''}');
 
     AppConstant().bookingId = '';
     clearSavedBookingFare();
@@ -180,10 +173,7 @@ class ProfileController extends GetxController
     PassengerFlowDebug.send(
       'stale_booking_cleared',
       bookingId: staleBookingId,
-      data: <String, dynamic>{
-        'reason': reason,
-        'status': status,
-      },
+      data: <String, dynamic>{'reason': reason, 'status': status},
     );
   }
 
