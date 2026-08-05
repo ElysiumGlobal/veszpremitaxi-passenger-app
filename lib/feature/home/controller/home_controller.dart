@@ -789,7 +789,7 @@ class HomeController extends GetxController with LoadingMixin, LoadingApiMixin {
             text: AppString.done.tr,
             onTap: () {
               Get.back();
-              Navigation.popupUtil(Routes.rateDriverScreen);
+              Navigation.pushNamed(Routes.rateDriverScreen);
             },
           ),
         ],

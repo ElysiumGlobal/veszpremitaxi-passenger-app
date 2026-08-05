@@ -63,7 +63,7 @@ class _RateDriverScreenState extends State<RateDriverScreen> {
         centerTitle: false,
         onBackTap: () {
           homeController.finishCompletedRideUi(reason: 'rating_back');
-          Navigation.popupUtil(Routes.dashboardScreen);
+          Navigation.replaceAll(Routes.dashboardScreen);
         },
       ),
       body: PopScope(
@@ -73,7 +73,7 @@ class _RateDriverScreenState extends State<RateDriverScreen> {
             return;
           }
           homeController.finishCompletedRideUi(reason: 'rating_system_back');
-          Navigation.popupUtil(Routes.dashboardScreen);
+          Navigation.replaceAll(Routes.dashboardScreen);
         },
         child: SingleChildScrollView(
           child: Padding(
@@ -308,7 +308,7 @@ class _RateDriverScreenState extends State<RateDriverScreen> {
                                   homeController.finishCompletedRideUi(
                                     reason: 'rating_skipped',
                                   );
-                                  Navigation.popupUtil(Routes.dashboardScreen);
+                                  Navigation.replaceAll(Routes.dashboardScreen);
                                 },
                               ),
                               16.verticalSpace,
@@ -388,7 +388,7 @@ class _RateDriverScreenState extends State<RateDriverScreen> {
             onTap: () {
               Navigation.pop();
               homeController.finishCompletedRideUi(reason: 'rating_submitted');
-              Navigation.popupUtil(Routes.dashboardScreen);
+              Navigation.replaceAll(Routes.dashboardScreen);
             },
           ),
         ],
