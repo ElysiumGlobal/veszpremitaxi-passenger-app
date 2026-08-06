@@ -19,18 +19,46 @@ class CancelRequestScreen extends StatefulWidget {
   State<CancelRequestScreen> createState() => _CancelRequestScreenState();
 }
 
+class _CancellationReason {
+  const _CancellationReason({required this.label, required this.apiValue});
+
+  final String label;
+  final String apiValue;
+}
+
 class _CancelRequestScreenState extends State<CancelRequestScreen> {
   RxInt selectedIndex = 0.obs;
 
-  List<String> reasonList = [
-    "Waiting for long time",
-    "Unable to contact driver",
-    "Driver denied to go to destination",
-    "Driver denied to come to pickup",
-    "Wrong address shown",
-    "The Price is not reasonable",
-    "Car condition is not good",
-    "Other",
+  static const List<_CancellationReason> reasonList = <_CancellationReason>[
+    _CancellationReason(
+      label: 'Túl sokat kell várnom',
+      apiValue: 'Waiting for long time',
+    ),
+    _CancellationReason(
+      label: 'Nem érem el a sofőrt',
+      apiValue: 'Unable to contact driver',
+    ),
+    _CancellationReason(
+      label: 'A sofőr nem vállalja az úti célt',
+      apiValue: 'Driver denied to go to destination',
+    ),
+    _CancellationReason(
+      label: 'A sofőr nem jön el a felvételi helyre',
+      apiValue: 'Driver denied to come to pickup',
+    ),
+    _CancellationReason(
+      label: 'Hibás cím lett megadva',
+      apiValue: 'Wrong address shown',
+    ),
+    _CancellationReason(
+      label: 'A becsült ár nem megfelelő',
+      apiValue: 'The Price is not reasonable',
+    ),
+    _CancellationReason(
+      label: 'Az autó állapota nem megfelelő',
+      apiValue: 'Car condition is not good',
+    ),
+    _CancellationReason(label: 'Egyéb ok', apiValue: 'Other'),
   ];
   TextEditingController reasonController = TextEditingController();
 
@@ -81,7 +109,7 @@ class _CancelRequestScreenState extends State<CancelRequestScreen> {
                       onTap: () {
                         selectedIndex.value = index;
                       },
-                      title: data,
+                      title: data.label,
                       isSelected: selectedIndex.value == index,
                     ),
                   );
@@ -113,14 +141,14 @@ class _CancelRequestScreenState extends State<CancelRequestScreen> {
               if (selectedIndex.value == reasonList.length - 1) {
                 if (reasonController.text.trim().isEmpty) {
                   AppSnackBar.showErrorSnackBar(
-                    message: "Please Enter your reason",
+                    message: "Írd be a lemondás okát.",
                     isError: true,
                   );
                   return;
                 }
                 reason = reasonController.text.trim();
               } else {
-                reason = reasonList[selectedIndex.value];
+                reason = reasonList[selectedIndex.value].apiValue;
               }
 
               homeController.cancelRide(
