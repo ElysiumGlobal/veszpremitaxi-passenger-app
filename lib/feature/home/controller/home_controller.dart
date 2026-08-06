@@ -145,6 +145,8 @@ class HomeController extends GetxController with LoadingMixin, LoadingApiMixin {
   final RxString awaitingRidePaymentBookingId = ''.obs;
   final Set<String> _finalizedCompletedBookingIds = <String>{};
   String _paymentSelectionShownForBooking = '';
+  String _passengerCancellationInProgressBookingId = '';
+  String _driverCancellationHandlingBookingId = '';
 
   bool _isPaymentSettled(String? value) {
     final normalized = (value ?? '').trim().toLowerCase();
@@ -286,9 +288,15 @@ class HomeController extends GetxController with LoadingMixin, LoadingApiMixin {
         final Map<String, dynamic>? eventData = _decodeSocketMap(data['data']);
         final dynamic bookingRaw = eventData?['booking'];
         final Map<String, dynamic>? booking = _decodeSocketMap(bookingRaw);
-        final String bookingId =
-            '${booking?['id'] ?? eventData?['booking_id'] ?? AppConstant().bookingId}'
-                .trim();
+        final String explicitBookingId =
+            '${booking?['id'] ?? eventData?['booking_id'] ?? ''}'.trim();
+        final String bookingId = explicitBookingId.isNotEmpty
+            ? explicitBookingId
+            : AppConstant().bookingId.trim();
+        final String incomingStatus =
+            '${booking?['status'] ?? eventData?['status'] ?? ''}'
+                .trim()
+                .toLowerCase();
 
         PassengerFlowDebug.send(
           'socket_event_received',
@@ -305,6 +313,22 @@ class HomeController extends GetxController with LoadingMixin, LoadingApiMixin {
           final String socketId = '${eventData?['socket_id'] ?? ''}'.trim();
           if (socketId.isNotEmpty) {
             AppConstant().socketId = socketId;
+          }
+          return;
+        }
+
+        final String activeBookingId = AppConstant().bookingId.trim();
+        if (incomingStatus == 'cancelled' &&
+            explicitBookingId.isNotEmpty &&
+            activeBookingId.isNotEmpty &&
+            explicitBookingId == activeBookingId) {
+          if (!isPassengerCancellationInProgressFor(explicitBookingId)) {
+            unawaited(
+              handleDriverCancellation(
+                bookingId: explicitBookingId,
+                source: 'socket_exact_booking_status',
+              ),
+            );
           }
           return;
         }
@@ -789,7 +813,7 @@ class HomeController extends GetxController with LoadingMixin, LoadingApiMixin {
             text: AppString.done.tr,
             onTap: () {
               Get.back();
-              Navigation.pushNamed(Routes.rateDriverScreen);
+              Navigation.popupUtil(Routes.rateDriverScreen);
             },
           ),
         ],
@@ -1643,6 +1667,7 @@ class HomeController extends GetxController with LoadingMixin, LoadingApiMixin {
   bool dialogOpen = false;
 
   void _clearCancelledRideLocalState(String bookingId) {
+    timer?.cancel();
     AppConstant().bookingId = '';
     clearSavedBookingFare();
     riderBookingModel.value = null;
@@ -1650,32 +1675,97 @@ class HomeController extends GetxController with LoadingMixin, LoadingApiMixin {
     tripType.value = 0;
     isDriverCome.value = false;
     changePolyLine = false;
+    awaitingRidePayment.value = false;
+    awaitingRidePaymentBookingId.value = '';
+    _paymentSelectionShownForBooking = '';
     dialogOpen = false;
+    AppPreference.removeKey(AppPreference.RideTime);
     PassengerFlowDebug.send(
       'passenger_cancel_local_state_cleared',
       bookingId: bookingId,
     );
   }
 
+  bool isPassengerCancellationInProgressFor(String bookingId) {
+    final normalizedBookingId = bookingId.trim();
+    return normalizedBookingId.isNotEmpty &&
+        _passengerCancellationInProgressBookingId == normalizedBookingId;
+  }
+
+  Future<void> handleDriverCancellation({
+    required String bookingId,
+    required String source,
+  }) async {
+    final normalizedBookingId = bookingId.trim();
+    final activeBookingId = AppConstant().bookingId.trim();
+
+    if (normalizedBookingId.isEmpty ||
+        activeBookingId.isEmpty ||
+        normalizedBookingId != activeBookingId ||
+        isPassengerCancellationInProgressFor(normalizedBookingId) ||
+        _driverCancellationHandlingBookingId == normalizedBookingId) {
+      PassengerFlowDebug.send(
+        'driver_cancel_ignored',
+        bookingId: normalizedBookingId,
+        data: <String, dynamic>{
+          'source': source,
+          'active_booking_id': activeBookingId,
+          'passenger_cancel_in_progress':
+              isPassengerCancellationInProgressFor(normalizedBookingId),
+        },
+      );
+      return;
+    }
+
+    _driverCancellationHandlingBookingId = normalizedBookingId;
+    try {
+      PassengerFlowDebug.send(
+        'driver_cancel_confirmed',
+        bookingId: normalizedBookingId,
+        data: <String, dynamic>{'source': source},
+      );
+
+      _clearCancelledRideLocalState(normalizedBookingId);
+      Navigation.replaceAll(Routes.dashboardScreen);
+      await Future<void>.delayed(const Duration(milliseconds: 250));
+      AppSnackBar.showErrorSnackBar(
+        message: 'A sofőr lemondta a fuvart.',
+        isError: true,
+      );
+    } finally {
+      if (_driverCancellationHandlingBookingId == normalizedBookingId) {
+        _driverCancellationHandlingBookingId = '';
+      }
+    }
+  }
+
   Future<void> cancelRide({
     required String bookingId,
     required String reason,
   }) async {
-    processApi(
-      () => HomeService.cancelRide(bookingId, reason),
-      result: (data) {
-        _clearCancelledRideLocalState(bookingId);
-        Navigation.popupUtil(Routes.dashboardScreen);
-      },
-      error: (error, stack) {
-        PassengerFlowDebug.send(
-          'passenger_cancel_failed',
-          bookingId: bookingId,
-          data: <String, dynamic>{'error': error.toString()},
-        );
-      },
-      loading: handleLoading,
-    );
+    final normalizedBookingId = bookingId.trim();
+    _passengerCancellationInProgressBookingId = normalizedBookingId;
+    try {
+      await processApi(
+        () => HomeService.cancelRide(normalizedBookingId, reason),
+        result: (data) {
+          _clearCancelledRideLocalState(normalizedBookingId);
+          Navigation.replaceAll(Routes.dashboardScreen);
+        },
+        error: (error, stack) {
+          PassengerFlowDebug.send(
+            'passenger_cancel_failed',
+            bookingId: normalizedBookingId,
+            data: <String, dynamic>{'error': error.toString()},
+          );
+        },
+        loading: handleLoading,
+      );
+    } finally {
+      if (_passengerCancellationInProgressBookingId == normalizedBookingId) {
+        _passengerCancellationInProgressBookingId = '';
+      }
+    }
   }
 
   // 0 - search driver / 1- driver get // trip destination
