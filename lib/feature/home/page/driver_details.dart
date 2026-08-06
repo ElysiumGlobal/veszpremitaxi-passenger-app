@@ -17,6 +17,7 @@ import '../../../utils/navigation_utils/navigation.dart';
 import '../../../utils/navigation_utils/routes.dart';
 import '../../../utils/utils.dart';
 import '../widget/dialog.dart';
+import '../widget/chat_unread_badge.dart';
 import '../widget/driver_ration_widget.dart';
 
 class DriverDetailsScreen extends StatefulWidget {
@@ -265,14 +266,22 @@ class _DriverDetailsScreenState extends State<DriverDetailsScreen> {
                         },
                       );
                     },
-                    child: Container(
-                      margin: EdgeInsets.only(right: 8.w),
-                      padding: EdgeInsets.all(10.w),
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: AppColors.titleTextColor,
+                    child: ChatUnreadBadge(
+                      bookingId:
+                          (riderBookingModel.value?.data?.bookingId ?? '')
+                              .toString(),
+                      child: Container(
+                        margin: EdgeInsets.only(right: 8.w),
+                        padding: EdgeInsets.all(10.w),
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: AppColors.titleTextColor,
+                        ),
+                        child: Icon(
+                          Icons.message,
+                          color: AppColors.whiteColor,
+                        ),
                       ),
-                      child: Icon(Icons.message, color: AppColors.whiteColor),
                     ),
                   ),
 

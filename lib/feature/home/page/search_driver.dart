@@ -32,6 +32,7 @@ import '../../../widgets/common_text.dart';
 import '../../../widgets/custom_button.dart';
 import '../../../widgets/app_snackbar.dart';
 import '../widget/driver_details_widget.dart';
+import '../widget/chat_unread_badge.dart';
 import '../widget/trip_modals.dart';
 
 class SearchDriverScreen extends StatefulWidget {
@@ -391,6 +392,7 @@ class _SearchDriverScreenState extends State<SearchDriverScreen> {
   String _lastAppliedBookingState = '';
   int _missingCurrentBookingPolls = 0;
   int _consecutiveExactServerReleasePolls = 0;
+  String _exactServerReleaseBookingId = '';
 
   bool driverReach = true;
   bool routLine = false;
@@ -667,8 +669,13 @@ class _SearchDriverScreenState extends State<SearchDriverScreen> {
             serverCurrentBookingId.isEmpty &&
             responseBookingId.isEmpty;
         if (serverReleasedBooking) {
+          if (_exactServerReleaseBookingId != activeBookingId) {
+            _exactServerReleaseBookingId = activeBookingId;
+            _consecutiveExactServerReleasePolls = 0;
+          }
           _consecutiveExactServerReleasePolls++;
         } else {
+          _exactServerReleaseBookingId = '';
           _consecutiveExactServerReleasePolls = 0;
         }
         PassengerFlowDebug.send(
@@ -694,6 +701,33 @@ class _SearchDriverScreenState extends State<SearchDriverScreen> {
             data: <String, dynamic>{'status': localStatus},
           );
           await homeController.socketData();
+          return;
+        }
+
+        // Accepted/arrived állapotban két egymást követő, sikeres és
+        // teljesen üres profilválasz a sofőr lemondásának biztonságos
+        // fallback bizonyítéka. Az utas saját folyamatban lévő lemondását
+        // itt nem szabad sofőrlemondásként kezelni.
+        if (serverReleasedBooking &&
+            const <String>{'accepted', 'arrived'}.contains(localStatus) &&
+            _consecutiveExactServerReleasePolls >= 2 &&
+            !homeController.isPassengerCancellationInProgressFor(
+              activeBookingId,
+            )) {
+          _bookingStatusPollingTimer?.cancel();
+          PassengerFlowDebug.send(
+            'booking_status_poll_driver_cancelled_by_pointer_release',
+            bookingId: activeBookingId,
+            data: <String, dynamic>{
+              'missing_poll_count': _missingCurrentBookingPolls,
+              'exact_release_poll_count': _consecutiveExactServerReleasePolls,
+              'previous_local_status': localStatus,
+            },
+          );
+          await homeController.handleDriverCancellation(
+            bookingId: activeBookingId,
+            source: 'profile_poll_exact_release',
+          );
           return;
         }
 
@@ -754,6 +788,7 @@ class _SearchDriverScreenState extends State<SearchDriverScreen> {
       }
 
       _missingCurrentBookingPolls = 0;
+      _exactServerReleaseBookingId = '';
       _consecutiveExactServerReleasePolls = 0;
       final authoritativeBooking = currentBooking!;
       final polledModel = NewRideModel.fromJson({
@@ -808,6 +843,8 @@ class _SearchDriverScreenState extends State<SearchDriverScreen> {
       }
     } catch (error, stack) {
       // A háttérpolling nem zavarhatja felugró hibával az utast.
+      _exactServerReleaseBookingId = '';
+      _consecutiveExactServerReleasePolls = 0;
       PassengerFlowDebug.send(
         'booking_status_poll_error',
         bookingId: activeBookingId,
@@ -1478,20 +1515,23 @@ class _SearchDriverScreenState extends State<SearchDriverScreen> {
                                                 },
                                               );
                                             },
-                                            child: Container(
-                                              margin: EdgeInsets.only(
-                                                right: 8.w,
-                                              ),
-                                              padding: EdgeInsets.all(8.w),
-                                              decoration: BoxDecoration(
-                                                shape: BoxShape.circle,
-                                                border: Border.all(
-                                                  color: AppColors
-                                                      .textFieldBorderColor,
+                                            child: ChatUnreadBadge(
+                                              bookingId: _activeBookingId(),
+                                              child: Container(
+                                                margin: EdgeInsets.only(
+                                                  right: 8.w,
                                                 ),
-                                              ),
-                                              child: CustomImage(
-                                                image: IconAsset.message,
+                                                padding: EdgeInsets.all(8.w),
+                                                decoration: BoxDecoration(
+                                                  shape: BoxShape.circle,
+                                                  border: Border.all(
+                                                    color: AppColors
+                                                        .textFieldBorderColor,
+                                                  ),
+                                                ),
+                                                child: CustomImage(
+                                                  image: IconAsset.message,
+                                                ),
                                               ),
                                             ),
                                           ),
