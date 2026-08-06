@@ -143,6 +143,7 @@ void persistBookingFareFromModel(SocketDataModel? data) {
 class HomeController extends GetxController with LoadingMixin, LoadingApiMixin {
   final RxBool awaitingRidePayment = false.obs;
   final RxString awaitingRidePaymentBookingId = ''.obs;
+  String completedRatingBookingId = '';
   final Set<String> _finalizedCompletedBookingIds = <String>{};
   String _paymentSelectionShownForBooking = '';
   String _passengerCancellationInProgressBookingId = '';
@@ -760,6 +761,7 @@ class HomeController extends GetxController with LoadingMixin, LoadingApiMixin {
     if (bookingId.isEmpty || bookingId == 'null') return;
     if (_finalizedCompletedBookingIds.contains(bookingId)) return;
     _finalizedCompletedBookingIds.add(bookingId);
+    completedRatingBookingId = bookingId;
 
     awaitingRidePayment.value = false;
     awaitingRidePaymentBookingId.value = '';
@@ -812,8 +814,14 @@ class HomeController extends GetxController with LoadingMixin, LoadingApiMixin {
           CustomButton(
             text: AppString.done.tr,
             onTap: () {
+              final String ratingBookingId = completedRatingBookingId.isNotEmpty
+                  ? completedRatingBookingId
+                  : bookingId;
               Get.back();
-              Navigation.popupUtil(Routes.rateDriverScreen);
+              Navigation.pushNamed(
+                Routes.rateDriverScreen,
+                arg: <String, dynamic>{'bookingId': ratingBookingId},
+              );
             },
           ),
         ],
@@ -822,8 +830,10 @@ class HomeController extends GetxController with LoadingMixin, LoadingApiMixin {
   }
 
   void finishCompletedRideUi({String reason = 'rating_flow_finished'}) {
-    final bookingId = '${riderBookingModel.value?.data?.booking?.id ?? ''}'
-        .trim();
+    final String bookingId = completedRatingBookingId.isNotEmpty
+        ? completedRatingBookingId
+        : '${riderBookingModel.value?.data?.booking?.id ?? ''}'.trim();
+    completedRatingBookingId = '';
     riderBookingModel.value = null;
     awaitingRidePayment.value = false;
     awaitingRidePaymentBookingId.value = '';

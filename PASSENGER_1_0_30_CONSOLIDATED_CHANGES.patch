@@ -1,0 +1,215 @@
+diff --git a/lib/feature/home/controller/home_controller.dart b/lib/feature/home/controller/home_controller.dart
+index be06654..539c786 100644
+--- a/lib/feature/home/controller/home_controller.dart
++++ b/lib/feature/home/controller/home_controller.dart
+@@ -143,6 +143,7 @@ void persistBookingFareFromModel(SocketDataModel? data) {
+ class HomeController extends GetxController with LoadingMixin, LoadingApiMixin {
+   final RxBool awaitingRidePayment = false.obs;
+   final RxString awaitingRidePaymentBookingId = ''.obs;
++  String completedRatingBookingId = '';
+   final Set<String> _finalizedCompletedBookingIds = <String>{};
+   String _paymentSelectionShownForBooking = '';
+   String _passengerCancellationInProgressBookingId = '';
+@@ -760,6 +761,7 @@ class HomeController extends GetxController with LoadingMixin, LoadingApiMixin {
+     if (bookingId.isEmpty || bookingId == 'null') return;
+     if (_finalizedCompletedBookingIds.contains(bookingId)) return;
+     _finalizedCompletedBookingIds.add(bookingId);
++    completedRatingBookingId = bookingId;
+ 
+     awaitingRidePayment.value = false;
+     awaitingRidePaymentBookingId.value = '';
+@@ -812,8 +814,14 @@ class HomeController extends GetxController with LoadingMixin, LoadingApiMixin {
+           CustomButton(
+             text: AppString.done.tr,
+             onTap: () {
++              final String ratingBookingId = completedRatingBookingId.isNotEmpty
++                  ? completedRatingBookingId
++                  : bookingId;
+               Get.back();
+-              Navigation.popupUtil(Routes.rateDriverScreen);
++              Navigation.pushNamed(
++                Routes.rateDriverScreen,
++                arg: <String, dynamic>{'bookingId': ratingBookingId},
++              );
+             },
+           ),
+         ],
+@@ -822,8 +830,10 @@ class HomeController extends GetxController with LoadingMixin, LoadingApiMixin {
+   }
+ 
+   void finishCompletedRideUi({String reason = 'rating_flow_finished'}) {
+-    final bookingId = '${riderBookingModel.value?.data?.booking?.id ?? ''}'
+-        .trim();
++    final String bookingId = completedRatingBookingId.isNotEmpty
++        ? completedRatingBookingId
++        : '${riderBookingModel.value?.data?.booking?.id ?? ''}'.trim();
++    completedRatingBookingId = '';
+     riderBookingModel.value = null;
+     awaitingRidePayment.value = false;
+     awaitingRidePaymentBookingId.value = '';
+diff --git a/lib/feature/home/page/driver_details.dart b/lib/feature/home/page/driver_details.dart
+index ee0043a..c71d2f6 100644
+--- a/lib/feature/home/page/driver_details.dart
++++ b/lib/feature/home/page/driver_details.dart
+@@ -17,6 +17,7 @@ import '../../../utils/navigation_utils/navigation.dart';
+ import '../../../utils/navigation_utils/routes.dart';
+ import '../../../utils/utils.dart';
+ import '../widget/dialog.dart';
++import '../widget/chat_unread_badge.dart';
+ import '../widget/driver_ration_widget.dart';
+ 
+ class DriverDetailsScreen extends StatefulWidget {
+@@ -265,14 +266,22 @@ class _DriverDetailsScreenState extends State<DriverDetailsScreen> {
+                         },
+                       );
+                     },
+-                    child: Container(
+-                      margin: EdgeInsets.only(right: 8.w),
+-                      padding: EdgeInsets.all(10.w),
+-                      decoration: BoxDecoration(
+-                        shape: BoxShape.circle,
+-                        color: AppColors.titleTextColor,
++                    child: ChatUnreadBadge(
++                      bookingId:
++                          (riderBookingModel.value?.data?.bookingId ?? '')
++                              .toString(),
++                      child: Container(
++                        margin: EdgeInsets.only(right: 8.w),
++                        padding: EdgeInsets.all(10.w),
++                        decoration: BoxDecoration(
++                          shape: BoxShape.circle,
++                          color: AppColors.titleTextColor,
++                        ),
++                        child: Icon(
++                          Icons.message,
++                          color: AppColors.whiteColor,
++                        ),
+                       ),
+-                      child: Icon(Icons.message, color: AppColors.whiteColor),
+                     ),
+                   ),
+ 
+diff --git a/lib/feature/home/page/rate_driver_screen.dart b/lib/feature/home/page/rate_driver_screen.dart
+index 41b1736..a965a8e 100644
+--- a/lib/feature/home/page/rate_driver_screen.dart
++++ b/lib/feature/home/page/rate_driver_screen.dart
+@@ -4,6 +4,7 @@ import 'package:e_taxi/feature/home/widget/driver_details_widget.dart';
+ import 'package:e_taxi/utils/app_colors.dart';
+ import 'package:e_taxi/utils/app_string.dart';
+ import 'package:e_taxi/utils/assets.dart';
++import 'package:e_taxi/widgets/app_snackbar.dart';
+ import 'package:e_taxi/widgets/appbar.dart';
+ import 'package:e_taxi/widgets/common_text.dart';
+ import 'package:e_taxi/widgets/custom_textfeild.dart';
+@@ -53,6 +54,28 @@ class _RateDriverScreenState extends State<RateDriverScreen> {
+   ];
+ 
+   final homeController = Get.find<HomeController>();
++  late final int ratingBookingId;
++
++  @override
++  void initState() {
++    super.initState();
++    final dynamic arguments = Get.arguments;
++    final String argumentBookingId = arguments is Map
++        ? '${arguments['bookingId'] ?? ''}'.trim()
++        : '';
++    final String controllerBookingId =
++        homeController.completedRatingBookingId.trim();
++    final String modelBookingId =
++        '${riderBookingModel.value?.data?.booking?.id ?? ''}'.trim();
++    String resolvedBookingId = argumentBookingId;
++    if (resolvedBookingId.isEmpty) {
++      resolvedBookingId = controllerBookingId;
++    }
++    if (resolvedBookingId.isEmpty) {
++      resolvedBookingId = modelBookingId;
++    }
++    ratingBookingId = int.tryParse(resolvedBookingId) ?? 0;
++  }
+ 
+   @override
+   Widget build(BuildContext context) {
+@@ -325,10 +348,17 @@ class _RateDriverScreenState extends State<RateDriverScreen> {
+                         return;
+                       }
+ 
++                      if (ratingBookingId <= 0) {
++                        AppSnackBar.showErrorSnackBar(
++                          message:
++                              'A fuvar azonosítása sikertelen. Az értékelés nem küldhető el.',
++                          isError: true,
++                        );
++                        return;
++                      }
++
+                       final data = await homeController.ratingDriver(
+-                        bookingId: int.parse(
+-                          riderBookingModel.value?.data?.booking?.id ?? "0",
+-                        ),
++                        bookingId: ratingBookingId,
+                         comment: commentController.text.trim(),
+                         rating: userRating,
+                       );
+diff --git a/lib/feature/home/page/search_driver.dart b/lib/feature/home/page/search_driver.dart
+index 11d0e7c..65c4dcb 100644
+--- a/lib/feature/home/page/search_driver.dart
++++ b/lib/feature/home/page/search_driver.dart
+@@ -32,6 +32,7 @@ import '../../../widgets/common_text.dart';
+ import '../../../widgets/custom_button.dart';
+ import '../../../widgets/app_snackbar.dart';
+ import '../widget/driver_details_widget.dart';
++import '../widget/chat_unread_badge.dart';
+ import '../widget/trip_modals.dart';
+ 
+ class SearchDriverScreen extends StatefulWidget {
+@@ -1514,20 +1515,23 @@ class _SearchDriverScreenState extends State<SearchDriverScreen> {
+                                                 },
+                                               );
+                                             },
+-                                            child: Container(
+-                                              margin: EdgeInsets.only(
+-                                                right: 8.w,
+-                                              ),
+-                                              padding: EdgeInsets.all(8.w),
+-                                              decoration: BoxDecoration(
+-                                                shape: BoxShape.circle,
+-                                                border: Border.all(
+-                                                  color: AppColors
+-                                                      .textFieldBorderColor,
++                                            child: ChatUnreadBadge(
++                                              bookingId: _activeBookingId(),
++                                              child: Container(
++                                                margin: EdgeInsets.only(
++                                                  right: 8.w,
++                                                ),
++                                                padding: EdgeInsets.all(8.w),
++                                                decoration: BoxDecoration(
++                                                  shape: BoxShape.circle,
++                                                  border: Border.all(
++                                                    color: AppColors
++                                                        .textFieldBorderColor,
++                                                  ),
++                                                ),
++                                                child: CustomImage(
++                                                  image: IconAsset.message,
+                                                 ),
+-                                              ),
+-                                              child: CustomImage(
+-                                                image: IconAsset.message,
+                                               ),
+                                             ),
+                                           ),
+diff --git a/pubspec.yaml b/pubspec.yaml
+index b4eb805..ba1a4e5 100644
+--- a/pubspec.yaml
++++ b/pubspec.yaml
+@@ -2,7 +2,7 @@ name: e_taxi
+ description: "A new Flutter project."
+ publish_to: 'none'
+ 
+-version: 1.0.29+38
++version: 1.0.30+39
+ environment:
+   sdk: ^3.9.0
+ 

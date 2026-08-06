@@ -4,6 +4,7 @@ import 'package:e_taxi/feature/home/widget/driver_details_widget.dart';
 import 'package:e_taxi/utils/app_colors.dart';
 import 'package:e_taxi/utils/app_string.dart';
 import 'package:e_taxi/utils/assets.dart';
+import 'package:e_taxi/widgets/app_snackbar.dart';
 import 'package:e_taxi/widgets/appbar.dart';
 import 'package:e_taxi/widgets/common_text.dart';
 import 'package:e_taxi/widgets/custom_textfeild.dart';
@@ -53,6 +54,28 @@ class _RateDriverScreenState extends State<RateDriverScreen> {
   ];
 
   final homeController = Get.find<HomeController>();
+  late final int ratingBookingId;
+
+  @override
+  void initState() {
+    super.initState();
+    final dynamic arguments = Get.arguments;
+    final String argumentBookingId = arguments is Map
+        ? '${arguments['bookingId'] ?? ''}'.trim()
+        : '';
+    final String controllerBookingId =
+        homeController.completedRatingBookingId.trim();
+    final String modelBookingId =
+        '${riderBookingModel.value?.data?.booking?.id ?? ''}'.trim();
+    String resolvedBookingId = argumentBookingId;
+    if (resolvedBookingId.isEmpty) {
+      resolvedBookingId = controllerBookingId;
+    }
+    if (resolvedBookingId.isEmpty) {
+      resolvedBookingId = modelBookingId;
+    }
+    ratingBookingId = int.tryParse(resolvedBookingId) ?? 0;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -325,10 +348,17 @@ class _RateDriverScreenState extends State<RateDriverScreen> {
                         return;
                       }
 
+                      if (ratingBookingId <= 0) {
+                        AppSnackBar.showErrorSnackBar(
+                          message:
+                              'A fuvar azonosítása sikertelen. Az értékelés nem küldhető el.',
+                          isError: true,
+                        );
+                        return;
+                      }
+
                       final data = await homeController.ratingDriver(
-                        bookingId: int.parse(
-                          riderBookingModel.value?.data?.booking?.id ?? "0",
-                        ),
+                        bookingId: ratingBookingId,
                         comment: commentController.text.trim(),
                         rating: userRating,
                       );
