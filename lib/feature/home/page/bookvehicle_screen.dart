@@ -218,7 +218,7 @@ class _BookVehicleScreenState extends State<BookVehicleScreen> {
 
   Future<void> _createCustomMarker() async {
     final Uint8List markerIcon = await _createMarkerImage(
-      title: originDestinationModel?.oName ?? "",
+      title: 'Indulás',
       subtitle: '',
       markerImagePath: ImagesAsset.sourceIcon,
     );
@@ -235,7 +235,7 @@ class _BookVehicleScreenState extends State<BookVehicleScreen> {
     );
 
     final Uint8List markerIcon1 = await _createMarkerImage(
-      title: originDestinationModel?.dName ?? "",
+      title: 'Érkezés',
       subtitle: '',
       markerImagePath: ImagesAsset.destinationIcon,
     );
@@ -679,7 +679,8 @@ class _BookVehicleScreenState extends State<BookVehicleScreen> {
                             6.horizontalSpace,
                             Expanded(
                               child: CommonText(
-                                string: AppString.rideInfo.tr,
+                                string:
+                                    'Google Maps-becslés • A menetidő és a viteldíj eltérhet.',
                                 softWrap: true,
                                 fontSize: 12.sp,
                               ),
