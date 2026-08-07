@@ -1,0 +1,8 @@
+{
+  "version": "1.0.33+43",
+  "exact_recent_booking_reason_helper": true,
+  "fallback_passes_reason": true,
+  "requires_cancelled_status": true,
+  "arrived_whistle_preserved": true,
+  "pubspec_lock_unchanged_from_r1": true
+}

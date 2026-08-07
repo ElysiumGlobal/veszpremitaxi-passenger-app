@@ -1,72 +1,46 @@
-# Veszprémi Taxi Passenger 1.0.30+39 – teljes, összevont forrás
+# Veszprémi Taxi Passenger 1.0.33+43 – UX R1 + cancellation reason profile fallback
 
 ## Kiindulási alap
 
-- Forrás ZIP: `veszpremitaxi-passenger-app-main(1).zip`
-- Forrás SHA-256: `5d42bffc9b0794f96a8d34986b7af67df4b26bccdcd1022b31f97d73da00418b`
-- Verzió: `1.0.29+38`
-- A kiindulási forrás már tartalmazta a route-outlier védelmet, a sofőrlemondási Passenger R1 javítást, a magyar lemondási okokat, az Indulás/Érkezés térképfeliratokat és a Google-becslés rövid tájékoztatóját.
+- Codex UX R1 Passenger: `1.0.32+42`
+- A teljes UX R1 funkcionalitás változatlanul megmaradt, beleértve a saját érkezési füttyöt, a nagy arrived popupot, a chat hang/badge javítást, a support chatet, a magyar státuszokat és a korábbi lifecycle/rating/route javításokat.
 
-## Ebben a teljes forrásban hozzáadva
+## Új célzott javítás
 
-1. Passenger chat olvasatlanjelzés:
-   - piros `1`, `2`, `3`, majd `3+` badge;
-   - 4 másodperces lekérés;
-   - háttérben és más route-on nem kérdez le;
-   - átmeneti API-hibánál nem törli a legutolsó igazolt jelzést;
-   - a meglévő chatküldés és `mark-read` változatlan.
+Ha a sofőr lemondási socket eseménye kimarad, az utas alkalmazás továbbra is a már meglévő két egymást követő, pontosan üres profilválaszos védelemmel igazolja a lemondást. A fallback most az exact booking ID alapján a profil `recent_bookings` listájából kiolvassa a `cancellation_reason` mezőt, és átadja a meglévő nagy lemondási modalnak.
 
-2. Fuvarvégi fekete képernyő javítása:
-   - a kötelező köszönő popup megmarad;
-   - a popup után az értékelőképernyő új route-ként nyílik meg;
-   - nem fut le a hibás teljes stack-visszapoppolás;
-   - értékelés, kihagyás és visszalépés után biztos Dashboard.
+A fallback csak akkor használ okot, ha:
 
-3. `booking_id = 0` értékelési hiba javítása:
-   - a completed booking ID a cleanup előtt megőrződik;
-   - explicit átadásra kerül az értékelőképernyőnek;
-   - az értékelés ezt az ID-t küldi;
-   - nulla vagy hiányzó ID-val az app nem indít hibás értékelési API-kérést.
+- az exact booking ID egyezik;
+- a `recent_bookings` elem státusza `cancelled`;
+- a kétpollos lemondási bizonyíték már teljesült.
 
-4. Verzió:
-   - `1.0.30+39`
+Más booking vagy nem `cancelled` elem indokát nem használja.
 
-## Érintett fájlok
+## Módosított production fájlok az UX R1-hez képest
 
-- `pubspec.yaml`
-- `lib/feature/home/controller/home_controller.dart`
-- `lib/feature/home/page/rate_driver_screen.dart`
 - `lib/feature/home/page/search_driver.dart`
-- `lib/feature/home/page/driver_details.dart`
-- `lib/feature/home/widget/chat_unread_badge.dart` – új fájl
+- `pubspec.yaml`
 
-## Nem módosult
+## Backend-feltétel
 
-- Laravel backend
-- lifecycle státuszok és cash-finalization
-- ETA-választás
-- OTP
-- Firebase/broadcast
-- Driver app
-- route-algoritmus
-- wallet/payment logika
+A koordinált backend patch a Passenger és Driver profilválasz `recent_bookings` listáját booking ID szerint csökkenő sorrendbe rendezi és a legújabb 10 elemet adja. Így az éppen lemondott booking megbízhatóan benne marad a fallbackhez szükséges profiladatban.
 
-## Ellenőrzések
+## Nem változott
 
-- `git diff --check`: PASS
-- baseline chat patch alkalmazhatósága: PASS
-- statikus célfeltételek: PASS – lásd `STATIC_CHECKS.json`
-- Flutter analyze/test/build: ebben a környezetben nem futott, mert Flutter/Dart SDK nem érhető el
-- fizikai telefonos teszt: még szükséges
+- arrived fütty/popup/rezgés;
+- chat és badge működés;
+- route-algoritmus és outlier védelem;
+- rating booking ID javítás;
+- OTP, cash és payment lifecycle;
+- Passenger saját lemondási guard;
+- kétpollos cancellation guard;
+- Firebase/broadcast szerződés.
 
-## Kötelező fizikai teszt
+## Verzió
 
-1. teljes készpénzes fuvar;
-2. sofőr `Átadva` / paid;
-3. köszönő popup;
-4. értékelőképernyő;
-5. értékelés elküldése valódi booking ID-val;
-6. Dashboard, fekete képernyő nélkül;
-7. utas üzenetet kap, miközben nincs nyitva a chat;
-8. piros badge megjelenik;
-9. chat megnyitásakor az üzenet látható és a badge eltűnik.
+- `1.0.33+43`
+
+## Ellenőrzési korlátozás
+
+Ebben a környezetben Flutter/Dart CLI nem érhető el, ezért `dart format`, `flutter analyze`, `flutter test` és APK build nem futott. A módosítás statikusan ellenőrzött; fizikai smoke teszt szükséges.

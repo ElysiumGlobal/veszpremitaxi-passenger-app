@@ -99,21 +99,21 @@ class ChatModel {
   );
 
   factory ChatModel.fromJson(Map<String, dynamic> json) => ChatModel(
-    id: json["id"],
-    userId: json["user_id"],
-    bookingId: json["booking_id"],
-    adminId: json["admin_id"],
-    senderType: json["sender_type"],
-    message: json["message"],
-    messageType: json["message_type"],
+    id: int.tryParse('${json["id"] ?? ''}'),
+    userId: json["user_id"]?.toString(),
+    bookingId: json["booking_id"]?.toString(),
+    adminId: json["admin_id"]?.toString(),
+    senderType: json["sender_type"]?.toString(),
+    message: json["message"]?.toString(),
+    messageType: json["message_type"]?.toString(),
     // metadata: json["metadata"] == null ? [] : List<dynamic>.from(json["metadata"]!.map((x) => x)),
     isRead: json["is_read"],
     readAt: json["read_at"],
-    status: json["status"],
-    subject: json["subject"],
-    priority: json["priority"],
-    createdAt: json["created_at"],
-    updatedAt: json["updated_at"],
+    status: json["status"]?.toString(),
+    subject: json["subject"]?.toString(),
+    priority: json["priority"]?.toString(),
+    createdAt: json["created_at"]?.toString(),
+    updatedAt: json["updated_at"]?.toString(),
   );
 
   Map<String, dynamic> toJson() => {

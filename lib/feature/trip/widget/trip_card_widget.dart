@@ -49,7 +49,7 @@ class TripCardWidget extends StatelessWidget {
                     Expanded(
                       child: CommonText(
                         string:
-                            "${tripHistory.rideType?.rideTypeName ?? ""} Ride",
+                            "${tripHistory.rideType?.rideTypeName ?? ""} fuvar",
                         fontSize: 16.sp,
                         fontWeight: FontWeight.w500,
                       ),
@@ -64,7 +64,9 @@ class TripCardWidget extends StatelessWidget {
                         color: getBgColor(tripHistory.tripInfo?.status ?? ""),
                       ),
                       child: CommonText(
-                        string: tripHistory.tripInfo?.status ?? "",
+                        string: Utils.tripStatusLabel(
+                          tripHistory.tripInfo?.status,
+                        ),
                         color: getTextColor(tripHistory.tripInfo?.status ?? ""),
                       ),
                     ),
@@ -165,7 +167,7 @@ class TripCardWidgetShimmer extends StatelessWidget {
                   children: [
                     Expanded(
                       child: CommonText(
-                        string: "Auth Ride",
+                        string: "Fuvar",
                         fontSize: 16.sp,
                         fontWeight: FontWeight.w500,
                       ),

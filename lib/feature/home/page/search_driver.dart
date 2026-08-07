@@ -8,6 +8,7 @@ import 'package:e_taxi/core/service/google_route_service.dart';
 import 'package:e_taxi/core/location_utils.dart';
 import 'package:e_taxi/feature/home/controller/home_controller.dart';
 import 'package:e_taxi/feature/home/model/get_socket_model.dart';
+import 'package:e_taxi/feature/profile/model/user_model.dart';
 import 'package:e_taxi/feature/profile/service/profile_service.dart';
 import 'package:e_taxi/feature/home/widget/origin_destination_widget.dart';
 import 'package:e_taxi/utils/app_colors.dart';
@@ -625,6 +626,27 @@ class _SearchDriverScreenState extends State<SearchDriverScreen> {
     });
   }
 
+  String _profileCancellationReasonForBooking({
+    required UserProfileModel profile,
+    required String bookingId,
+  }) {
+    final String normalizedBookingId = bookingId.trim();
+    if (normalizedBookingId.isEmpty) return '';
+
+    final recentBookings = profile.data?.recentBookings;
+    if (recentBookings == null) return '';
+
+    for (final booking in recentBookings) {
+      final String recentBookingId = (booking.id ?? '').trim();
+      final String recentStatus = (booking.status ?? '').toLowerCase().trim();
+      if (recentBookingId == normalizedBookingId &&
+          recentStatus == 'cancelled') {
+        return (booking.cancellationReason ?? '').trim();
+      }
+    }
+    return '';
+  }
+
   void _startBookingStatusPolling() {
     _bookingStatusPollingTimer?.cancel();
     unawaited(_pollBookingStatus());
@@ -727,6 +749,10 @@ class _SearchDriverScreenState extends State<SearchDriverScreen> {
           await homeController.handleDriverCancellation(
             bookingId: activeBookingId,
             source: 'profile_poll_exact_release',
+            cancellationReason: _profileCancellationReasonForBooking(
+              profile: profile,
+              bookingId: activeBookingId,
+            ),
           );
           return;
         }
@@ -1132,9 +1158,9 @@ class _SearchDriverScreenState extends State<SearchDriverScreen> {
                                   GestureDetector(
                                     onTap: () {
                                       String title =
-                                          "Origin : ${riderBookingModel.value?.data?.pickup?.address ?? ""}\nDestination : ${riderBookingModel.value?.data?.dropoff?.address ?? ""}";
+                                          "Indulási hely: ${riderBookingModel.value?.data?.pickup?.address ?? ""}\nÉrkezési hely: ${riderBookingModel.value?.data?.dropoff?.address ?? ""}";
                                       title +=
-                                          "\nUser last location : https://www.google.com/maps/search/?api=1&query=${LocationService().currentUserLatLg.value?.latitude},${LocationService().currentUserLatLg.value?.longitude}";
+                                          "\nAz utas utolsó ismert helye: https://www.google.com/maps/search/?api=1&query=${LocationService().currentUserLatLg.value?.latitude},${LocationService().currentUserLatLg.value?.longitude}";
                                       title +=
                                           "\n\nhttps://www.google.com/maps/dir/?api=1&origin=${LocationService().currentUserLatLg.value?.latitude ?? riderBookingModel.value?.data?.pickup?.latitude},${LocationService().currentUserLatLg.value?.longitude ?? riderBookingModel.value?.data?.pickup?.longitude}&destination=${riderBookingModel.value?.data?.dropoff?.latitude},${riderBookingModel.value?.data?.dropoff?.longitude}&travelmode=driving";
 

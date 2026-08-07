@@ -74,11 +74,7 @@ class Utils with LoadingMixin {
   }
 
   Future<void> setCarMarker() async {
-    carIcon = await getMarkerIcon(
-      IconAsset.driverMarker,
-      128,
-      displaySize: 54,
-    );
+    carIcon = await getMarkerIcon(IconAsset.driverMarker, 128, displaySize: 54);
   }
 
   Future<BitmapDescriptor> getMarkerIcon(
@@ -121,7 +117,9 @@ class Utils with LoadingMixin {
         targetWidth: logicalSize.round(),
       );
       final ui.FrameInfo fi = await codec.getNextFrame();
-      final byteData = await fi.image.toByteData(format: ui.ImageByteFormat.png);
+      final byteData = await fi.image.toByteData(
+        format: ui.ImageByteFormat.png,
+      );
       if (byteData == null) return null;
 
       return BitmapDescriptor.bytes(
@@ -250,10 +248,7 @@ class Utils with LoadingMixin {
   }
 
   static final List _languageList = [
-    {
-      "languageName": "Magyar",
-      "local": const ui.Locale('hu', 'HU'),
-    },
+    {"languageName": "Magyar", "local": const ui.Locale('hu', 'HU')},
   ];
 
   static updateLanguage(index) {
@@ -401,9 +396,9 @@ class Utils with LoadingMixin {
           .then(
             (lines) => lines.firstWhere(
               (l) => l.startsWith('ro.build.version.sdk'),
-          orElse: () => '',
-        ),
-      )
+              orElse: () => '',
+            ),
+          )
           .then((line) => int.tryParse(line.split('=').last.trim()) ?? 0);
       return sdk;
     } catch (_) {
@@ -412,4 +407,21 @@ class Utils with LoadingMixin {
   }
 
   bool checkPlatForm = Platform.isAndroid;
+
+  static String tripStatusLabel(String? value) {
+    final status = (value ?? '').trim().toLowerCase();
+    return switch (status) {
+      'searching' => 'Sofőrt keresünk',
+      'pending' => 'Függőben',
+      'accepted' => 'Elfogadva',
+      'arrived' => 'Megérkezett',
+      'started' || 'ongoing' || 'in_progress' => 'Folyamatban',
+      'completed' => 'Teljesítve',
+      'cancelled' || 'canceled' => 'Lemondva',
+      'expired' => 'Lejárt',
+      'deleted' => 'Törölve',
+      '' => 'Ismeretlen',
+      _ => value ?? 'Ismeretlen',
+    };
+  }
 }

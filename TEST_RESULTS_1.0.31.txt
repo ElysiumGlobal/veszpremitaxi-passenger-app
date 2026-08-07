@@ -1,0 +1,10 @@
+PROJECT=/mnt/data/vtaxi_cancel_modal_clients_work/passenger
+--- dart format ---
+environment: line 27: dart: command not found
+EXIT=127
+--- flutter analyze ---
+environment: line 29: flutter: command not found
+EXIT=127
+--- flutter test ---
+environment: line 31: flutter: command not found
+EXIT=127

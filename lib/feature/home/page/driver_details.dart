@@ -129,11 +129,11 @@ class _DriverDetailsScreenState extends State<DriverDetailsScreen> {
                   border: Border.all(color: AppColors.textFieldBorderColor),
                 ),
                 child: DriverRatingShowWidget(
-                  firstSubTitle: "Rating",
+                  firstSubTitle: "Értékelés",
                   firstTitle: data?.driver?.rating ?? "",
-                  secoundSubTitle: "Trip",
+                  secoundSubTitle: "Fuvar",
                   secoundTitle: data?.driver?.totalTrips ?? "",
-                  thirdSubTitle: "Rating",
+                  thirdSubTitle: "Értékelés",
                   thirdTitle: data?.driver?.rating ?? "",
                 ),
               ),
@@ -150,7 +150,7 @@ class _DriverDetailsScreenState extends State<DriverDetailsScreen> {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     titleData(
-                      title: "Member since",
+                      title: "Gyártási év",
                       data: data?.driver?.vehicle?.year ?? "",
                     ),
                     SizedBox(
@@ -166,7 +166,7 @@ class _DriverDetailsScreenState extends State<DriverDetailsScreen> {
                       ),
                     ),
                     titleData(
-                      title: "Vehicle Model",
+                      title: "Jármű típusa",
                       data: data?.driver?.vehicle?.model ?? "",
                     ),
                     SizedBox(
@@ -182,7 +182,7 @@ class _DriverDetailsScreenState extends State<DriverDetailsScreen> {
                       ),
                     ),
                     titleData(
-                      title: "Plate number",
+                      title: "Rendszám",
                       data: data?.driver?.vehicle?.numberPlate ?? "",
                     ),
                   ],
@@ -277,10 +277,7 @@ class _DriverDetailsScreenState extends State<DriverDetailsScreen> {
                           shape: BoxShape.circle,
                           color: AppColors.titleTextColor,
                         ),
-                        child: Icon(
-                          Icons.message,
-                          color: AppColors.whiteColor,
-                        ),
+                        child: Icon(Icons.message, color: AppColors.whiteColor),
                       ),
                     ),
                   ),
@@ -288,7 +285,7 @@ class _DriverDetailsScreenState extends State<DriverDetailsScreen> {
                   GestureDetector(
                     onTap: () {
                       String title =
-                          "Origin : ${riderBookingModel.value?.data?.pickup?.address ?? ""}\nDetination : ${riderBookingModel.value?.data?.dropoff?.address ?? ""}\n\n";
+                          "Indulási hely: ${riderBookingModel.value?.data?.pickup?.address ?? ""}\nÉrkezési hely: ${riderBookingModel.value?.data?.dropoff?.address ?? ""}\n\n";
                       title +=
                           "https://www.google.com/maps/dir/?api=1&origin=${LocationService().currentUserLatLg.value?.latitude ?? riderBookingModel.value?.data?.pickup?.latitude},${LocationService().currentUserLatLg.value?.longitude ?? riderBookingModel.value?.data?.pickup?.longitude}&destination=${riderBookingModel.value?.data?.dropoff?.latitude},${riderBookingModel.value?.data?.dropoff?.longitude}&travelmode=driving";
                       final box = context.findRenderObject() as RenderBox?;

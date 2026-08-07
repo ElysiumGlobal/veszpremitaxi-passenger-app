@@ -18,7 +18,6 @@ class ApiConstants {
 
   static const String rideTypeList = "ride-types";
 
-
   static const String bookingEstimate = "bookings/estimate";
   static const String bookingCreate = "bookings/create";
   static const String bookingPrefix = "bookings/";
@@ -35,7 +34,6 @@ class ApiConstants {
 
   static const String banner = "banners";
 
-
   static const String addEmergency = "emergency-contacts/create";
   static const String getEmergency = "emergency-contacts";
   static const String deleteEmergency = "emergency-contacts/delete/";
@@ -47,12 +45,11 @@ class ApiConstants {
 
   static const String getWalletData = "wallet/wallet-info-transactions";
 
-
   static const String getNotificationList = "notifications?page=";
-
 
   static const String socketAuthentication = "websocket-direct/authenticate";
   static const String supportSocketAuthentication = "support-websocket/auth";
+  static const String sendSupportChatMessage = "support-websocket/message";
   static const String getChatHistory = "chat/list?booking_id=";
   static const String sendChatMessage = "chat/send";
   static const String markChatRead = "chat/mark-read";

@@ -4,6 +4,7 @@ import 'dart:developer';
 import 'dart:io';
 import 'package:e_taxi/core/debug/passenger_flow_debug.dart';
 import 'package:e_taxi/core/location_utils.dart';
+import 'package:e_taxi/core/service/taxi_arrival_sound.dart';
 import 'package:e_taxi/feature/home/model/offer_model.dart';
 import 'package:e_taxi/feature/home/page/payment_screen.dart';
 import 'package:e_taxi/feature/home/service/home_service.dart';
@@ -15,6 +16,7 @@ import 'package:e_taxi/utils/constants.dart';
 import 'package:e_taxi/utils/loading_mixin.dart';
 import 'package:e_taxi/widgets/app_snackbar.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:geocoding/geocoding.dart';
@@ -148,6 +150,7 @@ class HomeController extends GetxController with LoadingMixin, LoadingApiMixin {
   String _paymentSelectionShownForBooking = '';
   String _passengerCancellationInProgressBookingId = '';
   String _driverCancellationHandlingBookingId = '';
+  String _arrivedNotificationShownForBookingId = '';
 
   bool _isPaymentSettled(String? value) {
     final normalized = (value ?? '').trim().toLowerCase();
@@ -298,6 +301,11 @@ class HomeController extends GetxController with LoadingMixin, LoadingApiMixin {
             '${booking?['status'] ?? eventData?['status'] ?? ''}'
                 .trim()
                 .toLowerCase();
+        final String bookingCancellationReason =
+            '${booking?['cancellation_reason'] ?? ''}'.trim();
+        final String cancellationReason = bookingCancellationReason.isNotEmpty
+            ? bookingCancellationReason
+            : '${eventData?['cancellation_reason'] ?? ''}'.trim();
 
         PassengerFlowDebug.send(
           'socket_event_received',
@@ -328,6 +336,7 @@ class HomeController extends GetxController with LoadingMixin, LoadingApiMixin {
               handleDriverCancellation(
                 bookingId: explicitBookingId,
                 source: 'socket_exact_booking_status',
+                cancellationReason: cancellationReason,
               ),
             );
           }
@@ -484,6 +493,7 @@ class HomeController extends GetxController with LoadingMixin, LoadingApiMixin {
         changePolyLine = false;
         tripType.value = 1;
         isDriverCome.value = true;
+        unawaited(_showDriverArrivedNotification(bookingId));
         PassengerFlowDebug.send(
           'trip_auth_display_ready',
           bookingId: bookingId,
@@ -1702,9 +1712,66 @@ class HomeController extends GetxController with LoadingMixin, LoadingApiMixin {
         _passengerCancellationInProgressBookingId == normalizedBookingId;
   }
 
+  Future<void> _showDriverArrivedNotification(String rawBookingId) async {
+    final bookingId = rawBookingId.trim();
+    if (bookingId.isEmpty ||
+        _arrivedNotificationShownForBookingId == bookingId ||
+        Get.context == null) {
+      return;
+    }
+
+    _arrivedNotificationShownForBookingId = bookingId;
+    unawaited(_playArrivalSoundWithFallback());
+    unawaited(HapticFeedback.heavyImpact());
+
+    await AppDialog.commonDialog<void>(
+      barrierDismissible: false,
+      barrierColor: Colors.black54,
+      padding: EdgeInsets.symmetric(horizontal: 24.w),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20.r)),
+      childs: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: <Widget>[
+          Icon(
+            Icons.local_taxi_rounded,
+            size: 72.w,
+            color: AppColors.mainPrimaryColor,
+          ),
+          16.verticalSpace,
+          CommonText(
+            string: 'Megérkezett a taxi',
+            fontSize: 22.sp,
+            fontWeight: FontWeight.w700,
+            textAlign: TextAlign.center,
+            softWrap: true,
+          ),
+          10.verticalSpace,
+          CommonText(
+            string: 'A sofőr a felvételi ponton vár.',
+            fontSize: 15.sp,
+            color: AppColors.textCaptionColor,
+            textAlign: TextAlign.center,
+            softWrap: true,
+          ),
+          22.verticalSpace,
+          CustomButton(text: 'Rendben', onTap: () => Get.back()),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _playArrivalSoundWithFallback() async {
+    final customWhistleStarted = await TaxiArrivalSound.play();
+    if (!customWhistleStarted) {
+      await SystemSound.play(SystemSoundType.alert);
+    }
+  }
+
   Future<void> handleDriverCancellation({
     required String bookingId,
     required String source,
+    String cancellationReason = '',
   }) async {
     final normalizedBookingId = bookingId.trim();
     final activeBookingId = AppConstant().bookingId.trim();
@@ -1720,8 +1787,9 @@ class HomeController extends GetxController with LoadingMixin, LoadingApiMixin {
         data: <String, dynamic>{
           'source': source,
           'active_booking_id': activeBookingId,
-          'passenger_cancel_in_progress':
-              isPassengerCancellationInProgressFor(normalizedBookingId),
+          'passenger_cancel_in_progress': isPassengerCancellationInProgressFor(
+            normalizedBookingId,
+          ),
         },
       );
       return;
@@ -1729,18 +1797,85 @@ class HomeController extends GetxController with LoadingMixin, LoadingApiMixin {
 
     _driverCancellationHandlingBookingId = normalizedBookingId;
     try {
+      final String normalizedReason = cancellationReason.trim();
       PassengerFlowDebug.send(
         'driver_cancel_confirmed',
         bookingId: normalizedBookingId,
-        data: <String, dynamic>{'source': source},
+        data: <String, dynamic>{
+          'source': source,
+          'cancellation_reason_present': normalizedReason.isNotEmpty,
+        },
       );
 
       _clearCancelledRideLocalState(normalizedBookingId);
-      Navigation.replaceAll(Routes.dashboardScreen);
+      if (Get.currentRoute != Routes.dashboardScreen) {
+        Navigation.replaceAll(Routes.dashboardScreen);
+      }
       await Future<void>.delayed(const Duration(milliseconds: 250));
-      AppSnackBar.showErrorSnackBar(
-        message: 'A sofőr lemondta a fuvart.',
-        isError: true,
+
+      unawaited(SystemSound.play(SystemSoundType.alert));
+      unawaited(HapticFeedback.heavyImpact());
+
+      if (Get.context == null) {
+        PassengerFlowDebug.send(
+          'driver_cancel_modal_context_missing',
+          bookingId: normalizedBookingId,
+        );
+        return;
+      }
+
+      await AppDialog.commonDialog<void>(
+        barrierDismissible: false,
+        barrierColor: Colors.black54,
+        padding: EdgeInsets.symmetric(horizontal: 24.w),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20.r),
+        ),
+        childs: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: <Widget>[
+            Icon(Icons.cancel_rounded, size: 72.w, color: AppColors.errorColor),
+            16.verticalSpace,
+            CommonText(
+              string: 'Fuvar lemondva',
+              fontSize: 22.sp,
+              fontWeight: FontWeight.w700,
+              textAlign: TextAlign.center,
+              softWrap: true,
+            ),
+            12.verticalSpace,
+            CommonText(
+              string: 'A sofőr lemondta a fuvart.',
+              fontSize: 16.sp,
+              fontWeight: FontWeight.w600,
+              textAlign: TextAlign.center,
+              softWrap: true,
+            ),
+            if (normalizedReason.isNotEmpty) ...<Widget>[
+              10.verticalSpace,
+              CommonText(
+                string: 'Indok: $normalizedReason',
+                fontSize: 14.sp,
+                color: AppColors.bodyText,
+                textAlign: TextAlign.center,
+                softWrap: true,
+                maxLines: 4,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
+            24.verticalSpace,
+            CustomButton(
+              text: 'Rendben',
+              onTap: () {
+                Get.back();
+                if (Get.currentRoute != Routes.dashboardScreen) {
+                  Navigation.replaceAll(Routes.dashboardScreen);
+                }
+              },
+            ),
+          ],
+        ),
       );
     } finally {
       if (_driverCancellationHandlingBookingId == normalizedBookingId) {

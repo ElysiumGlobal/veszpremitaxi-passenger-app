@@ -35,6 +35,44 @@ class TripService {
     }
   }
 
+  static Future<ChatModel> sendSupportChatMessage({
+    required String bookingId,
+    required int userId,
+    required String message,
+    required String subject,
+  }) async {
+    try {
+      final channel = 'private-support.booking.$bookingId';
+      final response = await Api().post(
+        ApiConstants.sendSupportChatMessage,
+        bodyData: {
+          'event': 'client-send-message',
+          'data': {
+            'message': message,
+            'message_type': 'text',
+            'subject': subject,
+            'priority': 'high',
+            'metadata': <String, dynamic>{},
+          },
+          'channel': channel,
+          'user_id': userId,
+        },
+      );
+      await ResponseHandler.checkResponseError(response);
+
+      final decoded = jsonDecode(response.body);
+      final data = decoded is Map ? decoded['data'] : null;
+      final supportChat = data is Map ? data['support_chat'] : null;
+      if (supportChat is! Map) {
+        throw const FormatException('Missing support_chat response data');
+      }
+      return ChatModel.fromJson(Map<String, dynamic>.from(supportChat));
+    } catch (e, st) {
+      LogUtils.printError('SUPPORT CHAT SEND ERROR $e, $st');
+      rethrow;
+    }
+  }
+
   static Future refundRequest({
     required String bookingId,
     required String reason,

@@ -1,0 +1,144 @@
+--- a/pubspec.yaml
++++ b/pubspec.yaml
+@@ -2,7 +2,7 @@
+ description: "A new Flutter project."
+ publish_to: 'none'
+ 
+-version: 1.0.30+39
++version: 1.0.31+40
+ environment:
+   sdk: ^3.9.0
+ 
+--- a/lib/feature/home/controller/home_controller.dart
++++ b/lib/feature/home/controller/home_controller.dart
+@@ -15,6 +15,7 @@
+ import 'package:e_taxi/utils/loading_mixin.dart';
+ import 'package:e_taxi/widgets/app_snackbar.dart';
+ import 'package:flutter/material.dart';
++import 'package:flutter/services.dart';
+ import 'package:flutter_dotenv/flutter_dotenv.dart';
+ import 'package:flutter_screenutil/flutter_screenutil.dart';
+ import 'package:geocoding/geocoding.dart';
+@@ -298,6 +299,11 @@
+             '${booking?['status'] ?? eventData?['status'] ?? ''}'
+                 .trim()
+                 .toLowerCase();
++        final String bookingCancellationReason =
++            '${booking?['cancellation_reason'] ?? ''}'.trim();
++        final String cancellationReason = bookingCancellationReason.isNotEmpty
++            ? bookingCancellationReason
++            : '${eventData?['cancellation_reason'] ?? ''}'.trim();
+ 
+         PassengerFlowDebug.send(
+           'socket_event_received',
+@@ -328,6 +334,7 @@
+               handleDriverCancellation(
+                 bookingId: explicitBookingId,
+                 source: 'socket_exact_booking_status',
++                cancellationReason: cancellationReason,
+               ),
+             );
+           }
+@@ -1705,6 +1712,7 @@
+   Future<void> handleDriverCancellation({
+     required String bookingId,
+     required String source,
++    String cancellationReason = '',
+   }) async {
+     final normalizedBookingId = bookingId.trim();
+     final activeBookingId = AppConstant().bookingId.trim();
+@@ -1729,18 +1737,89 @@
+ 
+     _driverCancellationHandlingBookingId = normalizedBookingId;
+     try {
++      final String normalizedReason = cancellationReason.trim();
+       PassengerFlowDebug.send(
+         'driver_cancel_confirmed',
+         bookingId: normalizedBookingId,
+-        data: <String, dynamic>{'source': source},
++        data: <String, dynamic>{
++          'source': source,
++          'cancellation_reason_present': normalizedReason.isNotEmpty,
++        },
+       );
+ 
+       _clearCancelledRideLocalState(normalizedBookingId);
+-      Navigation.replaceAll(Routes.dashboardScreen);
++      if (Get.currentRoute != Routes.dashboardScreen) {
++        Navigation.replaceAll(Routes.dashboardScreen);
++      }
+       await Future<void>.delayed(const Duration(milliseconds: 250));
+-      AppSnackBar.showErrorSnackBar(
+-        message: 'A sofőr lemondta a fuvart.',
+-        isError: true,
++
++      unawaited(SystemSound.play(SystemSoundType.alert));
++      unawaited(HapticFeedback.heavyImpact());
++
++      if (Get.context == null) {
++        PassengerFlowDebug.send(
++          'driver_cancel_modal_context_missing',
++          bookingId: normalizedBookingId,
++        );
++        return;
++      }
++
++      await AppDialog.commonDialog<void>(
++        barrierDismissible: false,
++        barrierColor: Colors.black54,
++        padding: EdgeInsets.symmetric(horizontal: 24.w),
++        shape: RoundedRectangleBorder(
++          borderRadius: BorderRadius.circular(20.r),
++        ),
++        childs: Column(
++          mainAxisSize: MainAxisSize.min,
++          crossAxisAlignment: CrossAxisAlignment.stretch,
++          children: <Widget>[
++            Icon(
++              Icons.cancel_rounded,
++              size: 72.w,
++              color: AppColors.errorColor,
++            ),
++            16.verticalSpace,
++            CommonText(
++              string: 'Fuvar lemondva',
++              fontSize: 22.sp,
++              fontWeight: FontWeight.w700,
++              textAlign: TextAlign.center,
++              softWrap: true,
++            ),
++            12.verticalSpace,
++            CommonText(
++              string: 'A sofőr lemondta a fuvart.',
++              fontSize: 16.sp,
++              fontWeight: FontWeight.w600,
++              textAlign: TextAlign.center,
++              softWrap: true,
++            ),
++            if (normalizedReason.isNotEmpty) ...<Widget>[
++              10.verticalSpace,
++              CommonText(
++                string: 'Indok: $normalizedReason',
++                fontSize: 14.sp,
++                color: AppColors.bodyText,
++                textAlign: TextAlign.center,
++                softWrap: true,
++                maxLines: 4,
++                overflow: TextOverflow.ellipsis,
++              ),
++            ],
++            24.verticalSpace,
++            CustomButton(
++              text: 'Rendben',
++              onTap: () {
++                Get.back();
++                if (Get.currentRoute != Routes.dashboardScreen) {
++                  Navigation.replaceAll(Routes.dashboardScreen);
++                }
++              },
++            ),
++          ],
++        ),
+       );
+     } finally {
+       if (_driverCancellationHandlingBookingId == normalizedBookingId) {

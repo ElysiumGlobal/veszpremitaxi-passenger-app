@@ -3,7 +3,6 @@ import 'dart:convert';
 import 'dart:developer';
 
 import 'package:e_taxi/utils/app_colors.dart';
-import 'package:e_taxi/utils/app_string.dart';
 import 'package:e_taxi/utils/assets.dart';
 import 'package:e_taxi/utils/utils.dart';
 import 'package:e_taxi/widgets/appbar.dart';
@@ -40,12 +39,13 @@ class ChatSupportScreen extends StatefulWidget {
 
 class _ChatSupportScreenState extends State<ChatSupportScreen> {
   StreamSubscription<dynamic>? _socketStream;
+  Timer? _historyTimer;
 
   @override
   void initState() {
     // TODO: implement initState
     super.initState();
-    socketAuthConnection();
+    unawaited(socketAuthConnection());
     _socketStream = SocketChannelService().onSocketDataListen.listen((events) {
       try {
         if (events != null) {
@@ -54,14 +54,12 @@ class _ChatSupportScreenState extends State<ChatSupportScreen> {
           if (event['event'] == "support.chat.message") {
             var data = jsonDecode(event['data']);
 
-            chatList.insert(
-              0,
-              ChatModel(
-                adminId: data['support_chat']['admin_id'],
-                message: data['support_chat']['message'],
-                createdAt: data['timestamp'],
-              ),
-            );
+            final supportChat = data['support_chat'];
+            if (supportChat is Map) {
+              _upsertMessage(
+                ChatModel.fromJson(Map<String, dynamic>.from(supportChat)),
+              );
+            }
           }
         }
       } catch (e, st) {
@@ -69,18 +67,20 @@ class _ChatSupportScreenState extends State<ChatSupportScreen> {
       }
     });
 
-    Future.microtask(() {
-      getHistory();
-    });
+    Future.microtask(() => getHistory());
+    _historyTimer = Timer.periodic(
+      const Duration(seconds: 8),
+      (_) => unawaited(getHistory(showLoading: false)),
+    );
   }
 
   RxBool chatHistoryLoading = false.obs;
 
   RxList<ChatModel> chatList = <ChatModel>[].obs;
 
-  Future<void> getHistory() async {
+  Future<void> getHistory({bool showLoading = true}) async {
     try {
-      chatHistoryLoading(true);
+      if (showLoading) chatHistoryLoading(true);
       final response = await TripService.getSupportChatHistory(
         bookingId: widget.bookingId,
       );
@@ -90,8 +90,21 @@ class _ChatSupportScreenState extends State<ChatSupportScreen> {
       LogUtils.printError("ERROR :: $e, $st");
       // Get.back();
     } finally {
-      chatHistoryLoading(false);
+      if (showLoading) chatHistoryLoading(false);
+      isLoading(false);
     }
+  }
+
+  void _upsertMessage(ChatModel message) {
+    final id = message.id;
+    if (id != null) {
+      final index = chatList.indexWhere((item) => item.id == id);
+      if (index >= 0) {
+        chatList[index] = message;
+        return;
+      }
+    }
+    chatList.insert(0, message);
   }
 
   final SocketChannelService _socketService = SocketChannelService();
@@ -105,6 +118,8 @@ class _ChatSupportScreenState extends State<ChatSupportScreen> {
     });
 
     _socketStream?.cancel();
+    _historyTimer?.cancel();
+    controller.dispose();
 
     super.dispose();
   }
@@ -135,53 +150,57 @@ class _ChatSupportScreenState extends State<ChatSupportScreen> {
       }
     } catch (e, st) {
       LogUtils.printError("SOCKET AUTH ERROR $e, $st");
-      Get.back();
-      AppSnackBar.showErrorSnackBar(message: "Something are wrong!");
-    } finally {}
+      AppSnackBar.showErrorSnackBar(
+        message: 'Az élő kapcsolat nem elérhető, az üzenetek frissülnek.',
+        isError: true,
+      );
+    }
   }
 
   Future<void> sendMessage(String msg) async {
-    if (msg.isEmpty) {
+    if (msg.isEmpty || isSending.value) {
       return;
     }
     try {
-      _socketService.sendPusherEventChanel(
-        "client-send-message",
-        {
-          "message": msg,
-          "message_type": "text",
-          "subject": widget.title,
-          "priority": "high",
-          "metadata": {},
-        },
-        channel: "private-support.booking.${widget.bookingId}",
+      final userId = int.tryParse(
+        AppPreference.getString(AppPreference.userId),
       );
+      if (userId == null) {
+        throw const FormatException('Missing authenticated user id');
+      }
 
-      chatList.insert(
-        0,
-        ChatModel(
-          message: msg,
-          createdAt:
-              "${DateTime.now().toUtc().toIso8601String().split('.').first}.000000Z",
-        ),
+      isSending(true);
+      final savedMessage = await TripService.sendSupportChatMessage(
+        bookingId: widget.bookingId,
+        userId: userId,
+        message: msg,
+        subject: widget.title,
       );
-
+      _upsertMessage(savedMessage);
       controller.clear();
     } catch (e, st) {
       LogUtils.printError("send Msg Error :$e, $st");
+      AppSnackBar.showErrorSnackBar(
+        message: 'Az üzenetet nem sikerült elküldeni. Próbáld újra.',
+        isError: true,
+      );
+    } finally {
+      isSending(false);
     }
   }
 
   TextEditingController controller = TextEditingController();
 
-  String userId = AppPreference.getString(AppPreference.userId);
-
   RxBool isLoading = true.obs;
+  RxBool isSending = false.obs;
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: CustomAppBar(title: AppString.support.tr, centerTitle: false),
+      appBar: CustomAppBar(
+        title: 'Ügyfélszolgálat – ${widget.title}',
+        centerTitle: false,
+      ),
       body: SafeArea(
         bottom: Utils().checkPlatForm,
         child: Stack(
@@ -224,23 +243,35 @@ class _ChatSupportScreenState extends State<ChatSupportScreen> {
                             Expanded(
                               child: CustomTextField(
                                 controller: controller,
-                                hintText: "Type...",
+                                hintText: 'Írj üzenetet…',
                               ),
                             ),
                             8.horizontalSpace,
-                            GestureDetector(
-                              onTap: () {
-                                sendMessage(controller.text.trim());
-                              },
-                              child: Container(
-                                height: 48.h,
-                                width: 48.h,
-                                decoration: BoxDecoration(
-                                  borderRadius: BorderRadius.circular(4.r),
-                                  color: AppColors.mainPrimaryColor,
+                            Obx(
+                              () => GestureDetector(
+                                onTap: isSending.value
+                                    ? null
+                                    : () => sendMessage(controller.text.trim()),
+                                child: Container(
+                                  height: 48.h,
+                                  width: 48.h,
+                                  decoration: BoxDecoration(
+                                    borderRadius: BorderRadius.circular(4.r),
+                                    color: AppColors.mainPrimaryColor,
+                                  ),
+                                  alignment: Alignment.center,
+                                  child: isSending.value
+                                      ? SizedBox(
+                                          width: 20.w,
+                                          height: 20.w,
+                                          child:
+                                              const CircularProgressIndicator(
+                                                strokeWidth: 2,
+                                                color: Colors.white,
+                                              ),
+                                        )
+                                      : CustomImage(image: IconAsset.sendIcon),
                                 ),
-                                alignment: Alignment.center,
-                                child: CustomImage(image: IconAsset.sendIcon),
                               ),
                             ),
                           ],

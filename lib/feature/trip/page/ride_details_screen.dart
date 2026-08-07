@@ -213,7 +213,7 @@ class _RideDetailsScreenState extends State<RideDetailsScreen> {
                                             16.verticalSpace,
                                             CutomeDropDownButton1(
                                               value: dropDownValue,
-                                              hintValue: "Ride Issue",
+                                              hintValue: 'Válassz problémát',
                                               listData: reasonList,
                                               onChange: (event) {
                                                 dropDownValue.value =
@@ -227,7 +227,8 @@ class _RideDetailsScreenState extends State<RideDetailsScreen> {
                                                   TextEditingController(),
                                               minLine: 5,
                                               maxLine: 6,
-                                              hintText: "Eg. Ride not Good",
+                                              hintText:
+                                                  'Írd le röviden a problémát',
                                               textfielHeight: 130.h,
                                               keyboardType: TextInputType.name,
                                               textInputAction:
@@ -371,7 +372,7 @@ class _RideDetailsScreenState extends State<RideDetailsScreen> {
                                       params: {
                                         "bookingId":
                                             '${tripHistory.tripInfo?.id}',
-                                        "title": "refund",
+                                        "title": "Visszatérítés",
                                       },
                                     );
                                   },
@@ -421,7 +422,7 @@ class _RideDetailsScreenState extends State<RideDetailsScreen> {
                               Routes.chatSupportScreen,
                               params: {
                                 "bookingId": '${tripHistory.tripInfo?.id}',
-                                "title": AppString.notReceivePromoDis,
+                                "title": 'Promóciós probléma',
                               },
                             );
                           },
@@ -452,7 +453,7 @@ class _RideDetailsScreenState extends State<RideDetailsScreen> {
                               Routes.chatSupportScreen,
                               params: {
                                 "bookingId": '${tripHistory.tripInfo?.id}',
-                                "title": AppString.notReceivePromoDis,
+                                "title": 'A sofőr hosszabb útvonalon ment',
                               },
                             );
                           },
@@ -484,7 +485,7 @@ class _RideDetailsScreenState extends State<RideDetailsScreen> {
                               Routes.chatSupportScreen,
                               params: {
                                 "bookingId": '${tripHistory.tripInfo?.id}',
-                                "title": AppString.notReceivePromoDis,
+                                "title": 'Valamit az autóban hagytam',
                               },
                             );
                           },
@@ -560,10 +561,10 @@ class _RideDetailsScreenState extends State<RideDetailsScreen> {
   }
 
   List<String> reasonList = [
-    "Driver did not arrive",
-    "Driver cancelled the ride",
-    "Driver took a wrong route",
-    "Ride was not completed properly",
+    'A sofőr nem érkezett meg',
+    'A sofőr lemondta a fuvart',
+    'A sofőr nem megfelelő útvonalon ment',
+    'A fuvar nem megfelelően fejeződött be',
   ];
   RxString dropDownValue = "".obs;
 

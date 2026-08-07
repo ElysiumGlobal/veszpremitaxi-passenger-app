@@ -1,0 +1,49 @@
+{
+  "passenger": {
+    "version_1_0_31_40": true,
+    "socket_exact_booking_guard_preserved": true,
+    "own_cancel_guard_preserved": true,
+    "two_empty_profile_fallback_preserved": true,
+    "socket_booking_reason_primary": true,
+    "modal_non_dismissible": true,
+    "modal_title": true,
+    "modal_message": true,
+    "reason_label": true,
+    "single_sound_call_in_handler_patch": true,
+    "single_heavy_haptic_in_handler_patch": true,
+    "dashboard_cleanup_before_modal": true,
+    "no_new_dependency": true,
+    "search_driver_unchanged": true
+  },
+  "driver": {
+    "version_1_0_33_39": true,
+    "exact_socket_booking_guard_preserved": true,
+    "two_empty_profile_fallback_preserved": true,
+    "duplicate_guard_preserved": true,
+    "socket_booking_reason_primary": true,
+    "modal_non_dismissible": true,
+    "modal_title": true,
+    "modal_message": true,
+    "reason_label": true,
+    "single_new_sound_call": true,
+    "single_new_heavy_haptic": true,
+    "home_cleanup_before_modal": true,
+    "online_state_not_modified_in_cancel_helper": true,
+    "empty_booking_api_guard_preserved": true,
+    "navigation_screen_chat_r2_unchanged": true,
+    "chat_r2_widget_unchanged": true,
+    "trip_activity_r2_unchanged": true,
+    "no_new_dependency": true
+  },
+  "syntax_balance": {
+    "passenger_home": {
+      "ok": true,
+      "detail": "balanced"
+    },
+    "driver_home": {
+      "ok": true,
+      "detail": "balanced"
+    }
+  },
+  "all_boolean_checks_pass": true
+}
