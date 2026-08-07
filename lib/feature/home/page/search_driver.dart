@@ -757,54 +757,81 @@ class _SearchDriverScreenState extends State<SearchDriverScreen> {
           return;
         }
 
+        // A current_booking pointer completed fuvarnal megszunhet mar a
+        // fizetes rendezese elott is (peldaul Stripe QR session inditasakor).
+        // Ezert pointer-release alapjan SOHA nem gyartunk lokalisan paid
+        // allapotot. A profile recent_bookings booking rekordja hordozza az
+        // autoritativ payment_status/payment_method mezoket.
         if (serverReleasedBooking &&
-            localStatus == 'completed' &&
+            const <String>{'started', 'completed'}.contains(localStatus) &&
             _consecutiveExactServerReleasePolls >= 2) {
-          _bookingStatusPollingTimer?.cancel();
-          final localData = riderBookingModel.value?.data;
-          if (localData?.booking != null) {
-            localData!.booking!.paymentStatus = 'paid';
+          RecentBooking? recentBooking;
+          for (final item in profile.data?.recentBookings ?? <RecentBooking>[]) {
+            if ((item.id ?? '').trim() == activeBookingId) {
+              recentBooking = item;
+              break;
+            }
           }
-          PassengerFlowDebug.send(
-            'completed_cash_released_by_server',
-            bookingId: activeBookingId,
-            data: <String, dynamic>{
-              'exact_release_poll_count': _consecutiveExactServerReleasePolls,
-            },
-          );
-          await homeController.socketData();
-          return;
-        }
 
-        // A backend searchingkor beállítja, completionkor pedig pontosan
-        // ugyanennek a bookingnak a pointerét üríti. Ha a fuvar lokálisan
-        // started, és két egymást követő sikeres profilválasz már üres
-        // pointert és üres current_booking objektumot ad, ez a completion
-        // szerveroldali bizonyítéka akkor is, ha a completed socket elveszett.
-        if (serverReleasedBooking &&
-            localStatus == 'started' &&
-            _consecutiveExactServerReleasePolls >= 2) {
-          _bookingStatusPollingTimer?.cancel();
-          final localData = riderBookingModel.value?.data;
-          if (localData?.booking != null) {
-            localData!.booking!.status = 'completed';
-            localData!.booking!.paymentStatus = 'paid';
+          final recentStatus = (recentBooking?.status ?? '').trim().toLowerCase();
+          final recentPaymentMethod =
+              (recentBooking?.paymentMethod ?? '').trim().toLowerCase();
+          final recentPaymentStatus =
+              (recentBooking?.paymentStatus ?? '').trim().toLowerCase();
+
+          if (recentBooking != null && recentStatus == 'completed') {
+            final localData = riderBookingModel.value?.data;
+            if (localData?.booking != null) {
+              localData!.booking!.status = 'completed';
+              if (recentPaymentMethod.isNotEmpty) {
+                localData.booking!.paymentMethod = recentPaymentMethod;
+              }
+              if (recentPaymentStatus.isNotEmpty) {
+                localData.booking!.paymentStatus = recentPaymentStatus;
+              }
+              final recentOnlinePaid =
+                  (recentBooking.onlinePaidAmount ?? '').trim();
+              if (recentOnlinePaid.isNotEmpty) {
+                localData.booking!.onlinePaidAmount = recentOnlinePaid;
+              }
+            }
+            if (localData != null) {
+              localData.status = 'completed';
+            }
+
+            _lastAppliedBookingState =
+                '$activeBookingId:completed:$recentPaymentStatus:$recentPaymentMethod:recent';
+            PassengerFlowDebug.send(
+              'booking_status_poll_completed_from_recent_booking',
+              bookingId: activeBookingId,
+              data: <String, dynamic>{
+                'missing_poll_count': _missingCurrentBookingPolls,
+                'exact_release_poll_count': _consecutiveExactServerReleasePolls,
+                'previous_local_status': localStatus,
+                'payment_method': recentPaymentMethod,
+                'payment_status': recentPaymentStatus,
+                'online_paid_amount': recentBooking.onlinePaidAmount ?? '',
+              },
+            );
+
+            await homeController.socketData();
+            if (recentPaymentStatus == 'paid') {
+              _bookingStatusPollingTimer?.cancel();
+            }
+            return;
           }
-          if (localData != null) {
-            localData.status = 'completed';
-          }
-          _lastAppliedBookingState =
-              '$activeBookingId:completed:pointer_released';
+
           PassengerFlowDebug.send(
-            'booking_status_poll_completed_by_pointer_release',
+            'booking_status_poll_release_waiting_for_authoritative_payment',
             bookingId: activeBookingId,
             data: <String, dynamic>{
-              'missing_poll_count': _missingCurrentBookingPolls,
               'exact_release_poll_count': _consecutiveExactServerReleasePolls,
               'previous_local_status': localStatus,
+              'recent_booking_present': recentBooking != null,
+              'recent_status': recentStatus,
+              'recent_payment_status': recentPaymentStatus,
             },
           );
-          await homeController.socketData();
           return;
         }
 
@@ -853,11 +880,9 @@ class _SearchDriverScreenState extends State<SearchDriverScreen> {
       homeController.socketData();
       await _showDriverMarkerIfAvailable();
 
-      final bool awaitsCashConfirmation =
-          status == 'completed' &&
-          paymentMethod == 'cash' &&
-          paymentStatus != 'paid';
-      if ((status == 'completed' && !awaitsCashConfirmation) ||
+      final bool awaitsPaymentSettlement =
+          status == 'completed' && paymentStatus != 'paid';
+      if ((status == 'completed' && !awaitsPaymentSettlement) ||
           status == 'cancelled' ||
           status == 'expired') {
         _bookingStatusPollingTimer?.cancel();

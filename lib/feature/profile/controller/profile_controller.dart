@@ -40,16 +40,11 @@ class ProfileController extends GetxController
         final bookingId =
             '${currentBooking?.booking?.id ?? currentBooking?.bookingId ?? ''}'
                 .trim();
-        final paymentMethod = (currentBooking?.booking?.paymentMethod ?? '')
-            .toLowerCase()
-            .trim();
         final paymentStatus = (currentBooking?.booking?.paymentStatus ?? '')
             .toLowerCase()
             .trim();
-        final bool awaitsCashConfirmation =
-            status == 'completed' &&
-            paymentMethod == 'cash' &&
-            paymentStatus != 'paid';
+        final bool awaitsPaymentSettlement =
+            status == 'completed' && paymentStatus != 'paid';
         final serverCurrentBookingId = (data.data?.currentBookingId ?? '')
             .trim();
         const activeStatuses = <String>{
@@ -83,16 +78,24 @@ class ProfileController extends GetxController
             (riderBookingModel.value?.data?.booking?.status ?? '')
                 .trim()
                 .toLowerCase();
+        final localPaymentStatus =
+            (riderBookingModel.value?.data?.booking?.paymentStatus ?? '')
+                .trim()
+                .toLowerCase();
         final bool completionReleasePendingOnTripScreen =
             currentBooking == null &&
             serverCurrentBookingId.isEmpty &&
-            localStatus == 'started';
+            (localStatus == 'started' ||
+                (localStatus == 'completed' && localPaymentStatus != 'paid'));
 
         if (completionReleasePendingOnTripScreen) {
           PassengerFlowDebug.send(
             'profile_pointer_release_deferred_to_trip_polling',
             bookingId: AppConstant().bookingId,
-            data: <String, dynamic>{'local_status': localStatus},
+            data: <String, dynamic>{
+              'local_status': localStatus,
+              'local_payment_status': localPaymentStatus,
+            },
           );
           return;
         }
@@ -108,7 +111,7 @@ class ProfileController extends GetxController
           return;
         }
 
-        if (!activeStatuses.contains(status) && !awaitsCashConfirmation) {
+        if (!activeStatuses.contains(status) && !awaitsPaymentSettlement) {
           _clearLocalBookingState(
             reason: 'profile_terminal_or_unknown_status',
             bookingId: bookingId,

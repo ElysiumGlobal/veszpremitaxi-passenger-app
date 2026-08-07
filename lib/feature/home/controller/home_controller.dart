@@ -153,17 +153,7 @@ class HomeController extends GetxController with LoadingMixin, LoadingApiMixin {
   String _arrivedNotificationShownForBookingId = '';
 
   bool _isPaymentSettled(String? value) {
-    final normalized = (value ?? '').trim().toLowerCase();
-    return const <String>{
-      'paid',
-      'completed',
-      'complete',
-      'success',
-      'successful',
-      'settled',
-      '1',
-      'true',
-    }.contains(normalized);
+    return (value ?? '').trim().toLowerCase() == 'paid';
   }
 
   String _currentPaymentStatus() {
@@ -414,10 +404,8 @@ class HomeController extends GetxController with LoadingMixin, LoadingApiMixin {
     final bookingId = '${booking?.id ?? AppConstant().bookingId}'.trim();
     final paymentMethod = (booking?.paymentMethod ?? '').trim().toLowerCase();
     final paymentStatus = (booking?.paymentStatus ?? '').trim().toLowerCase();
-    final awaitsCashConfirmation =
-        status == 'completed' &&
-        paymentMethod == 'cash' &&
-        !_isPaymentSettled(paymentStatus);
+    final awaitsPaymentSettlement =
+        status == 'completed' && !_isPaymentSettled(paymentStatus);
     const activeStatuses = <String>{
       'searching',
       'accepted',
@@ -441,7 +429,7 @@ class HomeController extends GetxController with LoadingMixin, LoadingApiMixin {
     );
 
     if (isFirstTime &&
-        (activeStatuses.contains(status) || awaitsCashConfirmation)) {
+        (activeStatuses.contains(status) || awaitsPaymentSettlement)) {
       final pickupLat =
           double.tryParse(
             riderBookingModel.value?.data?.pickup?.latitude ?? '',
@@ -522,11 +510,11 @@ class HomeController extends GetxController with LoadingMixin, LoadingApiMixin {
         );
 
         if (status == 'completed') {
-          if (awaitsCashConfirmation) {
+          if (awaitsPaymentSettlement) {
             awaitingRidePayment.value = true;
             awaitingRidePaymentBookingId.value = bookingId;
             PassengerFlowDebug.send(
-              'completed_cash_waiting_for_driver_confirmation',
+              'completed_waiting_for_payment_settlement',
               bookingId: bookingId,
               data: <String, dynamic>{
                 'payment_method': paymentMethod,
@@ -769,6 +757,19 @@ class HomeController extends GetxController with LoadingMixin, LoadingApiMixin {
     required String paymentStatus,
   }) async {
     if (bookingId.isEmpty || bookingId == 'null') return;
+    if (!_isPaymentSettled(paymentStatus)) {
+      awaitingRidePayment.value = true;
+      awaitingRidePaymentBookingId.value = bookingId;
+      PassengerFlowDebug.send(
+        'completed_finalize_blocked_unpaid',
+        bookingId: bookingId,
+        data: <String, dynamic>{
+          'payment_method': paymentMethod,
+          'payment_status': paymentStatus,
+        },
+      );
+      return;
+    }
     if (_finalizedCompletedBookingIds.contains(bookingId)) return;
     _finalizedCompletedBookingIds.add(bookingId);
     completedRatingBookingId = bookingId;
