@@ -128,6 +128,29 @@ class HomeService {
     }
   }
 
+  static Future getStripeQrPaymentStatus({required String bookingId}) async {
+    try {
+      final response = await Api().get(
+        "${ApiConstants.stripeQrPayment}/$bookingId/status",
+      );
+      await ResponseHandler.checkResponseError(
+        response,
+        showException: false,
+      );
+      return jsonDecode(response.body);
+    } catch (error, stack) {
+      PassengerFlowDebug.send(
+        'passenger_stripe_qr_status_http_exception',
+        bookingId: bookingId,
+        data: <String, dynamic>{
+          'error': error.toString(),
+          'stack': stack.toString(),
+        },
+      );
+      rethrow;
+    }
+  }
+
   static Future updatePickUpLocation({
     required String bookingId,
     required String address,

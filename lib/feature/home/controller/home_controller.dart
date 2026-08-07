@@ -32,6 +32,7 @@ import '../../../utils/assets.dart';
 import '../../../utils/log_utils.dart';
 import '../../../utils/navigation_utils/navigation.dart';
 import '../../../utils/navigation_utils/routes.dart';
+import '../../../utils/utils.dart';
 import '../../../widgets/common_text.dart';
 import '../../../widgets/custom_button.dart';
 import '../../../widgets/custome_img.dart';
@@ -799,6 +800,14 @@ class HomeController extends GetxController with LoadingMixin, LoadingApiMixin {
       await Future<void>.delayed(const Duration(milliseconds: 150));
     }
 
+    final String paidAmount = Utils.formatCurrency(
+      _firstNonEmptyAmount(<String?>[
+        riderBookingModel.value?.data?.booking?.finalFare,
+        riderBookingModel.value?.data?.booking?.totalAmount,
+        riderBookingModel.value?.data?.booking?.estimatedFare,
+      ]),
+    );
+
     AppDialog.commonDialog(
       barrierDismissible: false,
       childs: Column(
@@ -808,22 +817,37 @@ class HomeController extends GetxController with LoadingMixin, LoadingApiMixin {
           CustomImage(image: ImagesAsset.tripComplete, wt: 200.w, ht: 110.h),
           16.verticalSpace,
           CommonText(
+            string: '✓ FIZETVE',
+            fontSize: 24.sp,
+            fontWeight: FontWeight.w700,
+            color: AppColors.successColor,
+            textAlign: TextAlign.center,
+          ),
+          6.verticalSpace,
+          CommonText(
+            string: paidAmount,
+            fontSize: 20.sp,
+            fontWeight: FontWeight.w700,
+            textAlign: TextAlign.center,
+          ),
+          14.verticalSpace,
+          CommonText(
             string: 'Köszönjük, hogy a Veszprémi Taxit választottad!',
             fontSize: 16.sp,
             fontWeight: FontWeight.w600,
             textAlign: TextAlign.center,
             softWrap: true,
           ),
-          12.verticalSpace,
+          10.verticalSpace,
           CommonText(
-            string: 'A fuvar sikeresen lezárult.',
+            string: 'A fuvar és a fizetés sikeresen lezárult.',
             softWrap: true,
             color: AppColors.textCaptionColor,
             textAlign: TextAlign.center,
           ),
           16.verticalSpace,
           CustomButton(
-            text: AppString.done.tr,
+            text: 'Sofőr értékelése',
             onTap: () {
               final String ratingBookingId = completedRatingBookingId.isNotEmpty
                   ? completedRatingBookingId

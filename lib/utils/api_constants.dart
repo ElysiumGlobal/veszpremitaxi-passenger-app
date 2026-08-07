@@ -47,6 +47,7 @@ class ApiConstants {
   static const String stripeWalletTopupConfig =
       "payments/wallet/stripe/config";
   static const String stripeWalletTopup = "payments/wallet/stripe/topup";
+  static const String stripeQrPayment = "payments/stripe/qr";
 
   static const String getNotificationList = "notifications?page=";
 

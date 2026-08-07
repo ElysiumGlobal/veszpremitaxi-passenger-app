@@ -8,6 +8,7 @@ import 'package:e_taxi/core/service/google_route_service.dart';
 import 'package:e_taxi/core/location_utils.dart';
 import 'package:e_taxi/feature/home/controller/home_controller.dart';
 import 'package:e_taxi/feature/home/model/get_socket_model.dart';
+import 'package:e_taxi/feature/home/service/home_service.dart';
 import 'package:e_taxi/feature/profile/model/user_model.dart';
 import 'package:e_taxi/feature/profile/service/profile_service.dart';
 import 'package:e_taxi/feature/home/widget/origin_destination_widget.dart';
@@ -125,6 +126,240 @@ class _SearchDriverScreenState extends State<SearchDriverScreen> {
         ],
       ),
     );
+  }
+
+  bool _isCompletedAwaitingPayment() {
+    final booking = riderBookingModel.value?.data?.booking;
+    final status = (booking?.status ?? '').trim().toLowerCase();
+    final paymentStatus = (booking?.paymentStatus ?? '').trim().toLowerCase();
+    return status == 'completed' && paymentStatus != 'paid';
+  }
+
+  String _paymentMethodLabel(String? value) {
+    switch ((value ?? '').trim().toLowerCase()) {
+      case 'stripe':
+        return 'Bankkártya / telefonos fizetés';
+      case 'wallet':
+        return 'Wallet';
+      case 'cash':
+        return 'Készpénz';
+      default:
+        return 'Fizetés';
+    }
+  }
+
+  String _paymentAmountText() {
+    final booking = riderBookingModel.value?.data?.booking;
+    final raw = (booking?.finalFare ?? '').trim().isNotEmpty
+        ? booking?.finalFare
+        : ((booking?.totalAmount ?? '').trim().isNotEmpty
+              ? booking?.totalAmount
+              : booking?.estimatedFare);
+    return Utils.formatCurrency(raw);
+  }
+
+  Widget _buildPaymentSettlementOverlay() {
+    final booking = riderBookingModel.value?.data?.booking;
+    final paymentMethod = (booking?.paymentMethod ?? '').trim().toLowerCase();
+    final methodLabel = _paymentMethodLabel(paymentMethod);
+    final amount = _paymentAmountText();
+
+    String message;
+    if (paymentMethod == 'stripe') {
+      message =
+          'A bankkártyás fizetés visszaigazolására várunk. A fizetés után ez a képernyő automatikusan frissül.';
+    } else if (paymentMethod == 'cash') {
+      message =
+          'A készpénzes fizetés sofőri visszaigazolására várunk.';
+    } else if (paymentMethod == 'wallet') {
+      message = 'A Wallet fizetés feldolgozására várunk.';
+    } else {
+      message = 'A fizetés visszaigazolására várunk.';
+    }
+
+    return Positioned.fill(
+      child: Material(
+        color: AppColors.whiteColor,
+        child: Padding(
+          padding: EdgeInsets.symmetric(horizontal: 28.w),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                width: 112.w,
+                height: 112.w,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: AppColors.mainPrimaryColor.withValues(alpha: .10),
+                ),
+                alignment: Alignment.center,
+                child: Icon(
+                  Icons.check_circle_outline_rounded,
+                  size: 64.w,
+                  color: AppColors.mainPrimaryColor,
+                ),
+              ),
+              24.verticalSpace,
+              CommonText(
+                string: 'Az utazás véget ért',
+                fontSize: 24.sp,
+                fontWeight: FontWeight.w700,
+                textAlign: TextAlign.center,
+              ),
+              10.verticalSpace,
+              CommonText(
+                string: 'Fizetésre várunk…',
+                fontSize: 18.sp,
+                fontWeight: FontWeight.w600,
+                color: AppColors.mainPrimaryColor,
+                textAlign: TextAlign.center,
+              ),
+              24.verticalSpace,
+              Container(
+                width: double.infinity,
+                padding: EdgeInsets.all(18.w),
+                decoration: BoxDecoration(
+                  color: AppColors.primaryContainer,
+                  borderRadius: BorderRadius.circular(16.r),
+                  border: Border.all(
+                    color: AppColors.mainPrimaryColor.withValues(alpha: .25),
+                  ),
+                ),
+                child: Column(
+                  children: [
+                    CommonText(
+                      string: 'Fizetendő összeg',
+                      fontSize: 13.sp,
+                      color: AppColors.textCaptionColor,
+                    ),
+                    6.verticalSpace,
+                    CommonText(
+                      string: amount,
+                      fontSize: 28.sp,
+                      fontWeight: FontWeight.w700,
+                    ),
+                    14.verticalSpace,
+                    Divider(color: AppColors.textFieldBorderColor),
+                    10.verticalSpace,
+                    CommonText(
+                      string: 'Fizetési mód: $methodLabel',
+                      fontSize: 14.sp,
+                      fontWeight: FontWeight.w600,
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                ),
+              ),
+              22.verticalSpace,
+              SizedBox(
+                width: 26.w,
+                height: 26.w,
+                child: CircularProgressIndicator(
+                  strokeWidth: 3.w,
+                  color: AppColors.mainPrimaryColor,
+                ),
+              ),
+              14.verticalSpace,
+              CommonText(
+                string: message,
+                fontSize: 13.sp,
+                color: AppColors.textCaptionColor,
+                textAlign: TextAlign.center,
+                softWrap: true,
+              ),
+              10.verticalSpace,
+              CommonText(
+                string: 'Ne zárd be az alkalmazást.',
+                fontSize: 12.sp,
+                color: AppColors.textCaptionColor,
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Map<String, dynamic>? _apiData(dynamic response) {
+    if (response is! Map) return null;
+    final dynamic data = response['data'];
+    if (data is! Map) return null;
+    return Map<String, dynamic>.from(data);
+  }
+
+  Future<bool> _syncReleasedPaymentStatus(String bookingId) async {
+    try {
+      final response = await HomeService.getStripeQrPaymentStatus(
+        bookingId: bookingId,
+      );
+      final payload = _apiData(response);
+      if (payload == null) return false;
+
+      final responseBookingId = '${payload['booking_id'] ?? ''}'.trim();
+      if (responseBookingId.isNotEmpty && responseBookingId != bookingId) {
+        return false;
+      }
+
+      final paymentMethod = (payload['payment_method'] ?? '')
+          .toString()
+          .trim()
+          .toLowerCase();
+      final paymentStatus = (payload['payment_status'] ?? '')
+          .toString()
+          .trim()
+          .toLowerCase();
+      final onlinePaidAmount = (payload['online_paid_amount_huf'] ?? '')
+          .toString()
+          .trim();
+
+      if (paymentStatus.isEmpty) return false;
+
+      final localData = riderBookingModel.value?.data;
+      if (localData?.booking != null) {
+        localData!.booking!.status = 'completed';
+        if (paymentMethod.isNotEmpty) {
+          localData.booking!.paymentMethod = paymentMethod;
+        }
+        localData.booking!.paymentStatus = paymentStatus;
+        if (onlinePaidAmount.isNotEmpty) {
+          localData.booking!.onlinePaidAmount = onlinePaidAmount;
+        }
+      }
+      if (localData != null) {
+        localData.status = 'completed';
+      }
+      riderBookingModel.refresh();
+
+      PassengerFlowDebug.send(
+        'booking_status_poll_payment_authoritative',
+        bookingId: bookingId,
+        data: <String, dynamic>{
+          'payment_method': paymentMethod,
+          'payment_status': paymentStatus,
+          'online_paid_amount': onlinePaidAmount,
+          'qr_status': payload['qr'] is Map
+              ? '${(payload['qr'] as Map)['status'] ?? ''}'
+              : '',
+        },
+      );
+
+      await homeController.socketData();
+      if (paymentStatus == 'paid') {
+        _bookingStatusPollingTimer?.cancel();
+      }
+      return true;
+    } catch (error, stack) {
+      PassengerFlowDebug.send(
+        'booking_status_poll_payment_authoritative_error',
+        bookingId: bookingId,
+        data: <String, dynamic>{'error': '$error'},
+      );
+      LogUtils.printError(
+        'PASSENGER PAYMENT STATUS FALLBACK ERROR: $error, $stack',
+      );
+      return false;
+    }
   }
 
   double _bearingBetween(LatLng from, LatLng to) {
@@ -765,6 +1000,14 @@ class _SearchDriverScreenState extends State<SearchDriverScreen> {
         if (serverReleasedBooking &&
             const <String>{'started', 'completed'}.contains(localStatus) &&
             _consecutiveExactServerReleasePolls >= 2) {
+          if (localStatus == 'completed') {
+            final bool paymentSynced =
+                await _syncReleasedPaymentStatus(activeBookingId);
+            if (paymentSynced) {
+              return;
+            }
+          }
+
           RecentBooking? recentBooking;
           for (final item in profile.data?.recentBookings ?? <RecentBooking>[]) {
             if ((item.id ?? '').trim() == activeBookingId) {
@@ -798,6 +1041,7 @@ class _SearchDriverScreenState extends State<SearchDriverScreen> {
             if (localData != null) {
               localData.status = 'completed';
             }
+            riderBookingModel.refresh();
 
             _lastAppliedBookingState =
                 '$activeBookingId:completed:$recentPaymentStatus:$recentPaymentMethod:recent';
@@ -1021,8 +1265,11 @@ class _SearchDriverScreenState extends State<SearchDriverScreen> {
         backgroundColor: AppColors.whiteColor,
         body: SafeArea(
           bottom: Utils().checkPlatForm,
-          child: Column(
+          child: Stack(
+            fit: StackFit.expand,
             children: [
+              Column(
+                children: [
               // Map Section (top 2/3)
               SizedBox(
                 height: 425.h,
@@ -1783,6 +2030,20 @@ class _SearchDriverScreenState extends State<SearchDriverScreen> {
                   );
                 }),
               ),
+                ],
+              ),
+              Obx(() {
+                // Az awaitingRidePayment Rx biztosítja, hogy a teljes képernyős
+                // fizetési állapot akkor is újrarajzolódjon, ha a booking
+                // current_booking pointerét a backend már elengedte.
+                final bool controllerWaiting =
+                    homeController.awaitingRidePayment.value;
+                final bool localWaiting = _isCompletedAwaitingPayment();
+                if (!controllerWaiting && !localWaiting) {
+                  return const SizedBox.shrink();
+                }
+                return _buildPaymentSettlementOverlay();
+              }),
             ],
           ),
         ),
