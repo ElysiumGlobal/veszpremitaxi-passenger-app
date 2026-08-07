@@ -4,7 +4,7 @@ import 'dart:developer';
 import 'dart:io';
 import 'package:e_taxi/core/debug/passenger_flow_debug.dart';
 import 'package:e_taxi/core/location_utils.dart';
-import 'package:e_taxi/core/service/taxi_arrival_sound.dart';
+import 'package:e_taxi/core/service/vtaxi_audio_service.dart';
 import 'package:e_taxi/feature/home/model/offer_model.dart';
 import 'package:e_taxi/feature/home/page/payment_screen.dart';
 import 'package:e_taxi/feature/home/service/home_service.dart';
@@ -1787,10 +1787,12 @@ class HomeController extends GetxController with LoadingMixin, LoadingApiMixin {
   }
 
   Future<void> _playArrivalSoundWithFallback() async {
-    final customWhistleStarted = await TaxiArrivalSound.play();
-    if (!customWhistleStarted) {
-      await SystemSound.play(SystemSoundType.alert);
-    }
+    final bool started = await VTaxiAudioService.playArrivalWhistle();
+    PassengerFlowDebug.send(
+      'arrival_whistle_play_result',
+      bookingId: _arrivedNotificationShownForBookingId,
+      data: <String, dynamic>{'started': started},
+    );
   }
 
   Future<void> handleDriverCancellation({

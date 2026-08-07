@@ -2,7 +2,7 @@ name: e_taxi
 description: "A new Flutter project."
 publish_to: 'none'
 
-version: 1.0.36+46
+version: 1.0.37+47
 environment:
   sdk: ^3.9.0
 
@@ -83,6 +83,7 @@ flutter:
     - assets/font/
     - assets/icons/
     - assets/images/
+    - assets/sounds/
     - assets/
 
 

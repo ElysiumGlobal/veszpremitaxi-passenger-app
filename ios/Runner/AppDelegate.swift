@@ -7,9 +7,9 @@ import AVFoundation
 
 @main
 @objc class AppDelegate: FlutterAppDelegate, AVAudioPlayerDelegate {
-  private let arrivalSoundChannelName =
-    "hu.veszpremitaxi.passenger/arrival_sound"
-  private var arrivalSoundPlayer: AVAudioPlayer?
+  private let audioChannelName = "hu.veszpremitaxi.passenger/audio"
+  private let screenAwakeChannelName = "hu.veszpremitaxi.passenger/screen_awake"
+  private var soundPlayer: AVAudioPlayer?
 
   override func application(
     _ application: UIApplication,
@@ -25,12 +25,12 @@ import AVFoundation
     GeneratedPluginRegistrant.register(with: self)
 
     if let controller = window?.rootViewController as? FlutterViewController {
-      let arrivalSoundChannel = FlutterMethodChannel(
-        name: arrivalSoundChannelName,
+      let audioChannel = FlutterMethodChannel(
+        name: audioChannelName,
         binaryMessenger: controller.binaryMessenger
       )
-      arrivalSoundChannel.setMethodCallHandler { [weak self] call, result in
-        guard call.method == "playWhistle" else {
+      audioChannel.setMethodCallHandler { [weak self] call, result in
+        guard call.method == "playArrivalWhistle" || call.method == "playChatBeep" else {
           result(FlutterMethodNotImplemented)
           return
         }
@@ -41,65 +41,68 @@ import AVFoundation
           return
         }
 
-        result(self?.playArrivalWhistle(data: typedData.data) ?? false)
+        result(self?.playSound(data: typedData.data) ?? false)
+      }
+
+      let screenAwakeChannel = FlutterMethodChannel(
+        name: screenAwakeChannelName,
+        binaryMessenger: controller.binaryMessenger
+      )
+      screenAwakeChannel.setMethodCallHandler { call, result in
+        guard call.method == "setKeepAwake" else {
+          result(FlutterMethodNotImplemented)
+          return
+        }
+        let keepAwake = (call.arguments as? Bool) ?? false
+        DispatchQueue.main.async {
+          UIApplication.shared.isIdleTimerDisabled = keepAwake
+        }
+        result(nil)
       }
     }
 
     return super.application(application, didFinishLaunchingWithOptions: launchOptions)
   }
 
-  private func playArrivalWhistle(data: Data) -> Bool {
-    stopArrivalWhistle()
+  private func playSound(data: Data) -> Bool {
+    stopSound()
 
     do {
       let session = AVAudioSession.sharedInstance()
-      try session.setCategory(
-        .playback,
-        mode: .default,
-        options: [.duckOthers]
-      )
+      try session.setCategory(.playback, mode: .default, options: [.duckOthers])
       try session.setActive(true)
 
-      let player = try AVAudioPlayer(
-        data: data,
-        fileTypeHint: AVFileType.wav.rawValue
-      )
+      let player = try AVAudioPlayer(data: data, fileTypeHint: AVFileType.wav.rawValue)
       player.delegate = self
       player.volume = 1.0
       player.prepareToPlay()
       guard player.play() else {
-        stopArrivalWhistle()
+        stopSound()
         return false
       }
 
-      arrivalSoundPlayer = player
+      soundPlayer = player
       return true
     } catch {
-      stopArrivalWhistle()
+      stopSound()
       return false
     }
   }
 
-  private func stopArrivalWhistle() {
-    arrivalSoundPlayer?.stop()
-    arrivalSoundPlayer = nil
+  private func stopSound() {
+    soundPlayer?.stop()
+    soundPlayer = nil
     try? AVAudioSession.sharedInstance().setActive(
       false,
       options: [.notifyOthersOnDeactivation]
     )
   }
 
-  func audioPlayerDidFinishPlaying(
-    _ player: AVAudioPlayer,
-    successfully flag: Bool
-  ) {
-    stopArrivalWhistle()
+  func audioPlayerDidFinishPlaying(_ player: AVAudioPlayer, successfully flag: Bool) {
+    stopSound()
   }
 
-  func audioPlayerDecodeErrorDidOccur(
-    _ player: AVAudioPlayer,
-    error: Error?
-  ) {
-    stopArrivalWhistle()
+  func audioPlayerDecodeErrorDidOccur(_ player: AVAudioPlayer, error: Error?) {
+    stopSound()
   }
 }

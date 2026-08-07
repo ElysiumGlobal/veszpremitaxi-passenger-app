@@ -2,6 +2,8 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:e_taxi/core/api/api.dart';
+import 'package:e_taxi/core/debug/passenger_flow_debug.dart';
+import 'package:e_taxi/core/service/vtaxi_audio_service.dart';
 import 'package:e_taxi/feature/home/model/chat_model.dart';
 import 'package:e_taxi/utils/api_constants.dart';
 import 'package:flutter/material.dart';
@@ -235,9 +237,21 @@ class _SharedChatUnreadPoller extends ChangeNotifier
     _unreadCount = value;
     notifyListeners();
     if (shouldAlert) {
-      unawaited(SystemSound.play(SystemSoundType.alert));
-      unawaited(HapticFeedback.mediumImpact());
+      unawaited(_playUnreadAlert());
     }
+  }
+
+  Future<void> _playUnreadAlert() async {
+    final bool started = await VTaxiAudioService.playChatBeep();
+    unawaited(HapticFeedback.mediumImpact());
+    PassengerFlowDebug.send(
+      'chat_unread_alert',
+      bookingId: bookingId,
+      data: <String, dynamic>{
+        'unread_count': _unreadCount,
+        'sound_started': started,
+      },
+    );
   }
 
   void _disposePoller() {

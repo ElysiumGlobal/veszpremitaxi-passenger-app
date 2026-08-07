@@ -1,0 +1,150 @@
+{
+  "pass": true,
+  "checks": [
+    {
+      "name": "passenger_version",
+      "pass": true,
+      "detail": "1.0.37+47"
+    },
+    {
+      "name": "driver_version",
+      "pass": true,
+      "detail": "1.0.39+45"
+    },
+    {
+      "name": "passenger_debug_version",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "driver_debug_version",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "passenger_sounds_asset_declared",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "old_arrival_service_removed",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "passenger_audio_service",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "passenger_awake_service",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "driver_audio_service",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "wallet_released_started_sync",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "separate_settlement_poller",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "screen_awake_active_ride",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "terminal_poll_cleanup",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "passenger_chat_custom_beep",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "driver_chat_custom_beep",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "passenger_chat_edge_trigger",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "driver_chat_shared_poller",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "arrival_custom_whistle",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "arrival_booking_dedupe",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "passenger_native_audio_channel",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "passenger_native_screen_awake",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "driver_always_awake_foreground",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "driver_native_audio_channel",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "no_undefined_legacy_stream_at_arrival_call",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "wav_taxi_arrived_whistle.wav_sounds",
+      "pass": true,
+      "detail": "1ch 44100Hz 1.080s"
+    },
+    {
+      "name": "wav_vtaxi_chat_beep.wav_sounds",
+      "pass": true,
+      "detail": "1ch 44100Hz 0.220s"
+    },
+    {
+      "name": "wav_vtaxi_arrival_whistle.wav_raw",
+      "pass": true,
+      "detail": "1ch 44100Hz 1.080s"
+    },
+    {
+      "name": "wav_vtaxi_chat_beep.wav_raw",
+      "pass": true,
+      "detail": "1ch 44100Hz 0.220s"
+    },
+    {
+      "name": "wav_vtaxi_chat_beep.wav_raw",
+      "pass": true,
+      "detail": "1ch 44100Hz 0.220s"
+    }
+  ]
+}

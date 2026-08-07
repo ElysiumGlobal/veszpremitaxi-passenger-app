@@ -5,6 +5,7 @@ import 'dart:math' as Math;
 import 'package:dotted_line/dotted_line.dart';
 import 'package:e_taxi/core/debug/passenger_flow_debug.dart';
 import 'package:e_taxi/core/service/google_route_service.dart';
+import 'package:e_taxi/core/service/screen_awake_service.dart';
 import 'package:e_taxi/core/location_utils.dart';
 import 'package:e_taxi/feature/home/controller/home_controller.dart';
 import 'package:e_taxi/feature/home/model/get_socket_model.dart';
@@ -309,6 +310,10 @@ class _SearchDriverScreenState extends State<SearchDriverScreen> {
           .toString()
           .trim()
           .toLowerCase();
+      final bookingStatus = (payload['booking_status'] ?? '')
+          .toString()
+          .trim()
+          .toLowerCase();
       final onlinePaidAmount = (payload['online_paid_amount_huf'] ?? '')
           .toString()
           .trim();
@@ -316,6 +321,15 @@ class _SearchDriverScreenState extends State<SearchDriverScreen> {
       if (paymentStatus.isEmpty) return false;
 
       final localData = riderBookingModel.value?.data;
+      final localStatus = (localData?.booking?.status ?? '').trim().toLowerCase();
+      final bool authoritativeCompletion =
+          bookingStatus == 'completed' ||
+          localStatus == 'completed' ||
+          paymentStatus == 'paid' ||
+          (_consecutiveExactServerReleasePolls >= 2 &&
+              const <String>{'cash', 'wallet', 'stripe'}.contains(paymentMethod));
+      if (!authoritativeCompletion) return false;
+
       if (localData?.booking != null) {
         localData!.booking!.status = 'completed';
         if (paymentMethod.isNotEmpty) {
@@ -337,6 +351,7 @@ class _SearchDriverScreenState extends State<SearchDriverScreen> {
         data: <String, dynamic>{
           'payment_method': paymentMethod,
           'payment_status': paymentStatus,
+          'booking_status': bookingStatus,
           'online_paid_amount': onlinePaidAmount,
           'qr_status': payload['qr'] is Map
               ? '${(payload['qr'] as Map)['status'] ?? ''}'
@@ -345,9 +360,6 @@ class _SearchDriverScreenState extends State<SearchDriverScreen> {
       );
 
       await homeController.socketData();
-      if (paymentStatus == 'paid') {
-        _bookingStatusPollingTimer?.cancel();
-      }
       return true;
     } catch (error, stack) {
       PassengerFlowDebug.send(
@@ -624,7 +636,10 @@ class _SearchDriverScreenState extends State<SearchDriverScreen> {
   StreamSubscription? _sub;
   Worker? _rideModelWorker;
   Timer? _bookingStatusPollingTimer;
+  Timer? _paymentSettlementPollingTimer;
   bool _bookingStatusPollInProgress = false;
+  bool _paymentSettlementPollInProgress = false;
+  String _paymentSettlementBookingId = '';
   String _lastAppliedBookingState = '';
   int _missingCurrentBookingPolls = 0;
   int _consecutiveExactServerReleasePolls = 0;
@@ -667,6 +682,7 @@ class _SearchDriverScreenState extends State<SearchDriverScreen> {
   void initState() {
     // TODO: implement initState
     super.initState();
+    unawaited(ScreenAwakeService.setKeepAwake(true));
 
     if (Get.arguments != null) {
       Map data = Get.arguments;
@@ -891,6 +907,63 @@ class _SearchDriverScreenState extends State<SearchDriverScreen> {
     );
   }
 
+  void _startPaymentSettlementPolling(String rawBookingId) {
+    final bookingId = rawBookingId.trim();
+    if (bookingId.isEmpty || bookingId == 'null') return;
+
+    _bookingStatusPollingTimer?.cancel();
+    _paymentSettlementBookingId = bookingId;
+    if (_paymentSettlementPollingTimer?.isActive == true) return;
+
+    PassengerFlowDebug.send(
+      'payment_settlement_poll_started',
+      bookingId: bookingId,
+    );
+    unawaited(_pollPaymentSettlementStatus());
+    _paymentSettlementPollingTimer = Timer.periodic(
+      const Duration(seconds: 3),
+      (_) => unawaited(_pollPaymentSettlementStatus()),
+    );
+  }
+
+  Future<void> _pollPaymentSettlementStatus() async {
+    if (_paymentSettlementPollInProgress || !mounted) return;
+    final bookingId = _paymentSettlementBookingId.trim();
+    if (bookingId.isEmpty || bookingId == 'null') return;
+
+    _paymentSettlementPollInProgress = true;
+    try {
+      final synced = await _syncReleasedPaymentStatus(bookingId);
+      if (!synced) return;
+
+      final paymentStatus =
+          (riderBookingModel.value?.data?.booking?.paymentStatus ?? '')
+              .trim()
+              .toLowerCase();
+      if (paymentStatus == 'paid') {
+        _paymentSettlementPollingTimer?.cancel();
+        _paymentSettlementBookingId = '';
+        PassengerFlowDebug.send(
+          'payment_settlement_poll_paid',
+          bookingId: bookingId,
+        );
+      }
+    } finally {
+      _paymentSettlementPollInProgress = false;
+    }
+  }
+
+  void _stopRidePolling({required String reason, String bookingId = ''}) {
+    _bookingStatusPollingTimer?.cancel();
+    _paymentSettlementPollingTimer?.cancel();
+    _paymentSettlementBookingId = '';
+    PassengerFlowDebug.send(
+      'search_driver_polling_stopped',
+      bookingId: bookingId,
+      data: <String, dynamic>{'reason': reason},
+    );
+  }
+
   Future<void> _pollBookingStatus() async {
     if (_bookingStatusPollInProgress || !mounted) return;
 
@@ -951,7 +1024,10 @@ class _SearchDriverScreenState extends State<SearchDriverScreen> {
 
         if (currentBooking == null &&
             const <String>{'cancelled', 'expired'}.contains(localStatus)) {
-          _bookingStatusPollingTimer?.cancel();
+          _stopRidePolling(
+            reason: 'terminal_without_profile_booking',
+            bookingId: activeBookingId,
+          );
           PassengerFlowDebug.send(
             'booking_status_poll_terminal_without_profile_booking',
             bookingId: activeBookingId,
@@ -971,7 +1047,10 @@ class _SearchDriverScreenState extends State<SearchDriverScreen> {
             !homeController.isPassengerCancellationInProgressFor(
               activeBookingId,
             )) {
-          _bookingStatusPollingTimer?.cancel();
+          _stopRidePolling(
+            reason: 'driver_cancelled_by_pointer_release',
+            bookingId: activeBookingId,
+          );
           PassengerFlowDebug.send(
             'booking_status_poll_driver_cancelled_by_pointer_release',
             bookingId: activeBookingId,
@@ -1000,12 +1079,22 @@ class _SearchDriverScreenState extends State<SearchDriverScreen> {
         if (serverReleasedBooking &&
             const <String>{'started', 'completed'}.contains(localStatus) &&
             _consecutiveExactServerReleasePolls >= 2) {
-          if (localStatus == 'completed') {
-            final bool paymentSynced =
-                await _syncReleasedPaymentStatus(activeBookingId);
-            if (paymentSynced) {
-              return;
+          final bool paymentSynced =
+              await _syncReleasedPaymentStatus(activeBookingId);
+          if (paymentSynced) {
+            final paymentStatus =
+                (riderBookingModel.value?.data?.booking?.paymentStatus ?? '')
+                    .trim()
+                    .toLowerCase();
+            if (paymentStatus == 'paid') {
+              _stopRidePolling(
+                reason: 'released_booking_payment_paid',
+                bookingId: activeBookingId,
+              );
+            } else {
+              _startPaymentSettlementPolling(activeBookingId);
             }
+            return;
           }
 
           RecentBooking? recentBooking;
@@ -1060,7 +1149,12 @@ class _SearchDriverScreenState extends State<SearchDriverScreen> {
 
             await homeController.socketData();
             if (recentPaymentStatus == 'paid') {
-              _bookingStatusPollingTimer?.cancel();
+              _stopRidePolling(
+                reason: 'recent_booking_payment_paid',
+                bookingId: activeBookingId,
+              );
+            } else {
+              _startPaymentSettlementPolling(activeBookingId);
             }
             return;
           }
@@ -1121,15 +1215,28 @@ class _SearchDriverScreenState extends State<SearchDriverScreen> {
 
       riderBookingModel.value = polledModel;
       persistBookingFareFromModel(polledModel.data);
-      homeController.socketData();
+      await homeController.socketData();
       await _showDriverMarkerIfAvailable();
 
       final bool awaitsPaymentSettlement =
           status == 'completed' && paymentStatus != 'paid';
-      if ((status == 'completed' && !awaitsPaymentSettlement) ||
+      if (awaitsPaymentSettlement) {
+        _startPaymentSettlementPolling(polledBookingId);
+        PassengerFlowDebug.send(
+          'booking_status_poll_terminal_settlement_only',
+          bookingId: polledBookingId,
+          data: <String, dynamic>{
+            'status': status,
+            'payment_status': paymentStatus,
+          },
+        );
+      } else if (status == 'completed' ||
           status == 'cancelled' ||
           status == 'expired') {
-        _bookingStatusPollingTimer?.cancel();
+        _stopRidePolling(
+          reason: 'terminal_booking_status',
+          bookingId: polledBookingId,
+        );
         PassengerFlowDebug.send(
           'booking_status_poll_terminal',
           bookingId: polledBookingId,
@@ -1247,10 +1354,12 @@ class _SearchDriverScreenState extends State<SearchDriverScreen> {
       },
     );
     _bookingStatusPollingTimer?.cancel();
+    _paymentSettlementPollingTimer?.cancel();
     _driverMarkerAnimationTimer?.cancel();
     _rideModelWorker?.dispose();
     _subscription?.cancel();
     _sub?.cancel();
+    unawaited(ScreenAwakeService.setKeepAwake(false));
     super.dispose();
   }
 

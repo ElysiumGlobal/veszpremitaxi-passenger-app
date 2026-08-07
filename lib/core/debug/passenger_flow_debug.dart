@@ -18,7 +18,7 @@ import '../../utils/app_preferences.dart';
 class PassengerFlowDebug {
   PassengerFlowDebug._();
 
-  static const String appVersion = '1.0.24+33';
+  static const String appVersion = '1.0.37+47';
   static const String expectedCollectorVersion =
       '2026-07-29-role2-role3-v2';
   static final String sessionId =
