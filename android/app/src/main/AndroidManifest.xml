@@ -75,6 +75,12 @@
                 <action android:name="FLUTTER_NOTIFICATION_CLICK" />
                 <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="flutterstripe" android:host="redirect" />
+            </intent-filter>
         </activity>
 
 <!--        // for apple login-->
@@ -107,6 +113,9 @@
             android:value="high_importance_channel" />
         <meta-data android:name="com.google.android.geo.API_KEY"
             android:value="${googleMapsApiKey}"/>
+        <meta-data
+            android:name="com.google.android.gms.wallet.api.enabled"
+            android:value="true" />
     </application>
     <!-- Required to query activities that can process text, see:
          https://developer.android.com/training/package-visibility and

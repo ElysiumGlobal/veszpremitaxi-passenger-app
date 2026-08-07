@@ -2,13 +2,13 @@ package hu.veszpremitaxi.passenger
 
 import android.media.AudioAttributes
 import android.media.MediaPlayer
-import io.flutter.embedding.android.FlutterActivity
+import io.flutter.embedding.android.FlutterFragmentActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 import java.io.File
 import java.io.FileOutputStream
 
-class MainActivity : FlutterActivity() {
+class MainActivity : FlutterFragmentActivity() {
     private companion object {
         const val ARRIVAL_SOUND_CHANNEL =
             "hu.veszpremitaxi.passenger/arrival_sound"

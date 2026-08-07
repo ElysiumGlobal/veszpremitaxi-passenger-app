@@ -2,7 +2,7 @@ name: e_taxi
 description: "A new Flutter project."
 publish_to: 'none'
 
-version: 1.0.33+43
+version: 1.0.34+44
 environment:
   sdk: ^3.9.0
 
@@ -60,6 +60,7 @@ dependencies:
   shimmer: ^3.0.0
   pin_code_fields: ^8.0.1
   auto_size_text: ^3.0.0
+  flutter_stripe: ^13.1.0
 
 dev_dependencies:
   flutter_test:
