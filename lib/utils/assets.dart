@@ -87,6 +87,7 @@ class IconAsset {
   static const String premiumCar = '$_icons/premium_car.png';
   static const String person = '$_icons/person.svg';
   static const String wallet = '$_icons/wallet.svg';
+  static const String creditCard = '$_icons/credit_card.svg';
   static const String razorPay = '$_icons/razorpay.svg';
   static const String stripe = '$_icons/stripe.svg';
   static const String paytm = '$_icons/paytm.svg';

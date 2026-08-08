@@ -1,0 +1,17 @@
+{
+  "version_1_0_38_48": true,
+  "bank_card_screen_exists": true,
+  "profile_menu_links_bank_card": true,
+  "route_registered": true,
+  "hungarian_strings_added": true,
+  "one_card_wording_present": true,
+  "no_raw_card_form_fields": true,
+  "no_stripe_api_call_in_ui_shell": true,
+  "credit_card_svg_valid_xml": true,
+  "credit_card_asset_declared": true,
+  "existing_payment_screen_unchanged": true,
+  "flutter_sdk_available_in_runtime": false,
+  "flutter_build_run": false,
+  "flutter_build_note": "Flutter SDK is not installed in this execution environment; build must be verified in Codemagic/Flutter environment.",
+  "all_static_checks_pass": true
+}

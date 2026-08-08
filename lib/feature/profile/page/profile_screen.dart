@@ -148,6 +148,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 12.verticalSpace,
 
                 commonWidget(
+                  image: IconAsset.creditCard,
+                  title: AppString.bankCard.tr,
+                  onTap: () {
+                    Navigation.pushNamed(Routes.bankCardScreen);
+                  },
+                ),
+                12.verticalSpace,
+
+                commonWidget(
                   image: IconAsset.notification,
                   title: AppString.notification.tr,
                   onTap: () {

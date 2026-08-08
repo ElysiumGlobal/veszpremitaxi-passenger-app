@@ -18,6 +18,7 @@ import 'package:e_taxi/feature/home/page/search_screenfirst.dart';
 import 'package:e_taxi/feature/home/page/search_screen_secound.dart';
 import 'package:e_taxi/feature/home/page/trip_details.dart';
 import 'package:e_taxi/feature/onboarding/page/onboarding_scrreen.dart';
+import 'package:e_taxi/feature/profile/page/bank_card_screen.dart';
 import 'package:e_taxi/feature/profile/page/language_screen.dart';
 import 'package:e_taxi/feature/profile/page/notification_screen.dart';
 import 'package:e_taxi/feature/profile/page/profile_screen.dart';
@@ -51,6 +52,7 @@ mixin Routes {
   static const String walletScreen = '/WalletScreen';
   static const String tripScreen = '/TripScreen';
   static const String profileScreen = '/profileScreen';
+  static const String bankCardScreen = '/BankCardScreen';
   static const String searchSecoundScreen = '/SearchSecoundScreen';
   static const String searchFirstScreen = '/SearchFirstScreen';
   static const String bookVehicleScreen = '/BookVehicleScreen';
@@ -140,6 +142,11 @@ mixin Routes {
     GetPage<dynamic>(
       name: profileScreen,
       page: () => ProfileScreen(),
+      transition: defaultTransition,
+    ),
+    GetPage<dynamic>(
+      name: bankCardScreen,
+      page: () => const BankCardScreen(),
       transition: defaultTransition,
     ),
 

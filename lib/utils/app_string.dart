@@ -183,6 +183,19 @@ class AppString {
   static const String currentBalanceAvailable =
       "Current balance available for payments.";
   static const String profile = "Profile";
+  static const String bankCard = "Bank card";
+  static const String bankCardIntro =
+      "Manage the single bank card connected to your VTaxi account.";
+  static const String noBankCard = "No bank card added";
+  static const String noBankCardText =
+      "You can manage one bank card here. Add it when card payments are enabled.";
+  static const String addBankCard = "Add bank card";
+  static const String cardHolder = "Card holder";
+  static const String cardExpiry = "Expiry";
+  static const String bankCardSecurityText =
+      "VTaxi does not store your full card number. Secure card entry is handled by the payment provider.";
+  static const String bankCardSetupText =
+      "Bank card setup is not active yet. Secure card entry will open through the payment provider when enabled.";
   static const String notification = "Notification";
   static const String referEarn = "Refer And Earn";
   static const String language = "Language";
