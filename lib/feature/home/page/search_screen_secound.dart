@@ -1,5 +1,7 @@
 import 'dart:async';
 import 'dart:io';
+import 'package:e_taxi/core/location_utils.dart';
+import 'package:e_taxi/core/localization/vtaxi_localization_service.dart';
 import 'package:e_taxi/feature/home/controller/home_controller.dart';
 import 'package:e_taxi/feature/home/widget/dialog.dart';
 import 'package:e_taxi/utils/app_colors.dart';
@@ -15,6 +17,7 @@ import 'package:image_picker/image_picker.dart';
 import '../../../utils/app_string.dart';
 import '../../../utils/assets.dart';
 import '../../../widgets/appbar.dart';
+import '../../../widgets/app_snackbar.dart';
 import '../../../widgets/common_widget.dart';
 import '../../../widgets/custome_img.dart';
 import '../widget/origin_destination_widget.dart';
@@ -27,11 +30,70 @@ class SearchSecoundScreen extends StatefulWidget {
   State<SearchSecoundScreen> createState() => _SearchSecoundScreenState();
 }
 
-class _SearchSecoundScreenState extends State<SearchSecoundScreen> {
+class _SearchSecoundScreenState extends State<SearchSecoundScreen>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _destinationPulseController;
+  late final Animation<double> _destinationPulse;
+  final RxBool _locatingCurrentPosition = false.obs;
+
   @override
   void initState() {
-    // TODO: implement initState
     super.initState();
+    _destinationPulseController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 900),
+      lowerBound: 0,
+      upperBound: 1,
+    )..repeat(reverse: true);
+    _destinationPulse = CurvedAnimation(
+      parent: _destinationPulseController,
+      curve: Curves.easeInOut,
+    );
+  }
+
+  @override
+  void dispose() {
+    _destinationPulseController.dispose();
+    searchController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _refreshCurrentPosition() async {
+    if (_locatingCurrentPosition.value) return;
+    _locatingCurrentPosition.value = true;
+    try {
+      final location = await LocationService().getCurrentLocation();
+      if (!mounted) return;
+      if (location == null) {
+        AppSnackBar.showErrorSnackBar(
+          message: AppString.turnOnLocation.tr,
+          isError: true,
+        );
+        return;
+      }
+
+      final addressUse = LocationService().currentAddressUse.value.trim();
+      final address = LocationService().currentAddress.value.trim();
+      final name = addressUse.isNotEmpty
+          ? addressUse.split('**').first.trim()
+          : VTaxiLocalizationService.text(
+              'vtaxi.destination.current_position',
+              'Jelenlegi helyzeted',
+            );
+      final fullAddress = address.isNotEmpty
+          ? address
+          : (addressUse.isNotEmpty ? addressUse.replaceAll('**', ', ') : name);
+
+      homeController.setSelectedLocation(
+        name: name,
+        address: fullAddress,
+        latLng: location,
+        isOrigin: true,
+      );
+      setState(() {});
+    } finally {
+      _locatingCurrentPosition.value = false;
+    }
   }
 
   RxString destination = "".obs;
@@ -359,12 +421,15 @@ class _SearchSecoundScreenState extends State<SearchSecoundScreen> {
                 ),
                 child: Obx(
                   () => OriginDestinationWidget(
-                    destination: destination.value == ""
-                        ? "Destination"
-                        : destination.value,
+                    destination: destination.value,
                     origin: homeController.selectedLocationModel.oAddress ?? "",
                     showTextField: true,
                     controller: searchController,
+                    destinationPulse: _destinationPulse,
+                    destinationHint: VTaxiLocalizationService.text(
+                      'vtaxi.destination.enter_address_long',
+                      'Írd be, hová szeretnél menni',
+                    ),
                     onChange: (search) {
                       if ((search ?? "").isNotEmpty) {
                         debugPrint(
@@ -383,6 +448,93 @@ class _SearchSecoundScreenState extends State<SearchSecoundScreen> {
                         );
                       }
                     },
+                  ),
+                ),
+              ),
+              Padding(
+                padding: EdgeInsets.fromLTRB(16.w, 0, 16.w, 4.h),
+                child: Obx(
+                  () => Material(
+                    color: AppColors.transparent,
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(14.r),
+                      onTap: _locatingCurrentPosition.value
+                          ? null
+                          : _refreshCurrentPosition,
+                      child: Container(
+                        width: double.infinity,
+                        padding: EdgeInsets.symmetric(
+                          horizontal: 14.w,
+                          vertical: 12.h,
+                        ),
+                        decoration: BoxDecoration(
+                          color: AppColors.sucessContainer,
+                          borderRadius: BorderRadius.circular(14.r),
+                          border: Border.all(
+                            color: AppColors.routeGreen.withValues(alpha: .24),
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 38.w,
+                              height: 38.w,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: AppColors.routeGreen,
+                              ),
+                              alignment: Alignment.center,
+                              child: _locatingCurrentPosition.value
+                                  ? SizedBox(
+                                      width: 19.w,
+                                      height: 19.w,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2.2.w,
+                                        color: AppColors.whiteColor,
+                                      ),
+                                    )
+                                  : Icon(
+                                      Icons.my_location_rounded,
+                                      color: AppColors.whiteColor,
+                                      size: 21.w,
+                                    ),
+                            ),
+                            11.horizontalSpace,
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  CommonText(
+                                    string: VTaxiLocalizationService.text(
+                                      'vtaxi.destination.where_am_i',
+                                      'Hol vagyok most?',
+                                    ),
+                                    fontSize: 14.sp,
+                                    fontWeight: FontWeight.w700,
+                                    color: AppColors.routeGreen,
+                                  ),
+                                  2.verticalSpace,
+                                  CommonText(
+                                    string: VTaxiLocalizationService.text(
+                                      'vtaxi.destination.where_am_i_hint',
+                                      'Frissítsd az indulási helyed a telefon GPS-ével.',
+                                    ),
+                                    fontSize: 12.sp,
+                                    color: AppColors.textCaptionColor,
+                                    softWrap: true,
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Icon(
+                              Icons.refresh_rounded,
+                              color: AppColors.routeGreen,
+                              size: 22.w,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
                   ),
                 ),
               ),

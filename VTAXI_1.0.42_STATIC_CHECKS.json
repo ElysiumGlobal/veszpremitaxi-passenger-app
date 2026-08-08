@@ -1,0 +1,29 @@
+{
+  "version": "1.0.42+52",
+  "base": "1.0.41+51",
+  "checks": {
+    "version_1_0_42_52": true,
+    "origin_red_card": true,
+    "destination_green_card": true,
+    "white_location_text": true,
+    "destination_pulse": true,
+    "destination_hu_hint": true,
+    "where_am_i_gps_card": true,
+    "pickup_pulse": true,
+    "pickup_you_are_here": true,
+    "pickup_exact_map_hint": true,
+    "vehicle_icon_enlarged": true,
+    "driver_live_position_fallback": true,
+    "arrival_no_empty_dash": true,
+    "trip_real_progress_route_length": true,
+    "trip_progress_percent_ui": true,
+    "trip_remaining_km_ui": true,
+    "trip_eta_ui": true,
+    "trip_car_uses_progress": true,
+    "trip_debug_metrics": true,
+    "no_new_route_api_for_progress": true
+  },
+  "pass": true,
+  "compile_runtime_note": "Flutter SDK unavailable in this environment; Codemagic build is still required.",
+  "lifecycle_scope_note": "Diff is limited to passenger UX files, release notes/static checks and pubspec version; booking/payment controller/service/backend files were not changed."
+}

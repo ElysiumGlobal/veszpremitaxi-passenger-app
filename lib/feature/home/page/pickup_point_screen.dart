@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:e_taxi/core/localization/vtaxi_localization_service.dart';
 import 'package:e_taxi/feature/home/controller/home_controller.dart';
 import 'package:e_taxi/feature/home/widget/dialog.dart';
 import 'package:e_taxi/utils/app_colors.dart';
@@ -28,16 +29,28 @@ class PickupPointScreen extends StatefulWidget {
   State<PickupPointScreen> createState() => _PickupPointScreenState();
 }
 
-class _PickupPointScreenState extends State<PickupPointScreen> {
+class _PickupPointScreenState extends State<PickupPointScreen>
+    with SingleTickerProviderStateMixin {
   Completer<GoogleMapController> _controller = Completer();
+  late final AnimationController _pickupPulseController;
+  late final Animation<double> _pickupPulse;
   OriginDestinationModel? originDestinationModel;
   String rideTypeId = "";
   String paymentType = "cash";
 
   @override
   void initState() {
-    // TODO: implement initState
     super.initState();
+    _pickupPulseController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 900),
+      lowerBound: 0,
+      upperBound: 1,
+    )..repeat(reverse: true);
+    _pickupPulse = CurvedAnimation(
+      parent: _pickupPulseController,
+      curve: Curves.easeInOut,
+    );
 
     if (Get.arguments != null) {
       final arg = Get.arguments as Map;
@@ -67,6 +80,13 @@ class _PickupPointScreenState extends State<PickupPointScreen> {
             .last;
       });
     }
+  }
+
+
+  @override
+  void dispose() {
+    _pickupPulseController.dispose();
+    super.dispose();
   }
 
   Future<void> updateCameraPosition() async {
@@ -194,10 +214,76 @@ class _PickupPointScreenState extends State<PickupPointScreen> {
                       ),
                     ),
                   ),
-                  Image.asset(
-                    IconAsset.pickupMarker,
-                    width: 54.w,
-                    height: 54.w,
+                  AnimatedBuilder(
+                    animation: _pickupPulse,
+                    builder: (context, child) {
+                      return Stack(
+                        alignment: Alignment.center,
+                        clipBehavior: Clip.none,
+                        children: [
+                          Transform.scale(
+                            scale: .96 + (_pickupPulse.value * .08),
+                            child: Container(
+                              width: 74.w,
+                              height: 74.w,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: AppColors.errorColor.withValues(
+                                  alpha: .08 + (_pickupPulse.value * .08),
+                                ),
+                              ),
+                            ),
+                          ),
+                          Image.asset(
+                            IconAsset.pickupMarker,
+                            width: 60.w,
+                            height: 60.w,
+                          ),
+                          Positioned(
+                            top: -42.h,
+                            child: Container(
+                              padding: EdgeInsets.symmetric(
+                                horizontal: 11.w,
+                                vertical: 7.h,
+                              ),
+                              decoration: BoxDecoration(
+                                color: AppColors.errorColor,
+                                borderRadius: BorderRadius.circular(999.r),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: AppColors.blackColor.withValues(
+                                      alpha: .14,
+                                    ),
+                                    blurRadius: 10,
+                                    offset: const Offset(0, 4),
+                                  ),
+                                ],
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    Icons.my_location_rounded,
+                                    color: AppColors.whiteColor,
+                                    size: 16.w,
+                                  ),
+                                  5.horizontalSpace,
+                                  CommonText(
+                                    string: VTaxiLocalizationService.text(
+                                      'vtaxi.pickup.you_are_here',
+                                      'Most itt vagy',
+                                    ),
+                                    color: AppColors.whiteColor,
+                                    fontSize: 12.sp,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
+                      );
+                    },
                   ),
                 ],
               ),
@@ -219,8 +305,19 @@ class _PickupPointScreenState extends State<PickupPointScreen> {
                   children: [
                     CommonText(
                       string: AppString.doubleCheckPickupPoint.tr,
-                      fontSize: 16.sp,
-                      fontWeight: FontWeight.w600,
+                      fontSize: 18.sp,
+                      fontWeight: FontWeight.w700,
+                    ),
+                    5.verticalSpace,
+                    CommonText(
+                      string: VTaxiLocalizationService.text(
+                        'vtaxi.pickup.adjust_pin_hint',
+                        'Mozgasd a térképet, hogy a pin pontosan ott legyen, ahol várni fogsz a taxira.',
+                      ),
+                      fontSize: 12.sp,
+                      color: AppColors.textCaptionColor,
+                      softWrap: true,
+                      height: 1.35,
                     ),
                     Container(
                       margin: EdgeInsets.symmetric(vertical: 12.h),

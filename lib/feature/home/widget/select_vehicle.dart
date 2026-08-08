@@ -40,7 +40,7 @@ class SelectVehicleWidget extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        padding: EdgeInsets.all(12.w),
+        padding: EdgeInsets.symmetric(horizontal: 13.w, vertical: 14.h),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(8.r),
           border: Border.all(
@@ -53,17 +53,17 @@ class SelectVehicleWidget extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             Container(
-              width: 48.w,
-              height: 48.w,
-              padding: EdgeInsets.all(5.w),
+              width: 72.w,
+              height: 62.w,
+              padding: EdgeInsets.all(6.w),
               decoration: BoxDecoration(
                 color: AppColors.mainPrimaryColor.withValues(alpha: 0.18),
-                borderRadius: BorderRadius.circular(12.r),
+                borderRadius: BorderRadius.circular(15.r),
               ),
               child: NetworkImageWidget(
                 image: rideOption?.icon ?? "",
-                ht: 38.w,
-                wt: 38.w,
+                ht: 54.w,
+                wt: 64.w,
                 boxFit: BoxFit.contain,
                 errorWidget: Image.asset(
                   IconAsset.driverMarker,
@@ -71,7 +71,7 @@ class SelectVehicleWidget extends StatelessWidget {
                 ),
               ),
             ),
-            8.horizontalSpace,
+            12.horizontalSpace,
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -80,12 +80,13 @@ class SelectVehicleWidget extends StatelessWidget {
                     children: [
                       CommonText(
                         string: _vehicleName(),
-                        fontSize: 14.sp,
+                        fontSize: 15.sp,
+                        fontWeight: FontWeight.w700,
                       ),
                       CustomImage(
                         image: IconAsset.person,
-                        ht: 16.w,
-                        wt: 16.w,
+                        ht: 18.w,
+                        wt: 18.w,
                       ),
                       4.horizontalSpace,
                       CommonText(
@@ -96,8 +97,8 @@ class SelectVehicleWidget extends StatelessWidget {
                       8.horizontalSpace,
                       CustomImage(
                         image: IconAsset.time,
-                        ht: 16.w,
-                        wt: 16.w,
+                        ht: 18.w,
+                        wt: 18.w,
                       ),
                       4.horizontalSpace,
                       CommonText(

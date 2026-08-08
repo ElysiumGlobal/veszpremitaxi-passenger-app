@@ -51,10 +51,17 @@ class _SearchDriverScreenState extends State<SearchDriverScreen> with SingleTick
   Rx<Set<Marker>> _marker = Rx<Set<Marker>>({});
   BitmapDescriptor? _driverMarkerIcon;
   LatLng? _driverMarkerPosition;
+  final Rxn<LatLng> _driverLivePosition = Rxn<LatLng>();
   double _driverMarkerRotation = 0;
   Timer? _driverMarkerAnimationTimer;
   late final AnimationController _tripCarAnimationController;
   late final Animation<double> _tripCarAnimation;
+  double _tripTotalRouteMeters = 0;
+  final RxDouble _tripProgressValue = 0.0.obs;
+  final RxDouble _tripRemainingKm = 0.0.obs;
+  final RxInt _tripEtaMinutes = 0.obs;
+  final RxBool _tripProgressHasData = false.obs;
+  DateTime? _lastDriverLocationAt;
 
   String _displayTripOtp() {
     final raw = riderBookingModel.value?.data?.booking?.otp?.toString() ?? '';
@@ -132,9 +139,94 @@ class _SearchDriverScreenState extends State<SearchDriverScreen> with SingleTick
     );
   }
 
+  double _routeLengthMeters(List<LatLng> points) {
+    if (points.length < 2) return 0;
+    double total = 0;
+    for (int i = 1; i < points.length; i++) {
+      total += Geolocator.distanceBetween(
+        points[i - 1].latitude,
+        points[i - 1].longitude,
+        points[i].latitude,
+        points[i].longitude,
+      );
+    }
+    return total;
+  }
+
+  double? _bookingTripDistanceKm() {
+    final raw =
+        '${riderBookingModel.value?.data?.booking?.distance ?? homeController.bookingCreateModel.value?.data?.booking?.distance ?? ''}'
+            .trim()
+            .toLowerCase();
+    if (raw.isEmpty) return null;
+    final match = RegExp(r'([0-9]+(?:[\.,][0-9]+)?)').firstMatch(raw);
+    if (match == null) return null;
+    final value = double.tryParse(match.group(1)!.replaceAll(',', '.'));
+    if (value == null || value <= 0) return null;
+    if (raw.contains(' m') && !raw.contains('km')) return value / 1000;
+    return value;
+  }
+
+  void _rememberTripTotalRoute(List<LatLng> points) {
+    final meters = _routeLengthMeters(points);
+    if (meters > 100) {
+      _tripTotalRouteMeters = meters;
+    }
+  }
+
+  void _updateTripProgressFromRoute(List<LatLng> points) {
+    if (homeController.tripType.value != 2 || points.length < 2) return;
+
+    final remainingMeters = _routeLengthMeters(points);
+    if (remainingMeters <= 0) return;
+
+    double totalMeters = _tripTotalRouteMeters;
+    final bookingDistanceKm = _bookingTripDistanceKm();
+    if (totalMeters <= 0 && bookingDistanceKm != null) {
+      totalMeters = bookingDistanceKm * 1000;
+    }
+    if (totalMeters <= 0) return;
+
+    // A maradek utvonal egy ujratervezes miatt lehet rovid ideig hosszabb.
+    // A progress emiatt nem mehet visszafele az utas szeme elott.
+    final candidate = (1 - (remainingMeters / totalMeters)).clamp(0.0, 1.0);
+    final stableProgress = Math.max(_tripProgressValue.value, candidate).toDouble();
+    _tripProgressValue.value = stableProgress;
+    _tripRemainingKm.value = remainingMeters / 1000;
+    _tripEtaMinutes.value = Math.max(
+      1,
+      ((_tripRemainingKm.value / 32) * 60).ceil(),
+    ).toInt();
+    _tripProgressHasData.value = true;
+  }
+
+  String _tripGpsStatusText() {
+    if (!_tripProgressHasData.value) {
+      return VTaxiLocalizationService.text(
+        'vtaxi.trip.gps_waiting',
+        'GPS-adatra várunk…',
+      );
+    }
+    final last = _lastDriverLocationAt;
+    if (last != null && DateTime.now().difference(last).inSeconds <= 20) {
+      return VTaxiLocalizationService.text(
+        'vtaxi.trip.gps_live',
+        'GPS aktív • élő sofőrhelyzet',
+      );
+    }
+    return VTaxiLocalizationService.text(
+      'vtaxi.trip.gps_active',
+      'GPS aktív • helyzetfrissítésre várunk',
+    );
+  }
+
   Widget _buildTripProgressRoad() {
+    final double progress = _tripProgressHasData.value
+        ? _tripProgressValue.value.clamp(0.0, 1.0).toDouble()
+        : 0.0;
+
     return Container(
-      height: 66.h,
+      height: 72.h,
       decoration: BoxDecoration(
         color: AppColors.whiteColor.withValues(alpha: .14),
         borderRadius: BorderRadius.circular(18.r),
@@ -146,7 +238,7 @@ class _SearchDriverScreenState extends State<SearchDriverScreen> with SingleTick
         builder: (BuildContext context, BoxConstraints constraints) {
           final double leftInset = 18.w;
           final double rightInset = 18.w;
-          final double carSize = 38.w;
+          final double carSize = 40.w;
           final double travelWidth = Math.max(
             0.0,
             constraints.maxWidth - leftInset - rightInset - carSize,
@@ -158,21 +250,36 @@ class _SearchDriverScreenState extends State<SearchDriverScreen> with SingleTick
               Positioned(
                 left: leftInset + 10.w,
                 right: rightInset + 10.w,
-                top: 31.h,
+                top: 34.h,
                 child: Container(
-                  height: 4.h,
+                  height: 5.h,
                   decoration: BoxDecoration(
-                    color: AppColors.whiteColor.withValues(alpha: .35),
+                    color: AppColors.whiteColor.withValues(alpha: .30),
+                    borderRadius: BorderRadius.circular(99.r),
+                  ),
+                ),
+              ),
+              Positioned(
+                left: leftInset + 10.w,
+                top: 34.h,
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 650),
+                  curve: Curves.easeOutCubic,
+                  width: Math.max(0.0, (travelWidth + carSize - 20.w) * progress)
+                      .toDouble(),
+                  height: 5.h,
+                  decoration: BoxDecoration(
+                    color: AppColors.whiteColor,
                     borderRadius: BorderRadius.circular(99.r),
                   ),
                 ),
               ),
               Positioned(
                 left: leftInset,
-                top: 24.h,
+                top: 26.h,
                 child: Container(
-                  width: 18.w,
-                  height: 18.w,
+                  width: 20.w,
+                  height: 20.w,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     color: AppColors.whiteColor,
@@ -185,10 +292,10 @@ class _SearchDriverScreenState extends State<SearchDriverScreen> with SingleTick
               ),
               Positioned(
                 right: rightInset,
-                top: 18.h,
+                top: 20.h,
                 child: Container(
-                  width: 30.w,
-                  height: 30.w,
+                  width: 32.w,
+                  height: 32.w,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     color: AppColors.whiteColor,
@@ -203,17 +310,20 @@ class _SearchDriverScreenState extends State<SearchDriverScreen> with SingleTick
                   alignment: Alignment.center,
                   child: Icon(
                     Icons.location_on_rounded,
-                    color: AppColors.mainPrimaryColor,
-                    size: 19.w,
+                    color: AppColors.errorColor,
+                    size: 20.w,
                   ),
                 ),
               ),
               AnimatedBuilder(
                 animation: _tripCarAnimation,
                 builder: (BuildContext context, Widget? child) {
-                  return Positioned(
-                    left: leftInset + travelWidth * _tripCarAnimation.value,
-                    top: 13.h,
+                  final bob = Math.sin(_tripCarAnimation.value * Math.pi * 2) * 1.6;
+                  return AnimatedPositioned(
+                    duration: const Duration(milliseconds: 650),
+                    curve: Curves.easeOutCubic,
+                    left: leftInset + travelWidth * progress,
+                    top: 14.h + bob,
                     child: child!,
                   );
                 },
@@ -235,7 +345,7 @@ class _SearchDriverScreenState extends State<SearchDriverScreen> with SingleTick
                   child: Icon(
                     Icons.local_taxi_rounded,
                     color: AppColors.routeGreen,
-                    size: 24.w,
+                    size: 25.w,
                   ),
                 ),
               ),
@@ -246,11 +356,52 @@ class _SearchDriverScreenState extends State<SearchDriverScreen> with SingleTick
     );
   }
 
+  Widget _tripMetricChip({required IconData icon, required String label}) {
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: 9.w, vertical: 7.h),
+      decoration: BoxDecoration(
+        color: AppColors.whiteColor.withValues(alpha: .16),
+        borderRadius: BorderRadius.circular(999.r),
+        border: Border.all(
+          color: AppColors.whiteColor.withValues(alpha: .18),
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, color: AppColors.whiteColor, size: 15.w),
+          5.horizontalSpace,
+          CommonText(
+            string: label,
+            color: AppColors.whiteColor,
+            fontSize: 11.sp,
+            fontWeight: FontWeight.w700,
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildTripInProgressPanel() {
     final booking = riderBookingModel.value?.data?.booking;
-    final String distance = '${booking?.distance ?? ''}'.trim();
     final String dropoffAddress = '${booking?.dropoffAddress ?? ''}'.trim();
     final String pickupAddress = '${booking?.pickupAddress ?? ''}'.trim();
+    final bool hasProgress = _tripProgressHasData.value;
+    final int progressPercent = hasProgress
+        ? (_tripProgressValue.value.clamp(0.0, 1.0) * 100).round()
+        : 0;
+    final String remainingText = hasProgress
+        ? '${_tripRemainingKm.value.toStringAsFixed(1).replaceAll('.', ',')} km'
+        : VTaxiLocalizationService.text(
+            'vtaxi.trip.distance_calculating',
+            'Távolság számítása…',
+          );
+    final String etaText = hasProgress
+        ? 'kb. ${_tripEtaMinutes.value} perc'
+        : VTaxiLocalizationService.text(
+            'vtaxi.trip.eta_calculating',
+            'ETA számítása…',
+          );
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -326,49 +477,78 @@ class _SearchDriverScreenState extends State<SearchDriverScreen> with SingleTick
                       ],
                     ),
                   ),
-                  if (distance.isNotEmpty) ...[
-                    10.horizontalSpace,
-                    Container(
-                      padding: EdgeInsets.symmetric(
-                        horizontal: 10.w,
-                        vertical: 7.h,
-                      ),
-                      decoration: BoxDecoration(
-                        color: AppColors.whiteColor,
-                        borderRadius: BorderRadius.circular(999.r),
-                      ),
-                      child: CommonText(
-                        string: '$distance km',
-                        color: AppColors.routeGreen,
-                        fontSize: 12.sp,
-                        fontWeight: FontWeight.w700,
-                      ),
+                  10.horizontalSpace,
+                  Container(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: 10.w,
+                      vertical: 7.h,
                     ),
-                  ],
+                    decoration: BoxDecoration(
+                      color: AppColors.whiteColor,
+                      borderRadius: BorderRadius.circular(999.r),
+                    ),
+                    child: CommonText(
+                      string: hasProgress
+                          ? '$progressPercent%'
+                          : VTaxiLocalizationService.text(
+                              'vtaxi.trip.gps_short',
+                              'GPS…',
+                            ),
+                      color: AppColors.routeGreen,
+                      fontSize: 12.sp,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
                 ],
               ),
               16.verticalSpace,
               _buildTripProgressRoad(),
+              11.verticalSpace,
+              Wrap(
+                spacing: 8.w,
+                runSpacing: 8.h,
+                children: [
+                  _tripMetricChip(
+                    icon: Icons.route_rounded,
+                    label: hasProgress
+                        ? '$progressPercent% megtéve'
+                        : VTaxiLocalizationService.text(
+                            'vtaxi.trip.progress_waiting',
+                            'Haladás számítása…',
+                          ),
+                  ),
+                  _tripMetricChip(
+                    icon: Icons.pin_drop_rounded,
+                    label: hasProgress ? 'Még $remainingText' : remainingText,
+                  ),
+                  _tripMetricChip(
+                    icon: Icons.schedule_rounded,
+                    label: etaText,
+                  ),
+                ],
+              ),
               10.verticalSpace,
               Row(
                 children: [
                   Container(
-                    width: 7.w,
-                    height: 7.w,
-                    decoration: const BoxDecoration(
+                    width: 8.w,
+                    height: 8.w,
+                    decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color: AppColors.whiteColor,
+                      color: hasProgress
+                          ? AppColors.whiteColor
+                          : AppColors.amber,
                     ),
                   ),
                   7.horizontalSpace,
-                  CommonText(
-                    string: VTaxiLocalizationService.text(
-                      'vtaxi.trip.live_status',
-                      'Utazás folyamatban',
+                  Expanded(
+                    child: CommonText(
+                      string: _tripGpsStatusText(),
+                      color: AppColors.whiteColor.withValues(alpha: .92),
+                      fontSize: 12.sp,
+                      fontWeight: FontWeight.w600,
+                      softWrap: true,
                     ),
-                    color: AppColors.whiteColor.withValues(alpha: .92),
-                    fontSize: 12.sp,
-                    fontWeight: FontWeight.w600,
                   ),
                 ],
               ),
@@ -758,12 +938,16 @@ class _SearchDriverScreenState extends State<SearchDriverScreen> with SingleTick
   double? _driverDistanceToPickupKm() {
     final driver = riderBookingModel.value?.data?.driver;
     final pickup = riderBookingModel.value?.data?.pickup;
-    final driverLat = double.tryParse(
-      driver?.currentLocation?.latitude ?? driver?.lastLatitude ?? '',
-    );
-    final driverLng = double.tryParse(
-      driver?.currentLocation?.longitude ?? driver?.lastLongitude ?? '',
-    );
+    final driverLat =
+        double.tryParse(
+          driver?.currentLocation?.latitude ?? driver?.lastLatitude ?? '',
+        ) ??
+        _driverLivePosition.value?.latitude;
+    final driverLng =
+        double.tryParse(
+          driver?.currentLocation?.longitude ?? driver?.lastLongitude ?? '',
+        ) ??
+        _driverLivePosition.value?.longitude;
     final pickupLat = double.tryParse(pickup?.latitude ?? '');
     final pickupLng = double.tryParse(pickup?.longitude ?? '');
     if (driverLat == null ||
@@ -810,17 +994,17 @@ class _SearchDriverScreenState extends State<SearchDriverScreen> with SingleTick
           _arrivalMetric(
             Icons.schedule_rounded,
             'Sofőr vállalása',
-            commitment == null ? '–' : '$commitment perc',
+            commitment == null ? 'ETA-ra várunk…' : '$commitment perc',
           ),
           _arrivalMetric(
             Icons.navigation_rounded,
             'GPS-becslés',
-            gpsEstimate == null ? '–' : '$gpsEstimate perc',
+            gpsEstimate == null ? 'GPS-jel keresése…' : '$gpsEstimate perc',
           ),
           _arrivalMetric(
             Icons.route_rounded,
             'Távolság',
-            distanceKm == null ? '–' : '${distanceKm.toStringAsFixed(1)} km',
+            distanceKm == null ? 'Távolság számítása…' : '${distanceKm.toStringAsFixed(1)} km',
           ),
         ],
       ),
@@ -853,6 +1037,8 @@ class _SearchDriverScreenState extends State<SearchDriverScreen> with SingleTick
   }
 
   Future<void> setDriverMarker(LatLng latLong) async {
+    _lastDriverLocationAt = DateTime.now();
+    _driverLivePosition.value = latLong;
     try {
       final BitmapDescriptor icon = await _resolveDriverMarkerIcon();
       final LatLng? previous = _driverMarkerPosition;
@@ -1173,12 +1359,23 @@ class _SearchDriverScreenState extends State<SearchDriverScreen> with SingleTick
           destinationLatLng,
         );
 
+        _updateTripProgressFromRoute(polylineCoordinates);
+
         PassengerFlowDebug.send(
           'driver_route_points_updated',
           bookingId: _activeBookingId(),
           data: <String, dynamic>{
             'point_count': polylineCoordinates.length,
             'change_polyline': homeController.changePolyLine,
+            'trip_progress_percent': _tripProgressHasData.value
+                ? (_tripProgressValue.value * 100).round()
+                : null,
+            'trip_remaining_km': _tripProgressHasData.value
+                ? _tripRemainingKm.value.toStringAsFixed(2)
+                : null,
+            'trip_eta_minutes': _tripProgressHasData.value
+                ? _tripEtaMinutes.value
+                : null,
           },
         );
 
@@ -1634,6 +1831,8 @@ class _SearchDriverScreenState extends State<SearchDriverScreen> with SingleTick
     );
 
     if (polylineCoordinates.isNotEmpty) {
+      _rememberTripTotalRoute(polylineCoordinates);
+      _updateTripProgressFromRoute(polylineCoordinates);
       _polylines.value = {
         Polyline(
           geodesic: false,
