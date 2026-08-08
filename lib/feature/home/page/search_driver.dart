@@ -7,6 +7,7 @@ import 'package:e_taxi/core/debug/passenger_flow_debug.dart';
 import 'package:e_taxi/core/service/google_route_service.dart';
 import 'package:e_taxi/core/service/screen_awake_service.dart';
 import 'package:e_taxi/core/location_utils.dart';
+import 'package:e_taxi/core/localization/vtaxi_localization_service.dart';
 import 'package:e_taxi/feature/home/controller/home_controller.dart';
 import 'package:e_taxi/feature/home/model/get_socket_model.dart';
 import 'package:e_taxi/feature/home/service/home_service.dart';
@@ -45,13 +46,15 @@ class SearchDriverScreen extends StatefulWidget {
   State<SearchDriverScreen> createState() => _SearchDriverScreenState();
 }
 
-class _SearchDriverScreenState extends State<SearchDriverScreen> {
+class _SearchDriverScreenState extends State<SearchDriverScreen> with SingleTickerProviderStateMixin {
   Rx<Set<Polyline>> _polylines = Rx<Set<Polyline>>({});
   Rx<Set<Marker>> _marker = Rx<Set<Marker>>({});
   BitmapDescriptor? _driverMarkerIcon;
   LatLng? _driverMarkerPosition;
   double _driverMarkerRotation = 0;
   Timer? _driverMarkerAnimationTimer;
+  late final AnimationController _tripCarAnimationController;
+  late final Animation<double> _tripCarAnimation;
 
   String _displayTripOtp() {
     final raw = riderBookingModel.value?.data?.booking?.otp?.toString() ?? '';
@@ -129,6 +132,338 @@ class _SearchDriverScreenState extends State<SearchDriverScreen> {
     );
   }
 
+  Widget _buildTripProgressRoad() {
+    return Container(
+      height: 66.h,
+      decoration: BoxDecoration(
+        color: AppColors.whiteColor.withValues(alpha: .14),
+        borderRadius: BorderRadius.circular(18.r),
+        border: Border.all(
+          color: AppColors.whiteColor.withValues(alpha: .24),
+        ),
+      ),
+      child: LayoutBuilder(
+        builder: (BuildContext context, BoxConstraints constraints) {
+          final double leftInset = 18.w;
+          final double rightInset = 18.w;
+          final double carSize = 38.w;
+          final double travelWidth = Math.max(
+            0.0,
+            constraints.maxWidth - leftInset - rightInset - carSize,
+          ).toDouble();
+
+          return Stack(
+            clipBehavior: Clip.none,
+            children: [
+              Positioned(
+                left: leftInset + 10.w,
+                right: rightInset + 10.w,
+                top: 31.h,
+                child: Container(
+                  height: 4.h,
+                  decoration: BoxDecoration(
+                    color: AppColors.whiteColor.withValues(alpha: .35),
+                    borderRadius: BorderRadius.circular(99.r),
+                  ),
+                ),
+              ),
+              Positioned(
+                left: leftInset,
+                top: 24.h,
+                child: Container(
+                  width: 18.w,
+                  height: 18.w,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: AppColors.whiteColor,
+                    border: Border.all(
+                      color: AppColors.routeGreen.withValues(alpha: .45),
+                      width: 3.w,
+                    ),
+                  ),
+                ),
+              ),
+              Positioned(
+                right: rightInset,
+                top: 18.h,
+                child: Container(
+                  width: 30.w,
+                  height: 30.w,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: AppColors.whiteColor,
+                    boxShadow: [
+                      BoxShadow(
+                        color: AppColors.blackColor.withValues(alpha: .12),
+                        blurRadius: 8,
+                        offset: const Offset(0, 3),
+                      ),
+                    ],
+                  ),
+                  alignment: Alignment.center,
+                  child: Icon(
+                    Icons.location_on_rounded,
+                    color: AppColors.mainPrimaryColor,
+                    size: 19.w,
+                  ),
+                ),
+              ),
+              AnimatedBuilder(
+                animation: _tripCarAnimation,
+                builder: (BuildContext context, Widget? child) {
+                  return Positioned(
+                    left: leftInset + travelWidth * _tripCarAnimation.value,
+                    top: 13.h,
+                    child: child!,
+                  );
+                },
+                child: Container(
+                  width: carSize,
+                  height: carSize,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: AppColors.whiteColor,
+                    boxShadow: [
+                      BoxShadow(
+                        color: AppColors.blackColor.withValues(alpha: .16),
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  alignment: Alignment.center,
+                  child: Icon(
+                    Icons.local_taxi_rounded,
+                    color: AppColors.routeGreen,
+                    size: 24.w,
+                  ),
+                ),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildTripInProgressPanel() {
+    final booking = riderBookingModel.value?.data?.booking;
+    final String distance = '${booking?.distance ?? ''}'.trim();
+    final String dropoffAddress = '${booking?.dropoffAddress ?? ''}'.trim();
+    final String pickupAddress = '${booking?.pickupAddress ?? ''}'.trim();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: double.infinity,
+          padding: EdgeInsets.all(18.w),
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [AppColors.routeGreen, AppColors.successColor],
+            ),
+            borderRadius: BorderRadius.circular(22.r),
+            boxShadow: [
+              BoxShadow(
+                color: AppColors.routeGreen.withValues(alpha: .22),
+                blurRadius: 18,
+                offset: const Offset(0, 8),
+              ),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    width: 44.w,
+                    height: 44.w,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: AppColors.whiteColor.withValues(alpha: .18),
+                      border: Border.all(
+                        color: AppColors.whiteColor.withValues(alpha: .28),
+                      ),
+                    ),
+                    alignment: Alignment.center,
+                    child: Icon(
+                      Icons.navigation_rounded,
+                      color: AppColors.whiteColor,
+                      size: 24.w,
+                    ),
+                  ),
+                  12.horizontalSpace,
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        CommonText(
+                          string: VTaxiLocalizationService.text(
+                            'vtaxi.trip.in_progress_title',
+                            'Úton vagyunk az úticélhoz',
+                          ),
+                          color: AppColors.whiteColor,
+                          fontSize: 19.sp,
+                          fontWeight: FontWeight.w700,
+                          softWrap: true,
+                        ),
+                        5.verticalSpace,
+                        CommonText(
+                          string: VTaxiLocalizationService.text(
+                            'vtaxi.trip.in_progress_subtitle',
+                            'Dőlj hátra, kövesd az utat a térképen. A VTaxi visz tovább.',
+                          ),
+                          color: AppColors.whiteColor.withValues(alpha: .88),
+                          fontSize: 13.sp,
+                          fontWeight: FontWeight.w500,
+                          softWrap: true,
+                          height: 1.3,
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (distance.isNotEmpty) ...[
+                    10.horizontalSpace,
+                    Container(
+                      padding: EdgeInsets.symmetric(
+                        horizontal: 10.w,
+                        vertical: 7.h,
+                      ),
+                      decoration: BoxDecoration(
+                        color: AppColors.whiteColor,
+                        borderRadius: BorderRadius.circular(999.r),
+                      ),
+                      child: CommonText(
+                        string: '$distance km',
+                        color: AppColors.routeGreen,
+                        fontSize: 12.sp,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+              16.verticalSpace,
+              _buildTripProgressRoad(),
+              10.verticalSpace,
+              Row(
+                children: [
+                  Container(
+                    width: 7.w,
+                    height: 7.w,
+                    decoration: const BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: AppColors.whiteColor,
+                    ),
+                  ),
+                  7.horizontalSpace,
+                  CommonText(
+                    string: VTaxiLocalizationService.text(
+                      'vtaxi.trip.live_status',
+                      'Utazás folyamatban',
+                    ),
+                    color: AppColors.whiteColor.withValues(alpha: .92),
+                    fontSize: 12.sp,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+        14.verticalSpace,
+        Container(
+          width: double.infinity,
+          padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 13.h),
+          decoration: BoxDecoration(
+            color: AppColors.sucessContainer,
+            borderRadius: BorderRadius.circular(16.r),
+            border: Border.all(
+              color: AppColors.routeGreen.withValues(alpha: .22),
+            ),
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 38.w,
+                height: 38.w,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: AppColors.whiteColor,
+                ),
+                alignment: Alignment.center,
+                child: Icon(
+                  Icons.flag_rounded,
+                  color: AppColors.routeGreen,
+                  size: 22.w,
+                ),
+              ),
+              11.horizontalSpace,
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    CommonText(
+                      string: VTaxiLocalizationService.text(
+                        'vtaxi.trip.destination_label',
+                        'Úticél',
+                      ),
+                      color: AppColors.routeGreen,
+                      fontSize: 12.sp,
+                      fontWeight: FontWeight.w700,
+                    ),
+                    3.verticalSpace,
+                    CommonText(
+                      string: dropoffAddress.isEmpty
+                          ? AppString.destination.tr
+                          : dropoffAddress,
+                      fontSize: 14.sp,
+                      fontWeight: FontWeight.w600,
+                      softWrap: true,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        14.verticalSpace,
+        Container(
+          padding: EdgeInsets.all(10.w),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(14.r),
+            color: AppColors.whiteGrey,
+            border: Border.all(color: AppColors.textFieldBorderColor),
+          ),
+          child: DriverDetailsWidget(
+            image: riderBookingModel.value?.data?.driver?.profilePhoto ?? '',
+            firstText:
+                riderBookingModel.value?.data?.driver?.vehicle?.numberPlate ??
+                '',
+            thirdText:
+                riderBookingModel.value?.data?.driver?.vehicle?.model ?? '',
+            secoundText: riderBookingModel.value?.data?.driver?.name ?? '',
+            rating: riderBookingModel.value?.data?.driver?.rating ?? '',
+            radius: 100,
+          ),
+        ),
+        14.verticalSpace,
+        OriginDestinationWidget(
+          destination: dropoffAddress,
+          origin: pickupAddress,
+          customImage: true,
+        ),
+      ],
+    );
+  }
+
   bool _isCompletedAwaitingPayment() {
     final booking = riderBookingModel.value?.data?.booking;
     final status = (booking?.status ?? '').trim().toLowerCase();
@@ -139,13 +474,15 @@ class _SearchDriverScreenState extends State<SearchDriverScreen> {
   String _paymentMethodLabel(String? value) {
     switch ((value ?? '').trim().toLowerCase()) {
       case 'stripe':
-        return 'Bankkártya / telefonos fizetés';
+        return VTaxiLocalizationService.text('vtaxi.settlement.stripe_method', 'Bankkártya / telefonos fizetés');
       case 'wallet':
-        return 'Wallet';
+        return VTaxiLocalizationService.text('vtaxi.settlement.wallet_method', 'Wallet');
       case 'cash':
-        return 'Készpénz';
+        return VTaxiLocalizationService.text('vtaxi.settlement.cash_method', 'Készpénz');
+      case 'terminal':
+        return VTaxiLocalizationService.text('vtaxi.settlement.terminal_method', 'Bankkártya / terminál');
       default:
-        return 'Fizetés';
+        return VTaxiLocalizationService.text('vtaxi.settlement.generic_method', 'Fizetés');
     }
   }
 
@@ -167,15 +504,15 @@ class _SearchDriverScreenState extends State<SearchDriverScreen> {
 
     String message;
     if (paymentMethod == 'stripe') {
-      message =
-          'A bankkártyás fizetés visszaigazolására várunk. A fizetés után ez a képernyő automatikusan frissül.';
+      message = VTaxiLocalizationService.text('vtaxi.settlement.stripe_wait', 'A bankkártyás fizetés visszaigazolására várunk. A fizetés után ez a képernyő automatikusan frissül.');
     } else if (paymentMethod == 'cash') {
-      message =
-          'A készpénzes fizetés sofőri visszaigazolására várunk.';
+      message = VTaxiLocalizationService.text('vtaxi.settlement.cash_wait', 'A készpénzes fizetés sofőri visszaigazolására várunk.');
     } else if (paymentMethod == 'wallet') {
-      message = 'A Wallet fizetés feldolgozására várunk.';
+      message = VTaxiLocalizationService.text('vtaxi.settlement.wallet_wait', 'A Wallet fizetés feldolgozására várunk.');
+    } else if (paymentMethod == 'terminal') {
+      message = VTaxiLocalizationService.text('vtaxi.settlement.terminal_wait', 'A bankkártyás terminálfizetés sofőri visszaigazolására várunk.');
     } else {
-      message = 'A fizetés visszaigazolására várunk.';
+      message = VTaxiLocalizationService.text('vtaxi.settlement.generic_wait', 'A fizetés visszaigazolására várunk.');
     }
 
     return Positioned.fill(
@@ -202,14 +539,14 @@ class _SearchDriverScreenState extends State<SearchDriverScreen> {
               ),
               24.verticalSpace,
               CommonText(
-                string: 'Az utazás véget ért',
+                string: VTaxiLocalizationService.text('vtaxi.settlement.trip_ended', 'Az utazás véget ért'),
                 fontSize: 24.sp,
                 fontWeight: FontWeight.w700,
                 textAlign: TextAlign.center,
               ),
               10.verticalSpace,
               CommonText(
-                string: 'Fizetésre várunk…',
+                string: VTaxiLocalizationService.text('vtaxi.settlement.waiting', 'Fizetésre várunk…'),
                 fontSize: 18.sp,
                 fontWeight: FontWeight.w600,
                 color: AppColors.mainPrimaryColor,
@@ -229,7 +566,7 @@ class _SearchDriverScreenState extends State<SearchDriverScreen> {
                 child: Column(
                   children: [
                     CommonText(
-                      string: 'Fizetendő összeg',
+                      string: VTaxiLocalizationService.text('vtaxi.settlement.amount_due', 'Fizetendő összeg'),
                       fontSize: 13.sp,
                       color: AppColors.textCaptionColor,
                     ),
@@ -243,7 +580,7 @@ class _SearchDriverScreenState extends State<SearchDriverScreen> {
                     Divider(color: AppColors.textFieldBorderColor),
                     10.verticalSpace,
                     CommonText(
-                      string: 'Fizetési mód: $methodLabel',
+                      string: '${VTaxiLocalizationService.text('vtaxi.settlement.payment_method', 'Fizetési mód')}: $methodLabel',
                       fontSize: 14.sp,
                       fontWeight: FontWeight.w600,
                       textAlign: TextAlign.center,
@@ -682,6 +1019,14 @@ class _SearchDriverScreenState extends State<SearchDriverScreen> {
   void initState() {
     // TODO: implement initState
     super.initState();
+    _tripCarAnimationController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 4),
+    )..repeat();
+    _tripCarAnimation = CurvedAnimation(
+      parent: _tripCarAnimationController,
+      curve: Curves.easeInOutCubic,
+    );
     unawaited(ScreenAwakeService.setKeepAwake(true));
 
     if (Get.arguments != null) {
@@ -1356,6 +1701,7 @@ class _SearchDriverScreenState extends State<SearchDriverScreen> {
     _bookingStatusPollingTimer?.cancel();
     _paymentSettlementPollingTimer?.cancel();
     _driverMarkerAnimationTimer?.cancel();
+    _tripCarAnimationController.dispose();
     _rideModelWorker?.dispose();
     _subscription?.cancel();
     _sub?.cancel();
@@ -2052,89 +2398,7 @@ class _SearchDriverScreenState extends State<SearchDriverScreen> {
                                 ),
                               ],
                             )
-                          : Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  mainAxisAlignment:
-                                      MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    CommonText(
-                                      string: AppString.tripToDetination.tr,
-                                      fontSize: 16.sp,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                    CommonText(
-                                      string:
-                                          '${riderBookingModel.value?.data?.booking?.distance ?? ""} Km',
-                                      fontSize: 14.sp,
-                                    ),
-                                  ],
-                                ),
-                                Divider(color: AppColors.textFieldBorderColor),
-                                Container(
-                                  padding: EdgeInsets.all(8.w),
-                                  decoration: BoxDecoration(
-                                    borderRadius: BorderRadius.circular(8.r),
-                                    color: AppColors.whiteGrey,
-                                  ),
-                                  child: GestureDetector(
-                                    onTap: () {
-                                      // tripType.value=0;
-                                    },
-                                    child: DriverDetailsWidget(
-                                      image:
-                                          riderBookingModel
-                                              .value
-                                              ?.data
-                                              ?.driver
-                                              ?.profilePhoto ??
-                                          "",
-                                      firstText:
-                                          riderBookingModel
-                                              .value
-                                              ?.data
-                                              ?.driver
-                                              ?.vehicle
-                                              ?.numberPlate ??
-                                          "",
-                                      thirdText:
-                                          riderBookingModel
-                                              .value
-                                              ?.data
-                                              ?.driver
-                                              ?.vehicle
-                                              ?.model ??
-                                          "",
-                                      secoundText:
-                                          riderBookingModel
-                                              .value
-                                              ?.data
-                                              ?.driver
-                                              ?.name ??
-                                          "",
-                                      rating:
-                                          riderBookingModel
-                                              .value
-                                              ?.data
-                                              ?.driver
-                                              ?.rating ??
-                                          "",
-                                      radius: 100,
-                                    ),
-                                  ),
-                                ),
-                                16.verticalSpace,
-
-                                OriginDestinationWidget(
-                                  destination:
-                                      "${riderBookingModel.value?.data?.booking?.dropoffAddress}",
-                                  origin:
-                                      "${riderBookingModel.value?.data?.booking?.pickupAddress}",
-                                  customImage: true,
-                                ),
-                              ],
-                            ),
+                          : _buildTripInProgressPanel(),
                     ),
                   );
                 }),

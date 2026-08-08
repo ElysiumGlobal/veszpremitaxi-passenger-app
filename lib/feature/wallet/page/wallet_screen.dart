@@ -1,8 +1,11 @@
 import 'package:e_taxi/feature/wallet/controller/wallet_controller.dart';
+import 'package:e_taxi/core/localization/vtaxi_localization_service.dart';
 import 'package:e_taxi/utils/app_colors.dart';
 import 'package:e_taxi/utils/app_string.dart';
 import 'package:e_taxi/utils/assets.dart';
 import 'package:e_taxi/utils/utils.dart';
+import 'package:e_taxi/utils/navigation_utils/navigation.dart';
+import 'package:e_taxi/utils/navigation_utils/routes.dart';
 import 'package:e_taxi/widgets/appbar.dart';
 import 'package:e_taxi/widgets/common_text.dart';
 import 'package:e_taxi/widgets/custom_button.dart';
@@ -42,6 +45,8 @@ class _WalletScreenState extends State<WalletScreen> {
                     _balanceCard(),
                     12.verticalSpace,
                     _topupCard(),
+                    12.verticalSpace,
+                    _bankCardManagementCard(),
                     16.verticalSpace,
                     Expanded(child: _transactionCard()),
                   ],
@@ -65,6 +70,12 @@ class _WalletScreenState extends State<WalletScreen> {
           12.verticalSpace,
           Container(
             height: 72.h,
+            width: double.infinity,
+            color: AppColors.whiteColor,
+          ),
+          12.verticalSpace,
+          Container(
+            height: 76.h,
             width: double.infinity,
             color: AppColors.whiteColor,
           ),
@@ -92,7 +103,7 @@ class _WalletScreenState extends State<WalletScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           CommonText(
-            string: 'Elérhető egyenleg',
+            string: VTaxiLocalizationService.text('vtaxi.wallet.available_balance', 'Elérhető egyenleg'),
             color: AppColors.whiteColor.withValues(alpha: .78),
             fontSize: 14.sp,
           ),
@@ -107,7 +118,7 @@ class _WalletScreenState extends State<WalletScreen> {
           ),
           6.verticalSpace,
           CommonText(
-            string: 'Ebből az összegből teljes fuvarokat fizethetsz.',
+            string: VTaxiLocalizationService.text('vtaxi.wallet.full_rides_only', 'Ebből az összegből teljes fuvarokat fizethetsz.'),
             color: AppColors.whiteColor.withValues(alpha: .72),
             fontSize: 12.sp,
             softWrap: true,
@@ -135,9 +146,9 @@ class _WalletScreenState extends State<WalletScreen> {
               child: const CircularProgressIndicator(strokeWidth: 2),
             ),
             12.horizontalSpace,
-            const Expanded(
+            Expanded(
               child: CommonText(
-                string: 'Bankkártyás feltöltés betöltése…',
+                string: VTaxiLocalizationService.text('vtaxi.wallet.card_topup_loading', 'Bankkártyás feltöltés betöltése…'),
                 softWrap: true,
               ),
             ),
@@ -179,13 +190,13 @@ class _WalletScreenState extends State<WalletScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 CommonText(
-                  string: 'Egyenleg feltöltése',
+                  string: VTaxiLocalizationService.text('vtaxi.wallet.topup_balance', 'Egyenleg feltöltése'),
                   fontWeight: FontWeight.w600,
                   fontSize: 16.sp,
                 ),
                 3.verticalSpace,
                 CommonText(
-                  string: 'Bankkártyával vagy Google Pay-jel',
+                  string: VTaxiLocalizationService.text('vtaxi.wallet.card_or_google_pay', 'Bankkártyával vagy Google Pay-jel'),
                   color: AppColors.textCaptionColor,
                   fontSize: 12.sp,
                 ),
@@ -197,13 +208,74 @@ class _WalletScreenState extends State<WalletScreen> {
             width: 108.w,
             child: CustomButton(
               height: 44.h,
-              text: 'Feltöltés',
+              text: VTaxiLocalizationService.text('vtaxi.wallet.topup', 'Feltöltés'),
               fontSize: 14.sp,
               fontWeight: FontWeight.w600,
               onTap: _openTopupSheet,
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _bankCardManagementCard() {
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () {
+        Navigation.pushNamed(Routes.bankCardScreen);
+      },
+      child: Container(
+        width: double.infinity,
+        padding: EdgeInsets.all(14.w),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(12.r),
+          border: Border.all(color: AppColors.textFieldBorderColor),
+          color: AppColors.whiteColor,
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 44.w,
+              height: 44.w,
+              decoration: BoxDecoration(
+                color: AppColors.primaryContainer,
+                borderRadius: BorderRadius.circular(10.r),
+              ),
+              child: Icon(
+                Icons.credit_card_rounded,
+                color: AppColors.brandNavy,
+                size: 24.sp,
+              ),
+            ),
+            12.horizontalSpace,
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  CommonText(
+                    string: AppString.bankCard.tr,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 16.sp,
+                  ),
+                  3.verticalSpace,
+                  CommonText(
+                    string: AppString.bankCardIntro.tr,
+                    color: AppColors.textCaptionColor,
+                    fontSize: 12.sp,
+                    softWrap: true,
+                  ),
+                ],
+              ),
+            ),
+            8.horizontalSpace,
+            Icon(
+              Icons.chevron_right_rounded,
+              color: AppColors.textCaptionColor,
+              size: 26.sp,
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -391,14 +463,14 @@ class _WalletScreenState extends State<WalletScreen> {
                       ),
                       18.verticalSpace,
                       CommonText(
-                        string: 'Tárca feltöltése',
+                        string: VTaxiLocalizationService.text('vtaxi.wallet.modal_title', 'Tárca feltöltése'),
                         fontSize: 22.sp,
                         fontWeight: FontWeight.w700,
                       ),
                       6.verticalSpace,
                       CommonText(
                         string:
-                            'Válaszd ki az összeget. A teljes kiválasztott összeg kerül jóváírásra a tárcádban.',
+                            VTaxiLocalizationService.text('vtaxi.wallet.modal_help', 'Válaszd ki az összeget. A teljes kiválasztott összeg kerül jóváírásra a tárcádban.'),
                         color: AppColors.textCaptionColor,
                         fontSize: 13.sp,
                         softWrap: true,
@@ -415,7 +487,7 @@ class _WalletScreenState extends State<WalletScreen> {
                             borderRadius: BorderRadius.circular(8.r),
                           ),
                           child: CommonText(
-                            string: 'TESZT MÓD – valódi pénzt nem von le',
+                            string: VTaxiLocalizationService.text('vtaxi.wallet.test_mode', 'TESZT MÓD – valódi pénzt nem von le'),
                             color: AppColors.brandNavy,
                             fontSize: 12.sp,
                             fontWeight: FontWeight.w600,
@@ -492,7 +564,7 @@ class _WalletScreenState extends State<WalletScreen> {
                           Expanded(
                             child: CommonText(
                               string:
-                                  'A bankkártyaadatokat a Stripe kezeli; a Veszprémi Taxi nem tárolja a kártyaszámot.',
+                                  VTaxiLocalizationService.text('vtaxi.wallet.card_data_notice', 'A bankkártyaadatokat a Stripe kezeli; a Veszprémi Taxi nem tárolja a kártyaszámot.'),
                               color: AppColors.textCaptionColor,
                               fontSize: 11.sp,
                               softWrap: true,

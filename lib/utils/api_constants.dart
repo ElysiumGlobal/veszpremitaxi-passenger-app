@@ -61,6 +61,8 @@ class ApiConstants {
   static const String supportChatHistory = "support/messages_list?booking_id=";
 
   static const String setting = "settings";
+  static const String getAppLanguage = "get-app-language";
+  static const String updateLanguagePreference = "language/preference";
 
   static const String deleteAccount = "user/delete-account";
   static const String logOutAccount = "user/logout-safe";

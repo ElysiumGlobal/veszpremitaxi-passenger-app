@@ -1,6 +1,7 @@
 import 'package:get/get_navigation/src/root/internacionalization.dart';
 
 import '../../../../../utils/app_string.dart';
+import '../../../../localization/vtaxi_localization_service.dart';
 
 Map<String, String> hungarianLn = {
   AppString.onBoardingOneTitle: "Taxirendelés egyszerűen",
@@ -271,6 +272,6 @@ Map<String, String> hungarianLn = {
 class AppTranslations extends Translations {
   @override
   Map<String, Map<String, String>> get keys => {
-    "hu_HU": hungarianLn,
+    "hu_HU": VTaxiLocalizationService.merge(hungarianLn),
   };
 }

@@ -1,0 +1,17 @@
+{
+  "version": "1.0.41+51",
+  "scope": "Passenger started-trip UX only",
+  "checks": {
+    "trip_started_branch_replaced_with_new_panel": "PASS",
+    "green_active_trip_card_present": "PASS",
+    "decorative_moving_taxi_animation_present": "PASS",
+    "destination_card_present": "PASS",
+    "driver_details_preserved": "PASS",
+    "origin_destination_widget_preserved": "PASS",
+    "payment_settlement_overlay_preserved": "PASS",
+    "wallet_and_qr_code_paths_untouched": "PASS",
+    "bank_card_screen_preserved": "PASS",
+    "screen_awake_preserved": "PASS"
+  },
+  "note": "No Flutter SDK is available in this workspace, so the next compile proof is Codemagic. The moving taxi strip is decorative and does not claim a fake remaining-trip percentage."
+}

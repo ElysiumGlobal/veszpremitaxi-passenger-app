@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:ui';
 
 import 'package:e_taxi/utils/app_colors.dart';
@@ -17,6 +18,7 @@ import 'package:get/get.dart';
 import 'core/debug/passenger_flow_debug.dart';
 import 'core/helper/language_provider/localization/language/english.dart';
 import 'core/helper/notification_service/firebase_notification_service.dart';
+import 'core/localization/vtaxi_localization_service.dart';
 import 'firebase_options.dart';
 
 Future<Locale> updateLocal() async {
@@ -42,6 +44,7 @@ Future<void> main() async {
   }
 
   await AppPreference.initMySharedPreferences();
+  await VTaxiLocalizationService.loadCached();
   await PassengerFlowDebug.initialize();
 
   FlutterError.onError = (FlutterErrorDetails details) {
@@ -87,6 +90,7 @@ Future<void> main() async {
   }
 
   runApp(MyApp(initialLocale: locale));
+  unawaited(VTaxiLocalizationService.refreshFromBackend());
 }
 
 class MyApp extends StatelessWidget {

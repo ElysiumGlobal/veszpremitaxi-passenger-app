@@ -19,23 +19,9 @@ class LanguageScreen extends StatefulWidget {
 }
 
 class _LanguageScreenState extends State<LanguageScreen> {
-  List iconList = [ImagesAsset.uk, ImagesAsset.india, ImagesAsset.aerabic];
-  List titleList = [
-    "English",
-    "Hindi",
-    "Arebic",
-    "Portuguese",
-    "Hebrew",
-    "Russian",
-  ];
-  List subtitleList = [
-    "English",
-    "हिंदी",
-    "عربي",
-    "Português",
-    "עִברִית",
-    "Русский",
-  ];
+  List iconList = [IconAsset.language];
+  List titleList = ["Magyar"];
+  List subtitleList = ["Magyar"];
 
   @override
   Widget build(BuildContext context) {

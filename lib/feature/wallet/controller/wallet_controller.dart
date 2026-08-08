@@ -4,6 +4,7 @@ import 'dart:math';
 
 import 'package:e_taxi/feature/wallet/model/walllet_model.dart';
 import 'package:e_taxi/feature/wallet/service/wallet_service.dart';
+import 'package:e_taxi/core/localization/vtaxi_localization_service.dart';
 import 'package:e_taxi/utils/app_preferences.dart';
 import 'package:e_taxi/utils/common_api_caller.dart';
 import 'package:e_taxi/utils/loading_mixin.dart';
@@ -107,7 +108,7 @@ class WalletController extends GetxController
 
       if (!stripeTopupEnabled.value) {
         AppSnackBar.showErrorSnackBar(
-          message: 'A bankkártyás egyenlegfeltöltés jelenleg nem érhető el.',
+          message: VTaxiLocalizationService.text('vtaxi.wallet.topup_unavailable', 'A bankkártyás egyenlegfeltöltés jelenleg nem érhető el.'),
           isError: true,
         );
         return false;
@@ -115,7 +116,7 @@ class WalletController extends GetxController
 
       if (!allowedTopupAmounts.contains(amount)) {
         AppSnackBar.showErrorSnackBar(
-          message: 'Ez a feltöltési összeg jelenleg nem engedélyezett.',
+          message: VTaxiLocalizationService.text('vtaxi.wallet.amount_not_allowed', 'Ez a feltöltési összeg jelenleg nem engedélyezett.'),
           isError: true,
         );
         return false;
@@ -137,7 +138,7 @@ class WalletController extends GetxController
           .toLowerCase();
 
       if (topupId.isEmpty || clientSecret.isEmpty || publishableKey.isEmpty) {
-        throw const FormatException('Hiányos Stripe feltöltési válasz.');
+        throw FormatException(VTaxiLocalizationService.text('vtaxi.wallet.incomplete_stripe_response', 'Hiányos Stripe feltöltési válasz.'));
       }
 
       Stripe.publishableKey = publishableKey;
@@ -175,7 +176,7 @@ class WalletController extends GetxController
       await getWalletData();
       AppSnackBar.showErrorSnackBar(
         message:
-            'A kártyás fizetés megtörtént, a jóváírás még feldolgozás alatt van. Húzd le a Tárca oldalt frissítéshez.',
+            VTaxiLocalizationService.text('vtaxi.wallet.processing_notice', 'A kártyás fizetés megtörtént, a jóváírás még feldolgozás alatt van. Húzd le a Tárca oldalt frissítéshez.'),
       );
       return false;
     } on StripeException catch (e) {
@@ -191,7 +192,7 @@ class WalletController extends GetxController
       return false;
     } catch (e) {
       AppSnackBar.showErrorSnackBar(
-        message: 'A feltöltés nem sikerült. Kérlek próbáld újra.',
+        message: VTaxiLocalizationService.text('vtaxi.wallet.topup_failed', 'A feltöltés nem sikerült. Kérlek próbáld újra.'),
         isError: true,
       );
       return false;

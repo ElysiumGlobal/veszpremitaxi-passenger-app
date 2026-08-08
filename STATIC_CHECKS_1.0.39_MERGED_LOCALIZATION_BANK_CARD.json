@@ -1,0 +1,14 @@
+{
+  "version": "1.0.39+49",
+  "bank_card_screen_exists": true,
+  "credit_card_icon_exists": true,
+  "profile_has_bank_card_route": true,
+  "route_registered": true,
+  "remote_localization_service_exists": true,
+  "hungarian_merge_enabled": true,
+  "bank_card_appstring_missing": [],
+  "bank_card_hu_fallback_missing": [],
+  "booking_controller_changed_by_merge": false,
+  "wallet_engine_changed_by_merge": false,
+  "stripe_qr_changed_by_merge": false
+}

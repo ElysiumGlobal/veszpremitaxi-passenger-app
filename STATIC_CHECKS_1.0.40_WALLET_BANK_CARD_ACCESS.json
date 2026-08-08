@@ -1,0 +1,13 @@
+{
+  "version": "1.0.40+50",
+  "wallet_has_bank_card_entry": true,
+  "wallet_bank_card_entry_uses_existing_route": true,
+  "profile_bank_card_entry_preserved": true,
+  "single_bank_card_screen_preserved": true,
+  "bank_card_localization_reused": true,
+  "backend_changed": false,
+  "booking_controller_changed": false,
+  "wallet_engine_changed": false,
+  "stripe_qr_changed": false,
+  "payment_settlement_changed": false
+}

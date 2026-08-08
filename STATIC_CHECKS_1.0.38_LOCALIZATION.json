@@ -1,0 +1,30 @@
+{
+  "version": "1.0.38+48",
+  "baseline": "VeszpremiTaxi-Passenger-1.0.37-wallet-settlement-awake-audio-full-source.zip",
+  "localization": {
+    "default_locale": "hu_HU",
+    "remote_endpoint": "/api/get-app-language",
+    "cached_remote_hu": true,
+    "offline_builtin_hu_fallback": true,
+    "appstring_tr_keys_audited": 179,
+    "missing_appstring_tr_keys": 0
+  },
+  "changed_critical_areas": [
+    "Wallet/topup visible strings",
+    "completed ride payment settlement visible strings",
+    "terminal payment method label"
+  ],
+  "explicit_non_changes": [
+    "booking lifecycle",
+    "Wallet payment engine",
+    "Stripe wallet top-up engine",
+    "Stripe QR engine",
+    "SearchDriver settlement state machine"
+  ],
+  "static_validation": {
+    "dart_lexical_balance": "PASS",
+    "relative_import_targets": "PASS",
+    "flutter_analyze": "NOT_RUN_FLUTTER_CLI_NOT_AVAILABLE",
+    "codemagic_build": "REQUIRED"
+  }
+}
