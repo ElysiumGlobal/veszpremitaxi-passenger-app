@@ -149,7 +149,7 @@ class _PickupPointScreenState extends State<PickupPointScreen>
                 alignment: Alignment.center,
                 children: [
                   SizedBox(
-                    height: 430.h,
+                    height: 365.h,
                     child: Obx(
                       () => GoogleMap(
                         padding: EdgeInsets.only(top: 40.h),
@@ -274,7 +274,7 @@ class _PickupPointScreenState extends State<PickupPointScreen>
                                       'Most itt vagy',
                                     ),
                                     color: AppColors.whiteColor,
-                                    fontSize: 12.sp,
+                                    fontSize: 11.sp,
                                     fontWeight: FontWeight.w700,
                                   ),
                                 ],
@@ -289,7 +289,7 @@ class _PickupPointScreenState extends State<PickupPointScreen>
               ),
               Container(
                 width: double.infinity,
-                padding: EdgeInsets.all(16.w),
+                padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
 
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.vertical(
@@ -305,7 +305,7 @@ class _PickupPointScreenState extends State<PickupPointScreen>
                   children: [
                     CommonText(
                       string: AppString.doubleCheckPickupPoint.tr,
-                      fontSize: 18.sp,
+                      fontSize: 17.sp,
                       fontWeight: FontWeight.w700,
                     ),
                     5.verticalSpace,
@@ -320,8 +320,8 @@ class _PickupPointScreenState extends State<PickupPointScreen>
                       height: 1.35,
                     ),
                     Container(
-                      margin: EdgeInsets.symmetric(vertical: 12.h),
-                      padding: EdgeInsets.all(12.w),
+                      margin: EdgeInsets.symmetric(vertical: 9.h),
+                      padding: EdgeInsets.symmetric(horizontal: 11.w, vertical: 9.h),
                       width: double.infinity,
                       decoration: BoxDecoration(
                         borderRadius: BorderRadius.circular(8.r),
@@ -336,13 +336,13 @@ class _PickupPointScreenState extends State<PickupPointScreen>
                             CommonText(
                               string: title.value,
                               fontWeight: FontWeight.w500,
-                              fontSize: 16.sp,
+                              fontSize: 15.sp,
                             ),
                             2.verticalSpace,
                             CommonText(
                               string: subTitle.value,
                               fontWeight: FontWeight.w400,
-                              fontSize: 14.sp,
+                              fontSize: 13.sp,
                               color: AppColors.textCaptionColor,
                               softWrap: true,
                             ),
@@ -352,10 +352,10 @@ class _PickupPointScreenState extends State<PickupPointScreen>
                     ),
                     CommonText(
                       string: AppString.saveLocationAs.tr,
-                      fontSize: 16.sp,
+                      fontSize: 15.sp,
                       fontWeight: FontWeight.w500,
                     ),
-                    16.verticalSpace,
+                    12.verticalSpace,
                     Wrap(
                       direction: Axis.horizontal,
                       runSpacing: 10.w,

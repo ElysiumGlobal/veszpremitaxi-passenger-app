@@ -1926,7 +1926,7 @@ class _SearchDriverScreenState extends State<SearchDriverScreen> with SingleTick
                 children: [
               // Map Section (top 2/3)
               SizedBox(
-                height: 425.h,
+                height: 380.h,
                 child: Stack(
                   children: [
                     Obx(

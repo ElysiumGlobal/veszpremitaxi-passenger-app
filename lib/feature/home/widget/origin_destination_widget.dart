@@ -36,8 +36,8 @@ class OriginDestinationWidget extends StatelessWidget {
     Animation<double>? pulse,
   }) {
     final child = Container(
-      width: 36.w,
-      height: 36.w,
+      width: 32.w,
+      height: 32.w,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
         color: AppColors.whiteColor.withValues(alpha: .18),
@@ -46,7 +46,7 @@ class OriginDestinationWidget extends StatelessWidget {
         ),
       ),
       alignment: Alignment.center,
-      child: Icon(icon, color: AppColors.whiteColor, size: 21.w),
+      child: Icon(icon, color: AppColors.whiteColor, size: 18.w),
     );
 
     if (pulse == null) return child;
@@ -73,15 +73,15 @@ class OriginDestinationWidget extends StatelessWidget {
   }) {
     return Container(
       width: double.infinity,
-      padding: EdgeInsets.symmetric(horizontal: 13.w, vertical: 12.h),
+      padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 9.h),
       decoration: BoxDecoration(
         color: color,
-        borderRadius: BorderRadius.circular(15.r),
+        borderRadius: BorderRadius.circular(13.r),
         boxShadow: [
           BoxShadow(
             color: color.withValues(alpha: .18),
-            blurRadius: 12,
-            offset: const Offset(0, 5),
+            blurRadius: 8,
+            offset: const Offset(0, 3),
           ),
         ],
       ),
@@ -89,7 +89,7 @@ class OriginDestinationWidget extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           _iconBubble(icon: icon, color: color, pulse: pulse),
-          11.horizontalSpace,
+          9.horizontalSpace,
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -97,10 +97,10 @@ class OriginDestinationWidget extends StatelessWidget {
                 CommonText(
                   string: label,
                   color: AppColors.whiteColor.withValues(alpha: .82),
-                  fontSize: 11.sp,
+                  fontSize: 10.sp,
                   fontWeight: FontWeight.w700,
                 ),
-                3.verticalSpace,
+                2.verticalSpace,
                 child,
               ],
             ),
@@ -135,7 +135,7 @@ class OriginDestinationWidget extends StatelessWidget {
                     'Indulási hely kiválasztása',
                   )
                 : origin,
-            fontSize: 14.sp,
+            fontSize: 13.sp,
             fontWeight: FontWeight.w600,
             color: AppColors.whiteColor,
             softWrap: true,
@@ -145,12 +145,12 @@ class OriginDestinationWidget extends StatelessWidget {
         ),
         if (showDotLine) ...[
           Padding(
-            padding: EdgeInsets.only(left: 30.w),
+            padding: EdgeInsets.only(left: 27.w),
             child: SizedBox(
-              height: 18.h,
+              height: 14.h,
               child: DottedLine(
                 direction: Axis.vertical,
-                lineLength: 18.h,
+                lineLength: 14.h,
                 lineThickness: 2,
                 dashLength: 4,
                 dashColor: AppColors.textFieldBorderColor,
@@ -158,7 +158,7 @@ class OriginDestinationWidget extends StatelessWidget {
             ),
           ),
         ] else
-          8.verticalSpace,
+          6.verticalSpace,
         _locationCard(
           color: AppColors.routeGreen,
           icon: Icons.location_on_rounded,
@@ -173,7 +173,7 @@ class OriginDestinationWidget extends StatelessWidget {
                   cursorColor: AppColors.whiteColor,
                   style: TextStyle(
                     color: AppColors.whiteColor,
-                    fontSize: 15.sp,
+                    fontSize: 14.sp,
                     fontWeight: FontWeight.w600,
                   ),
                   decoration: InputDecoration(
@@ -185,7 +185,7 @@ class OriginDestinationWidget extends StatelessWidget {
                         ),
                     hintStyle: TextStyle(
                       color: AppColors.whiteColor.withValues(alpha: .82),
-                      fontSize: 14.sp,
+                      fontSize: 13.sp,
                       fontWeight: FontWeight.w500,
                     ),
                     contentPadding: EdgeInsets.zero,
@@ -203,7 +203,7 @@ class OriginDestinationWidget extends StatelessWidget {
                           'Úti cél nincs megadva',
                         )
                       : destination,
-                  fontSize: 14.sp,
+                  fontSize: 13.sp,
                   fontWeight: FontWeight.w600,
                   color: AppColors.whiteColor,
                   softWrap: true,

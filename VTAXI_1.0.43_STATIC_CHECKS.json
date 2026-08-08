@@ -1,0 +1,32 @@
+{
+  "version": "1.0.43+53",
+  "base": "1.0.42+52",
+  "checks": {
+    "version_1_0_43_53": true,
+    "book_vehicle_map_365": true,
+    "pickup_map_365": true,
+    "active_ride_map_380": true,
+    "compact_location_cards": true,
+    "compact_where_am_i": true,
+    "suggestion_soft_shadow": true,
+    "suggestion_thin_border": true,
+    "no_drag_sheet_added": true,
+    "home_controller_unchanged": true,
+    "select_vehicle_unchanged": true,
+    "only_expected_base_files_changed": true,
+    "changed_dart_structure_balance": true
+  },
+  "changed_base_files": [
+    "lib/feature/home/page/bookvehicle_screen.dart",
+    "lib/feature/home/page/pickup_point_screen.dart",
+    "lib/feature/home/page/search_driver.dart",
+    "lib/feature/home/page/search_screen_secound.dart",
+    "lib/feature/home/page/search_screenfirst.dart",
+    "lib/feature/home/widget/origin_destination_widget.dart",
+    "lib/feature/home/widget/suggetion_address.dart",
+    "pubspec.yaml"
+  ],
+  "pass": true,
+  "compile_runtime_note": "Flutter/Dart SDK unavailable in this environment; Codemagic build is still required.",
+  "lifecycle_scope_note": "No HomeController, booking/payment service/controller/backend or payment lifecycle file changed."
+}

@@ -2,7 +2,7 @@ import 'package:e_taxi/utils/app_colors.dart';
 import 'package:e_taxi/utils/assets.dart';
 import 'package:e_taxi/widgets/common_text.dart';
 import 'package:e_taxi/widgets/custome_img.dart';
-import 'package:flutter/cupertino.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 
 class SuggestionAddressWidget extends StatelessWidget {
@@ -22,44 +22,62 @@ class SuggestionAddressWidget extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       behavior: HitTestBehavior.translucent,
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        mainAxisAlignment: MainAxisAlignment.start,
-        children: [
-          Container(
-            padding: EdgeInsets.all(4.w),
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: AppColors.textFieldBorderColor,
-            ),
-            child: CustomImage(
-              image: IconAsset.locationPin,
-              ht: 16.h,
-              wt: 16.h,
-              fit: BoxFit.cover,
-            ),
+      child: Container(
+        width: double.infinity,
+        padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 8.h),
+        decoration: BoxDecoration(
+          color: AppColors.whiteColor,
+          borderRadius: BorderRadius.circular(10.r),
+          border: Border.all(
+            color: AppColors.textFieldBorderColor.withValues(alpha: .55),
           ),
-          14.horizontalSpace,
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                CommonText(
-                  string: title,
-                  fontSize: 14.sp,
-                  fontWeight: FontWeight.w500,
-                ),
-                4.verticalSpace,
-                CommonText(
-                  string: subTitle,
-                  fontSize: 12.sp,
-                  overflow: TextOverflow.ellipsis,
-                  color: AppColors.textCaptionColor,
-                ),
-              ],
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.blackColor.withValues(alpha: .045),
+              blurRadius: 9,
+              offset: const Offset(0, 2),
             ),
-          ),
-        ],
+          ],
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          mainAxisAlignment: MainAxisAlignment.start,
+          children: [
+            Container(
+              padding: EdgeInsets.all(4.w),
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: AppColors.textFieldBorderColor,
+              ),
+              child: CustomImage(
+                image: IconAsset.locationPin,
+                ht: 15.h,
+                wt: 15.h,
+                fit: BoxFit.cover,
+              ),
+            ),
+            10.horizontalSpace,
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  CommonText(
+                    string: title,
+                    fontSize: 13.sp,
+                    fontWeight: FontWeight.w500,
+                  ),
+                  2.verticalSpace,
+                  CommonText(
+                    string: subTitle,
+                    fontSize: 11.sp,
+                    overflow: TextOverflow.ellipsis,
+                    color: AppColors.textCaptionColor,
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

@@ -457,19 +457,19 @@ class _SearchSecoundScreenState extends State<SearchSecoundScreen>
                   () => Material(
                     color: AppColors.transparent,
                     child: InkWell(
-                      borderRadius: BorderRadius.circular(14.r),
+                      borderRadius: BorderRadius.circular(12.r),
                       onTap: _locatingCurrentPosition.value
                           ? null
                           : _refreshCurrentPosition,
                       child: Container(
                         width: double.infinity,
                         padding: EdgeInsets.symmetric(
-                          horizontal: 14.w,
-                          vertical: 12.h,
+                          horizontal: 12.w,
+                          vertical: 9.h,
                         ),
                         decoration: BoxDecoration(
                           color: AppColors.sucessContainer,
-                          borderRadius: BorderRadius.circular(14.r),
+                          borderRadius: BorderRadius.circular(12.r),
                           border: Border.all(
                             color: AppColors.routeGreen.withValues(alpha: .24),
                           ),
@@ -477,8 +477,8 @@ class _SearchSecoundScreenState extends State<SearchSecoundScreen>
                         child: Row(
                           children: [
                             Container(
-                              width: 38.w,
-                              height: 38.w,
+                              width: 32.w,
+                              height: 32.w,
                               decoration: BoxDecoration(
                                 shape: BoxShape.circle,
                                 color: AppColors.routeGreen,
@@ -486,8 +486,8 @@ class _SearchSecoundScreenState extends State<SearchSecoundScreen>
                               alignment: Alignment.center,
                               child: _locatingCurrentPosition.value
                                   ? SizedBox(
-                                      width: 19.w,
-                                      height: 19.w,
+                                      width: 16.w,
+                                      height: 16.w,
                                       child: CircularProgressIndicator(
                                         strokeWidth: 2.2.w,
                                         color: AppColors.whiteColor,
@@ -496,10 +496,10 @@ class _SearchSecoundScreenState extends State<SearchSecoundScreen>
                                   : Icon(
                                       Icons.my_location_rounded,
                                       color: AppColors.whiteColor,
-                                      size: 21.w,
+                                      size: 18.w,
                                     ),
                             ),
-                            11.horizontalSpace,
+                            9.horizontalSpace,
                             Expanded(
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -509,17 +509,17 @@ class _SearchSecoundScreenState extends State<SearchSecoundScreen>
                                       'vtaxi.destination.where_am_i',
                                       'Hol vagyok most?',
                                     ),
-                                    fontSize: 14.sp,
+                                    fontSize: 13.sp,
                                     fontWeight: FontWeight.w700,
                                     color: AppColors.routeGreen,
                                   ),
-                                  2.verticalSpace,
+                                  1.verticalSpace,
                                   CommonText(
                                     string: VTaxiLocalizationService.text(
                                       'vtaxi.destination.where_am_i_hint',
                                       'Frissítsd az indulási helyed a telefon GPS-ével.',
                                     ),
-                                    fontSize: 12.sp,
+                                    fontSize: 11.sp,
                                     color: AppColors.textCaptionColor,
                                     softWrap: true,
                                   ),
@@ -529,7 +529,7 @@ class _SearchSecoundScreenState extends State<SearchSecoundScreen>
                             Icon(
                               Icons.refresh_rounded,
                               color: AppColors.routeGreen,
-                              size: 22.w,
+                              size: 19.w,
                             ),
                           ],
                         ),
@@ -545,13 +545,13 @@ class _SearchSecoundScreenState extends State<SearchSecoundScreen>
                       ? SizedBox.shrink()
                       : Container(
                           margin: EdgeInsets.symmetric(
-                            vertical: 16.w,
+                            vertical: 12.h,
                             horizontal: 16.w,
                           ),
                           padding: EdgeInsets.all(8.w),
                           decoration: BoxDecoration(
                             color: AppColors.whiteColor,
-                            borderRadius: BorderRadius.circular(8.r),
+                            borderRadius: BorderRadius.circular(10.r),
                           ),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
@@ -567,9 +567,7 @@ class _SearchSecoundScreenState extends State<SearchSecoundScreen>
                                 child: Obx(
                                   () => ListView.separated(
                                     separatorBuilder: (context, index) =>
-                                        Divider(
-                                          color: AppColors.textFieldBorderColor,
-                                        ),
+                                        6.verticalSpace,
                                     itemCount: homeController.searchList.length,
                                     itemBuilder: (context, index) {
                                       final data =

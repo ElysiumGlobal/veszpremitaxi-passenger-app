@@ -306,10 +306,7 @@ class _SearchFirstScreenState extends State<SearchFirstScreen> {
                                   child: Obx(
                                     () => ListView.separated(
                                       separatorBuilder: (context, index) =>
-                                          Divider(
-                                            color:
-                                                AppColors.textFieldBorderColor,
-                                          ),
+                                          6.verticalSpace,
                                       itemCount:
                                           homeController.searchList.length,
                                       itemBuilder: (context, index) {
@@ -396,7 +393,7 @@ class _SearchFirstScreenState extends State<SearchFirstScreen> {
                         shrinkWrap: true,
                         physics: NeverScrollableScrollPhysics(),
                         separatorBuilder: (context, index) =>
-                            Divider(color: AppColors.textFieldBorderColor),
+                            6.verticalSpace,
                         padding: EdgeInsets.zero,
                         itemCount: homeController.searchList.length > 4
                             ? 4

@@ -392,7 +392,7 @@ class _BookVehicleScreenState extends State<BookVehicleScreen> {
           body: Column(
             children: [
               SizedBox(
-                height: 430.h,
+                height: 365.h,
                 child: Stack(
                   children: [
                     GoogleMap(
