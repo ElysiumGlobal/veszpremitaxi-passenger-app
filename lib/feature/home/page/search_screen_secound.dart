@@ -116,13 +116,24 @@ class _SearchSecoundScreenState extends State<SearchSecoundScreen>
           },
           behavior: HitTestBehavior.translucent,
           child: Container(
-            height: 48.h,
-            width: 48.h,
+            height: 40.h,
+            width: 40.h,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: AppColors.brandNavy,
+              boxShadow: [
+                BoxShadow(
+                  color: AppColors.brandNavy.withValues(alpha: .14),
+                  blurRadius: 9,
+                  offset: const Offset(0, 3),
+                ),
+              ],
+            ),
             alignment: Alignment.center,
-            child: CustomImage(
-              image: IconAsset.arrowLeftIcon,
-              ht: 24.h,
-              wt: 24.h,
+            child: Icon(
+              Icons.arrow_back_rounded,
+              color: AppColors.mainPrimaryColor,
+              size: 21.w,
             ),
           ),
         ),
@@ -379,7 +390,10 @@ class _SearchSecoundScreenState extends State<SearchSecoundScreen>
               margin: EdgeInsets.only(right: 24.w),
               padding: EdgeInsets.symmetric(horizontal: 11.w),
               decoration: BoxDecoration(
-                border: Border.all(color: AppColors.textFieldBorderColor),
+                color: AppColors.primaryContainer,
+                border: Border.all(
+                  color: AppColors.mainPrimaryColor.withValues(alpha: .34),
+                ),
                 borderRadius: BorderRadius.circular(16.r),
               ),
               alignment: Alignment.center,
@@ -397,7 +411,7 @@ class _SearchSecoundScreenState extends State<SearchSecoundScreen>
                   ),
                   Icon(
                     Icons.keyboard_arrow_down_rounded,
-                    color: AppColors.blackColor,
+                    color: AppColors.brandNavy,
                     size: 24.h,
                   ),
                 ],
@@ -468,11 +482,18 @@ class _SearchSecoundScreenState extends State<SearchSecoundScreen>
                           vertical: 9.h,
                         ),
                         decoration: BoxDecoration(
-                          color: AppColors.sucessContainer,
+                          color: AppColors.brandNavy,
                           borderRadius: BorderRadius.circular(12.r),
                           border: Border.all(
-                            color: AppColors.routeGreen.withValues(alpha: .24),
+                            color: AppColors.mainPrimaryColor.withValues(alpha: .28),
                           ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: AppColors.brandNavy.withValues(alpha: .08),
+                              blurRadius: 10,
+                              offset: const Offset(0, 3),
+                            ),
+                          ],
                         ),
                         child: Row(
                           children: [
@@ -480,8 +501,8 @@ class _SearchSecoundScreenState extends State<SearchSecoundScreen>
                               width: 32.w,
                               height: 32.w,
                               decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                color: AppColors.routeGreen,
+                                borderRadius: BorderRadius.circular(10.r),
+                                color: AppColors.mainPrimaryColor,
                               ),
                               alignment: Alignment.center,
                               child: _locatingCurrentPosition.value
@@ -495,7 +516,7 @@ class _SearchSecoundScreenState extends State<SearchSecoundScreen>
                                     )
                                   : Icon(
                                       Icons.my_location_rounded,
-                                      color: AppColors.whiteColor,
+                                      color: AppColors.brandNavy,
                                       size: 18.w,
                                     ),
                             ),
@@ -511,7 +532,7 @@ class _SearchSecoundScreenState extends State<SearchSecoundScreen>
                                     ),
                                     fontSize: 13.sp,
                                     fontWeight: FontWeight.w700,
-                                    color: AppColors.routeGreen,
+                                    color: AppColors.mainPrimaryColor,
                                   ),
                                   1.verticalSpace,
                                   CommonText(
@@ -520,7 +541,7 @@ class _SearchSecoundScreenState extends State<SearchSecoundScreen>
                                       'Frissítsd az indulási helyed a telefon GPS-ével.',
                                     ),
                                     fontSize: 11.sp,
-                                    color: AppColors.textCaptionColor,
+                                    color: AppColors.whiteColor.withValues(alpha: .72),
                                     softWrap: true,
                                   ),
                                 ],
@@ -528,7 +549,7 @@ class _SearchSecoundScreenState extends State<SearchSecoundScreen>
                             ),
                             Icon(
                               Icons.refresh_rounded,
-                              color: AppColors.routeGreen,
+                              color: AppColors.mainPrimaryColor,
                               size: 19.w,
                             ),
                           ],
@@ -551,15 +572,45 @@ class _SearchSecoundScreenState extends State<SearchSecoundScreen>
                           padding: EdgeInsets.all(8.w),
                           decoration: BoxDecoration(
                             color: AppColors.whiteColor,
-                            borderRadius: BorderRadius.circular(10.r),
+                            borderRadius: BorderRadius.circular(14.r),
+                            border: Border.all(
+                              color: AppColors.brandNavy.withValues(alpha: .08),
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: AppColors.brandNavy.withValues(alpha: .06),
+                                blurRadius: 14,
+                                offset: const Offset(0, 4),
+                              ),
+                            ],
                           ),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              CommonText(
-                                string: AppString.popularPlace.tr,
-                                fontSize: 16.sp,
-                                fontWeight: FontWeight.w500,
+                              Row(
+                                children: [
+                                  Container(
+                                    width: 30.w,
+                                    height: 30.w,
+                                    decoration: BoxDecoration(
+                                      color: AppColors.primaryContainer,
+                                      borderRadius: BorderRadius.circular(9.r),
+                                    ),
+                                    alignment: Alignment.center,
+                                    child: Icon(
+                                      Icons.star_rounded,
+                                      color: AppColors.brandNavy,
+                                      size: 18.w,
+                                    ),
+                                  ),
+                                  9.horizontalSpace,
+                                  CommonText(
+                                    string: AppString.popularPlace.tr,
+                                    fontSize: 15.sp,
+                                    fontWeight: FontWeight.w700,
+                                    color: AppColors.brandNavy,
+                                  ),
+                                ],
                               ),
                               Divider(color: AppColors.textFieldBorderColor),
                               8.verticalSpace,

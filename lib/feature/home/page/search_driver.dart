@@ -13,7 +13,6 @@ import 'package:e_taxi/feature/home/model/get_socket_model.dart';
 import 'package:e_taxi/feature/home/service/home_service.dart';
 import 'package:e_taxi/feature/profile/model/user_model.dart';
 import 'package:e_taxi/feature/profile/service/profile_service.dart';
-import 'package:e_taxi/feature/home/widget/origin_destination_widget.dart';
 import 'package:e_taxi/utils/app_colors.dart';
 import 'package:e_taxi/utils/app_preferences.dart';
 import 'package:e_taxi/utils/app_string.dart';
@@ -35,7 +34,6 @@ import '../../../utils/navigation_utils/routes.dart';
 import '../../../widgets/common_text.dart';
 import '../../../widgets/custom_button.dart';
 import '../../../widgets/app_snackbar.dart';
-import '../widget/driver_details_widget.dart';
 import '../widget/chat_unread_badge.dart';
 import '../widget/trip_modals.dart';
 
@@ -121,7 +119,7 @@ class _SearchDriverScreenState extends State<SearchDriverScreen> with SingleTick
             bottom: 18.w,
             child: Icon(
               Icons.location_on_rounded,
-              color: AppColors.successColor,
+              color: AppColors.brandNavy,
               size: 26.w,
             ),
           ),
@@ -130,7 +128,7 @@ class _SearchDriverScreenState extends State<SearchDriverScreen> with SingleTick
             top: 18.w,
             child: Icon(
               Icons.my_location_rounded,
-              color: AppColors.titleTextColor,
+              color: AppColors.mainPrimaryColor,
               size: 22.w,
             ),
           ),
@@ -225,20 +223,13 @@ class _SearchDriverScreenState extends State<SearchDriverScreen> with SingleTick
         ? _tripProgressValue.value.clamp(0.0, 1.0).toDouble()
         : 0.0;
 
-    return Container(
-      height: 72.h,
-      decoration: BoxDecoration(
-        color: AppColors.whiteColor.withValues(alpha: .14),
-        borderRadius: BorderRadius.circular(18.r),
-        border: Border.all(
-          color: AppColors.whiteColor.withValues(alpha: .24),
-        ),
-      ),
+    return SizedBox(
+      height: 40.h,
       child: LayoutBuilder(
         builder: (BuildContext context, BoxConstraints constraints) {
-          final double leftInset = 18.w;
-          final double rightInset = 18.w;
-          final double carSize = 40.w;
+          final double leftInset = 8.w;
+          final double rightInset = 8.w;
+          final double carSize = 26.w;
           final double travelWidth = Math.max(
             0.0,
             constraints.maxWidth - leftInset - rightInset - carSize,
@@ -248,82 +239,75 @@ class _SearchDriverScreenState extends State<SearchDriverScreen> with SingleTick
             clipBehavior: Clip.none,
             children: [
               Positioned(
-                left: leftInset + 10.w,
-                right: rightInset + 10.w,
-                top: 34.h,
+                left: leftInset + 7.w,
+                right: rightInset + 7.w,
+                top: 19.h,
                 child: Container(
-                  height: 5.h,
+                  height: 3.h,
                   decoration: BoxDecoration(
-                    color: AppColors.whiteColor.withValues(alpha: .30),
+                    color: AppColors.whiteColor.withValues(alpha: .20),
                     borderRadius: BorderRadius.circular(99.r),
                   ),
                 ),
               ),
               Positioned(
-                left: leftInset + 10.w,
-                top: 34.h,
+                left: leftInset + 7.w,
+                top: 19.h,
                 child: AnimatedContainer(
                   duration: const Duration(milliseconds: 650),
                   curve: Curves.easeOutCubic,
-                  width: Math.max(0.0, (travelWidth + carSize - 20.w) * progress)
+                  width: Math.max(0.0, (travelWidth + carSize - 14.w) * progress)
                       .toDouble(),
-                  height: 5.h,
+                  height: 3.h,
                   decoration: BoxDecoration(
-                    color: AppColors.whiteColor,
+                    color: AppColors.mainPrimaryColor,
                     borderRadius: BorderRadius.circular(99.r),
                   ),
                 ),
               ),
               Positioned(
                 left: leftInset,
-                top: 26.h,
+                top: 13.h,
                 child: Container(
-                  width: 20.w,
-                  height: 20.w,
+                  width: 15.w,
+                  height: 15.w,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: AppColors.whiteColor,
+                    color: AppColors.mainPrimaryColor,
                     border: Border.all(
-                      color: AppColors.routeGreen.withValues(alpha: .45),
-                      width: 3.w,
+                      color: AppColors.whiteColor.withValues(alpha: .75),
+                      width: 2.w,
                     ),
                   ),
                 ),
               ),
               Positioned(
                 right: rightInset,
-                top: 20.h,
+                top: 9.h,
                 child: Container(
-                  width: 32.w,
-                  height: 32.w,
+                  width: 23.w,
+                  height: 23.w,
                   decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: AppColors.whiteColor,
-                    boxShadow: [
-                      BoxShadow(
-                        color: AppColors.blackColor.withValues(alpha: .12),
-                        blurRadius: 8,
-                        offset: const Offset(0, 3),
-                      ),
-                    ],
+                    borderRadius: BorderRadius.circular(8.r),
+                    color: AppColors.mainPrimaryColor,
                   ),
                   alignment: Alignment.center,
                   child: Icon(
                     Icons.location_on_rounded,
-                    color: AppColors.errorColor,
-                    size: 20.w,
+                    color: AppColors.brandNavy,
+                    size: 15.w,
                   ),
                 ),
               ),
               AnimatedBuilder(
                 animation: _tripCarAnimation,
                 builder: (BuildContext context, Widget? child) {
-                  final bob = Math.sin(_tripCarAnimation.value * Math.pi * 2) * 1.6;
+                  final bob = Math.sin(_tripCarAnimation.value * Math.pi * 2) * .8;
                   return AnimatedPositioned(
                     duration: const Duration(milliseconds: 650),
                     curve: Curves.easeOutCubic,
                     left: leftInset + travelWidth * progress,
-                    top: 14.h + bob,
+                    top: 7.h + bob,
                     child: child!,
                   );
                 },
@@ -335,17 +319,17 @@ class _SearchDriverScreenState extends State<SearchDriverScreen> with SingleTick
                     color: AppColors.whiteColor,
                     boxShadow: [
                       BoxShadow(
-                        color: AppColors.blackColor.withValues(alpha: .16),
-                        blurRadius: 10,
-                        offset: const Offset(0, 4),
+                        color: AppColors.blackColor.withValues(alpha: .12),
+                        blurRadius: 7,
+                        offset: const Offset(0, 2),
                       ),
                     ],
                   ),
                   alignment: Alignment.center,
                   child: Icon(
                     Icons.local_taxi_rounded,
-                    color: AppColors.routeGreen,
-                    size: 25.w,
+                    color: AppColors.brandNavy,
+                    size: 17.w,
                   ),
                 ),
               ),
@@ -356,28 +340,374 @@ class _SearchDriverScreenState extends State<SearchDriverScreen> with SingleTick
     );
   }
 
-  Widget _tripMetricChip({required IconData icon, required String label}) {
-    return Container(
-      padding: EdgeInsets.symmetric(horizontal: 9.w, vertical: 7.h),
-      decoration: BoxDecoration(
-        color: AppColors.whiteColor.withValues(alpha: .16),
-        borderRadius: BorderRadius.circular(999.r),
-        border: Border.all(
-          color: AppColors.whiteColor.withValues(alpha: .18),
+  Widget _driverQuickAction({
+    required IconData icon,
+    required VoidCallback onTap,
+    String? label,
+    bool highlighted = false,
+  }) {
+    return Material(
+      color: AppColors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(11.r),
+        onTap: onTap,
+        child: Container(
+          height: 40.h,
+          padding: EdgeInsets.symmetric(horizontal: label == null ? 11.w : 12.w),
+          decoration: BoxDecoration(
+            color: highlighted ? AppColors.brandNavy : AppColors.primaryContainer,
+            borderRadius: BorderRadius.circular(11.r),
+            border: Border.all(
+              color: highlighted
+                  ? AppColors.brandNavy
+                  : AppColors.mainPrimaryColor.withValues(alpha: .28),
+            ),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                icon,
+                color: highlighted
+                    ? AppColors.mainPrimaryColor
+                    : AppColors.brandNavy,
+                size: 19.w,
+              ),
+              if (label != null) ...[
+                7.horizontalSpace,
+                CommonText(
+                  string: label,
+                  fontSize: 12.sp,
+                  fontWeight: FontWeight.w700,
+                  color: highlighted
+                      ? AppColors.whiteColor
+                      : AppColors.brandNavy,
+                ),
+              ],
+            ],
+          ),
         ),
       ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, color: AppColors.whiteColor, size: 15.w),
-          5.horizontalSpace,
-          CommonText(
-            string: label,
-            color: AppColors.whiteColor,
-            fontSize: 11.sp,
-            fontWeight: FontWeight.w700,
+    );
+  }
+
+  void _showDriverInfoSheet() {
+    final driver = riderBookingModel.value?.data?.driver;
+    if (driver == null) return;
+    final vehicle = driver.vehicle;
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: AppColors.transparent,
+      isScrollControlled: true,
+      builder: (bottomSheetContext) {
+        return SafeArea(
+          top: false,
+          child: Container(
+            padding: EdgeInsets.fromLTRB(18.w, 14.h, 18.w, 20.h),
+            decoration: BoxDecoration(
+              color: AppColors.whiteColor,
+              borderRadius: BorderRadius.vertical(top: Radius.circular(22.r)),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 42.w,
+                    height: 4.h,
+                    decoration: BoxDecoration(
+                      color: AppColors.lightGrey,
+                      borderRadius: BorderRadius.circular(20.r),
+                    ),
+                  ),
+                ),
+                16.verticalSpace,
+                Row(
+                  children: [
+                    Container(
+                      width: 46.w,
+                      height: 46.w,
+                      decoration: BoxDecoration(
+                        color: AppColors.primaryContainer,
+                        borderRadius: BorderRadius.circular(12.r),
+                      ),
+                      alignment: Alignment.center,
+                      child: Icon(
+                        Icons.person_rounded,
+                        color: AppColors.brandNavy,
+                        size: 26.w,
+                      ),
+                    ),
+                    12.horizontalSpace,
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          CommonText(
+                            string: driver?.name ?? 'Sofőr',
+                            fontSize: 17.sp,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.brandNavy,
+                          ),
+                          3.verticalSpace,
+                          CommonText(
+                            string: [
+                              vehicle?.numberPlate ?? '',
+                              vehicle?.model ?? '',
+                            ].where((value) => value.trim().isNotEmpty).join(' • '),
+                            fontSize: 12.sp,
+                            color: AppColors.textCaptionColor,
+                          ),
+                        ],
+                      ),
+                    ),
+                    Container(
+                      padding: EdgeInsets.symmetric(horizontal: 9.w, vertical: 6.h),
+                      decoration: BoxDecoration(
+                        color: AppColors.brandNavy,
+                        borderRadius: BorderRadius.circular(999.r),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.star_rounded,
+                            color: AppColors.mainPrimaryColor,
+                            size: 15.w,
+                          ),
+                          4.horizontalSpace,
+                          CommonText(
+                            string: (driver?.rating ?? '0').toString(),
+                            fontSize: 12.sp,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.whiteColor,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                16.verticalSpace,
+                Row(
+                  children: [
+                    Expanded(
+                      child: _driverQuickAction(
+                        icon: Icons.call_rounded,
+                        label: 'Hívás',
+                        onTap: () {
+                          Navigator.of(bottomSheetContext).pop();
+                          Utils().launchDialer(driver?.phone ?? '');
+                        },
+                      ),
+                    ),
+                    8.horizontalSpace,
+                    Expanded(
+                      child: _driverQuickAction(
+                        icon: Icons.chat_bubble_outline_rounded,
+                        label: 'Üzenet',
+                        onTap: () {
+                          Navigator.of(bottomSheetContext).pop();
+                          Navigation.pushNamed(
+                            Routes.chatScreen,
+                            params: {'bookingId': _activeBookingId()},
+                          );
+                        },
+                      ),
+                    ),
+                    8.horizontalSpace,
+                    Expanded(
+                      child: _driverQuickAction(
+                        icon: Icons.info_outline_rounded,
+                        label: 'Adatok',
+                        highlighted: true,
+                        onTap: () {
+                          Navigator.of(bottomSheetContext).pop();
+                          Navigation.pushNamed(Routes.driverDetailsScreen);
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildDriverActionStrip() {
+    final driver = riderBookingModel.value?.data?.driver;
+    final plate = driver?.vehicle?.numberPlate ?? '';
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 8.h),
+      decoration: BoxDecoration(
+        color: AppColors.whiteColor,
+        borderRadius: BorderRadius.circular(12.r),
+        border: Border.all(color: AppColors.brandNavy.withValues(alpha: .08)),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.brandNavy.withValues(alpha: .05),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
           ),
         ],
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: InkWell(
+              onTap: _showDriverInfoSheet,
+              borderRadius: BorderRadius.circular(10.r),
+              child: Row(
+                children: [
+                  Container(
+                    width: 34.w,
+                    height: 34.w,
+                    decoration: BoxDecoration(
+                      color: AppColors.brandNavy,
+                      borderRadius: BorderRadius.circular(10.r),
+                    ),
+                    alignment: Alignment.center,
+                    child: Icon(
+                      Icons.person_rounded,
+                      color: AppColors.mainPrimaryColor,
+                      size: 20.w,
+                    ),
+                  ),
+                  9.horizontalSpace,
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        CommonText(
+                          string: driver?.name ?? 'Sofőr',
+                          fontSize: 13.sp,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.brandNavy,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        if (plate.trim().isNotEmpty)
+                          CommonText(
+                            string: plate,
+                            fontSize: 11.sp,
+                            color: AppColors.textCaptionColor,
+                          ),
+                      ],
+                    ),
+                  ),
+                  Icon(
+                    Icons.info_outline_rounded,
+                    color: AppColors.mainPrimaryColor,
+                    size: 19.w,
+                  ),
+                ],
+              ),
+            ),
+          ),
+          8.horizontalSpace,
+          _driverQuickAction(
+            icon: Icons.call_rounded,
+            onTap: () => Utils().launchDialer(driver?.phone ?? ''),
+          ),
+          7.horizontalSpace,
+          ChatUnreadBadge(
+            bookingId: _activeBookingId(),
+            child: _driverQuickAction(
+              icon: Icons.chat_bubble_outline_rounded,
+              onTap: () {
+                Navigation.pushNamed(
+                  Routes.chatScreen,
+                  params: {'bookingId': _activeBookingId()},
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _rideUtilityItem({
+    required IconData icon,
+    required String label,
+    required VoidCallback onTap,
+    bool selected = false,
+  }) {
+    return Expanded(
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12.r),
+        child: Padding(
+          padding: EdgeInsets.symmetric(vertical: 7.h),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                icon,
+                color: selected
+                    ? AppColors.mainPrimaryColor
+                    : AppColors.whiteColor.withValues(alpha: .78),
+                size: 20.w,
+              ),
+              2.verticalSpace,
+              CommonText(
+                string: label,
+                fontSize: 10.sp,
+                fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                color: selected
+                    ? AppColors.mainPrimaryColor
+                    : AppColors.whiteColor.withValues(alpha: .78),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildRideUtilityBar() {
+    return SafeArea(
+      top: false,
+      child: Container(
+        padding: EdgeInsets.fromLTRB(8.w, 5.h, 8.w, 4.h),
+        decoration: BoxDecoration(
+          color: AppColors.brandNavy,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(18.r)),
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.brandNavy.withValues(alpha: .18),
+              blurRadius: 14,
+              offset: const Offset(0, -3),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            _rideUtilityItem(
+              icon: Icons.local_taxi_rounded,
+              label: 'Fuvar',
+              selected: true,
+              onTap: () {},
+            ),
+            _rideUtilityItem(
+              icon: Icons.person_outline_rounded,
+              label: 'Sofőr',
+              onTap: _showDriverInfoSheet,
+            ),
+            _rideUtilityItem(
+              icon: Icons.account_balance_wallet_outlined,
+              label: 'Tárca',
+              onTap: () {
+                Navigation.pushNamed(
+                  Routes.walletScreen,
+                  arg: <String, dynamic>{'fromRide': true},
+                );
+              },
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -385,7 +715,6 @@ class _SearchDriverScreenState extends State<SearchDriverScreen> with SingleTick
   Widget _buildTripInProgressPanel() {
     final booking = riderBookingModel.value?.data?.booking;
     final String dropoffAddress = '${booking?.dropoffAddress ?? ''}'.trim();
-    final String pickupAddress = '${booking?.pickupAddress ?? ''}'.trim();
     final bool hasProgress = _tripProgressHasData.value;
     final int progressPercent = hasProgress
         ? (_tripProgressValue.value.clamp(0.0, 1.0) * 100).round()
@@ -397,10 +726,10 @@ class _SearchDriverScreenState extends State<SearchDriverScreen> with SingleTick
             'Távolság számítása…',
           );
     final String etaText = hasProgress
-        ? 'kb. ${_tripEtaMinutes.value} perc'
+        ? '${_tripEtaMinutes.value} perc'
         : VTaxiLocalizationService.text(
             'vtaxi.trip.eta_calculating',
-            'ETA számítása…',
+            'ETA…',
           );
 
     return Column(
@@ -408,19 +737,19 @@ class _SearchDriverScreenState extends State<SearchDriverScreen> with SingleTick
       children: [
         Container(
           width: double.infinity,
-          padding: EdgeInsets.all(18.w),
+          padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 11.h),
           decoration: BoxDecoration(
             gradient: const LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
-              colors: [AppColors.routeGreen, AppColors.successColor],
+              colors: [AppColors.brandNavy, AppColors.brandNavyLight],
             ),
-            borderRadius: BorderRadius.circular(22.r),
+            borderRadius: BorderRadius.circular(16.r),
             boxShadow: [
               BoxShadow(
-                color: AppColors.routeGreen.withValues(alpha: .22),
-                blurRadius: 18,
-                offset: const Offset(0, 8),
+                color: AppColors.brandNavy.withValues(alpha: .16),
+                blurRadius: 14,
+                offset: const Offset(0, 5),
               ),
             ],
           ),
@@ -428,217 +757,154 @@ class _SearchDriverScreenState extends State<SearchDriverScreen> with SingleTick
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Container(
-                    width: 44.w,
-                    height: 44.w,
+                    width: 34.w,
+                    height: 34.w,
                     decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: AppColors.whiteColor.withValues(alpha: .18),
-                      border: Border.all(
-                        color: AppColors.whiteColor.withValues(alpha: .28),
-                      ),
+                      color: AppColors.mainPrimaryColor,
+                      borderRadius: BorderRadius.circular(10.r),
                     ),
                     alignment: Alignment.center,
                     child: Icon(
-                      Icons.navigation_rounded,
-                      color: AppColors.whiteColor,
-                      size: 24.w,
+                      Icons.local_taxi_rounded,
+                      color: AppColors.brandNavy,
+                      size: 21.w,
                     ),
                   ),
-                  12.horizontalSpace,
+                  9.horizontalSpace,
                   Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        CommonText(
-                          string: VTaxiLocalizationService.text(
-                            'vtaxi.trip.in_progress_title',
-                            'Úton vagyunk az úticélhoz',
-                          ),
-                          color: AppColors.whiteColor,
-                          fontSize: 19.sp,
-                          fontWeight: FontWeight.w700,
-                          softWrap: true,
-                        ),
-                        5.verticalSpace,
-                        CommonText(
-                          string: VTaxiLocalizationService.text(
-                            'vtaxi.trip.in_progress_subtitle',
-                            'Dőlj hátra, kövesd az utat a térképen. A VTaxi visz tovább.',
-                          ),
-                          color: AppColors.whiteColor.withValues(alpha: .88),
-                          fontSize: 13.sp,
-                          fontWeight: FontWeight.w500,
-                          softWrap: true,
-                          height: 1.3,
-                        ),
-                      ],
-                    ),
-                  ),
-                  10.horizontalSpace,
-                  Container(
-                    padding: EdgeInsets.symmetric(
-                      horizontal: 10.w,
-                      vertical: 7.h,
-                    ),
-                    decoration: BoxDecoration(
-                      color: AppColors.whiteColor,
-                      borderRadius: BorderRadius.circular(999.r),
-                    ),
                     child: CommonText(
-                      string: hasProgress
-                          ? '$progressPercent%'
-                          : VTaxiLocalizationService.text(
-                              'vtaxi.trip.gps_short',
-                              'GPS…',
-                            ),
-                      color: AppColors.routeGreen,
-                      fontSize: 12.sp,
+                      string: 'Úton vagyunk…',
+                      color: AppColors.whiteColor,
+                      fontSize: 16.sp,
                       fontWeight: FontWeight.w700,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  if (hasProgress)
+                    Container(
+                      padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 5.h),
+                      decoration: BoxDecoration(
+                        color: AppColors.mainPrimaryColor,
+                        borderRadius: BorderRadius.circular(999.r),
+                      ),
+                      child: CommonText(
+                        string: '$progressPercent%',
+                        color: AppColors.brandNavy,
+                        fontSize: 11.sp,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  6.horizontalSpace,
+                  GestureDetector(
+                    onTap: _showDriverInfoSheet,
+                    child: Container(
+                      width: 31.w,
+                      height: 31.w,
+                      decoration: BoxDecoration(
+                        color: AppColors.whiteColor.withValues(alpha: .10),
+                        borderRadius: BorderRadius.circular(9.r),
+                        border: Border.all(
+                          color: AppColors.whiteColor.withValues(alpha: .15),
+                        ),
+                      ),
+                      alignment: Alignment.center,
+                      child: Icon(
+                        Icons.person_outline_rounded,
+                        color: AppColors.mainPrimaryColor,
+                        size: 19.w,
+                      ),
                     ),
                   ),
                 ],
               ),
-              16.verticalSpace,
+              6.verticalSpace,
               _buildTripProgressRoad(),
-              11.verticalSpace,
-              Wrap(
-                spacing: 8.w,
-                runSpacing: 8.h,
-                children: [
-                  _tripMetricChip(
-                    icon: Icons.route_rounded,
-                    label: hasProgress
-                        ? '$progressPercent% megtéve'
-                        : VTaxiLocalizationService.text(
-                            'vtaxi.trip.progress_waiting',
-                            'Haladás számítása…',
-                          ),
-                  ),
-                  _tripMetricChip(
-                    icon: Icons.pin_drop_rounded,
-                    label: hasProgress ? 'Még $remainingText' : remainingText,
-                  ),
-                  _tripMetricChip(
-                    icon: Icons.schedule_rounded,
-                    label: etaText,
-                  ),
-                ],
-              ),
-              10.verticalSpace,
+              4.verticalSpace,
               Row(
                 children: [
+                  Icon(
+                    Icons.route_rounded,
+                    color: AppColors.mainPrimaryColor,
+                    size: 15.w,
+                  ),
+                  5.horizontalSpace,
+                  Expanded(
+                    child: CommonText(
+                      string: hasProgress
+                          ? 'Még $remainingText  •  $etaText'
+                          : '$remainingText  •  $etaText',
+                      color: AppColors.whiteColor.withValues(alpha: .88),
+                      fontSize: 11.sp,
+                      fontWeight: FontWeight.w600,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
                   Container(
-                    width: 8.w,
-                    height: 8.w,
+                    width: 7.w,
+                    height: 7.w,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       color: hasProgress
-                          ? AppColors.whiteColor
-                          : AppColors.amber,
+                          ? AppColors.successColor
+                          : AppColors.mainPrimaryColor,
                     ),
                   ),
-                  7.horizontalSpace,
-                  Expanded(
-                    child: CommonText(
-                      string: _tripGpsStatusText(),
-                      color: AppColors.whiteColor.withValues(alpha: .92),
-                      fontSize: 12.sp,
-                      fontWeight: FontWeight.w600,
-                      softWrap: true,
-                    ),
+                  5.horizontalSpace,
+                  CommonText(
+                    string: hasProgress ? 'GPS aktív' : 'GPS…',
+                    color: AppColors.whiteColor.withValues(alpha: .82),
+                    fontSize: 10.sp,
+                    fontWeight: FontWeight.w600,
                   ),
                 ],
               ),
             ],
           ),
         ),
-        14.verticalSpace,
+        10.verticalSpace,
         Container(
           width: double.infinity,
-          padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 13.h),
+          padding: EdgeInsets.symmetric(horizontal: 11.w, vertical: 9.h),
           decoration: BoxDecoration(
-            color: AppColors.sucessContainer,
-            borderRadius: BorderRadius.circular(16.r),
-            border: Border.all(
-              color: AppColors.routeGreen.withValues(alpha: .22),
-            ),
+            color: AppColors.whiteColor,
+            borderRadius: BorderRadius.circular(12.r),
+            border: Border.all(color: AppColors.brandNavy.withValues(alpha: .08)),
           ),
           child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Container(
-                width: 38.w,
-                height: 38.w,
+                width: 34.w,
+                height: 34.w,
                 decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: AppColors.whiteColor,
+                  color: AppColors.primaryContainer,
+                  borderRadius: BorderRadius.circular(10.r),
                 ),
                 alignment: Alignment.center,
                 child: Icon(
                   Icons.flag_rounded,
-                  color: AppColors.routeGreen,
-                  size: 22.w,
+                  color: AppColors.brandNavy,
+                  size: 19.w,
                 ),
               ),
-              11.horizontalSpace,
+              9.horizontalSpace,
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    CommonText(
-                      string: VTaxiLocalizationService.text(
-                        'vtaxi.trip.destination_label',
-                        'Úticél',
-                      ),
-                      color: AppColors.routeGreen,
-                      fontSize: 12.sp,
-                      fontWeight: FontWeight.w700,
-                    ),
-                    3.verticalSpace,
-                    CommonText(
-                      string: dropoffAddress.isEmpty
-                          ? AppString.destination.tr
-                          : dropoffAddress,
-                      fontSize: 14.sp,
-                      fontWeight: FontWeight.w600,
-                      softWrap: true,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
+                child: CommonText(
+                  string: dropoffAddress.isEmpty
+                      ? AppString.destination.tr
+                      : dropoffAddress,
+                  fontSize: 12.sp,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.brandNavy,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
             ],
           ),
-        ),
-        14.verticalSpace,
-        Container(
-          padding: EdgeInsets.all(10.w),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(14.r),
-            color: AppColors.whiteGrey,
-            border: Border.all(color: AppColors.textFieldBorderColor),
-          ),
-          child: DriverDetailsWidget(
-            image: riderBookingModel.value?.data?.driver?.profilePhoto ?? '',
-            firstText:
-                riderBookingModel.value?.data?.driver?.vehicle?.numberPlate ??
-                '',
-            thirdText:
-                riderBookingModel.value?.data?.driver?.vehicle?.model ?? '',
-            secoundText: riderBookingModel.value?.data?.driver?.name ?? '',
-            rating: riderBookingModel.value?.data?.driver?.rating ?? '',
-            radius: 100,
-          ),
-        ),
-        14.verticalSpace,
-        OriginDestinationWidget(
-          destination: dropoffAddress,
-          origin: pickupAddress,
-          customImage: true,
         ),
       ],
     );
@@ -1399,7 +1665,7 @@ class _SearchDriverScreenState extends State<SearchDriverScreen> with SingleTick
               width: 5,
               zIndex: 2,
               polylineId: const PolylineId('route_main'),
-              color: AppColors.routeGreen,
+              color: AppColors.brandNavy,
               points: polylineCoordinates,
               endCap: Cap.roundCap,
               startCap: Cap.roundCap,
@@ -1852,7 +2118,7 @@ class _SearchDriverScreenState extends State<SearchDriverScreen> with SingleTick
           polylineId: const PolylineId('route_main'),
           width: 5,
           zIndex: 2,
-          color: AppColors.routeGreen,
+          color: AppColors.brandNavy,
           points: polylineCoordinates,
           endCap: Cap.roundCap,
           startCap: Cap.roundCap,
@@ -2113,7 +2379,7 @@ class _SearchDriverScreenState extends State<SearchDriverScreen> with SingleTick
                                         borderRadius: BorderRadius.circular(
                                           4.r,
                                         ),
-                                        color: AppColors.blackColor,
+                                        color: AppColors.brandNavy,
                                       ),
                                       child: Row(
                                         children: [
@@ -2147,7 +2413,7 @@ class _SearchDriverScreenState extends State<SearchDriverScreen> with SingleTick
                                         borderRadius: BorderRadius.circular(
                                           4.r,
                                         ),
-                                        color: AppColors.blackColor,
+                                        color: AppColors.brandNavy,
                                       ),
                                       child: Row(
                                         children: [
@@ -2362,161 +2628,8 @@ class _SearchDriverScreenState extends State<SearchDriverScreen> with SingleTick
                                   ],
                                 ),
                                 16.verticalSpace,
-                                Container(
-                                  padding: EdgeInsets.all(8.w),
-                                  decoration: BoxDecoration(
-                                    color: AppColors.whiteGrey,
-                                    borderRadius: BorderRadius.circular(8.r),
-                                  ),
-                                  child: Column(
-                                    children: [
-                                      GestureDetector(
-                                        onTap: () {
-                                          Navigation.pushNamed(
-                                            Routes.driverDetailsScreen,
-                                          );
-                                        },
-                                        child: DriverDetailsWidget(
-                                          image:
-                                              riderBookingModel
-                                                  .value
-                                                  ?.data
-                                                  ?.driver
-                                                  ?.profilePhoto ??
-                                              "",
-                                          firstText:
-                                              riderBookingModel
-                                                  .value
-                                                  ?.data
-                                                  ?.driver
-                                                  ?.vehicle
-                                                  ?.numberPlate ??
-                                              "",
-                                          secoundText:
-                                              riderBookingModel
-                                                  .value
-                                                  ?.data
-                                                  ?.driver
-                                                  ?.name ??
-                                              "",
-                                          thirdText:
-                                              riderBookingModel
-                                                  .value
-                                                  ?.data
-                                                  ?.driver
-                                                  ?.vehicle
-                                                  ?.model ??
-                                              "",
-                                          rating:
-                                              riderBookingModel
-                                                  .value
-                                                  ?.data
-                                                  ?.driver
-                                                  ?.rating ??
-                                              "0",
-                                          radius: 100,
-                                        ),
-                                      ),
-                                      Padding(
-                                        padding: EdgeInsets.symmetric(
-                                          vertical: 8.h,
-                                        ),
-                                        child: Divider(
-                                          color: AppColors.textFieldBorderColor,
-                                        ),
-                                      ),
-
-                                      Row(
-                                        children: [
-                                          GestureDetector(
-                                            onTap: () {
-                                              Utils().launchDialer(
-                                                riderBookingModel
-                                                        .value
-                                                        ?.data
-                                                        ?.driver
-                                                        ?.phone ??
-                                                    "",
-                                              );
-                                            },
-                                            child: Container(
-                                              margin: EdgeInsets.only(
-                                                right: 8.w,
-                                              ),
-                                              padding: EdgeInsets.all(8.w),
-
-                                              decoration: BoxDecoration(
-                                                shape: BoxShape.circle,
-                                                border: Border.all(
-                                                  color: AppColors
-                                                      .textFieldBorderColor,
-                                                ),
-                                              ),
-                                              child: CustomImage(
-                                                image: IconAsset.call,
-                                              ),
-                                            ),
-                                          ),
-                                          GestureDetector(
-                                            onTap: () {
-                                              Navigation.pushNamed(
-                                                Routes.chatScreen,
-                                                params: {
-                                                  'bookingId':
-                                                      _activeBookingId(),
-                                                },
-                                              );
-                                            },
-                                            child: ChatUnreadBadge(
-                                              bookingId: _activeBookingId(),
-                                              child: Container(
-                                                margin: EdgeInsets.only(
-                                                  right: 8.w,
-                                                ),
-                                                padding: EdgeInsets.all(8.w),
-                                                decoration: BoxDecoration(
-                                                  shape: BoxShape.circle,
-                                                  border: Border.all(
-                                                    color: AppColors
-                                                        .textFieldBorderColor,
-                                                  ),
-                                                ),
-                                                child: CustomImage(
-                                                  image: IconAsset.message,
-                                                ),
-                                              ),
-                                            ),
-                                          ),
-                                          GestureDetector(
-                                            onTap: () {
-                                              Navigation.pushNamed(
-                                                Routes.driverDetailsScreen,
-                                              );
-                                            },
-                                            child: Container(
-                                              margin: EdgeInsets.only(
-                                                right: 8.w,
-                                              ),
-                                              padding: EdgeInsets.all(8.w),
-                                              decoration: BoxDecoration(
-                                                borderRadius:
-                                                    BorderRadius.circular(8.r),
-                                                border: Border.all(
-                                                  color: AppColors
-                                                      .textFieldBorderColor,
-                                                ),
-                                              ),
-                                              child: CommonText(
-                                                string:
-                                                    AppString.driverDetails.tr,
-                                              ),
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ],
-                                  ),
-                                ),
+                                _buildDriverActionStrip(),
+                                12.verticalSpace,
 
                                 SizedBox(
                                   height: 42,
@@ -2619,6 +2732,7 @@ class _SearchDriverScreenState extends State<SearchDriverScreen> with SingleTick
             ],
           ),
         ),
+        bottomNavigationBar: _buildRideUtilityBar(),
       ),
     );
   }
@@ -2668,9 +2782,9 @@ class _SearchDriverScreenState extends State<SearchDriverScreen> with SingleTick
                 ?.fareBreakdown
                 ?.total ??
             "",
+        allowCancel: homeController.canPassengerCancelCurrentRide,
         onTap: () {
-          // tripType.value = 1;
-
+          if (!homeController.ensurePassengerCancellationAllowed()) return;
           Navigation.pushNamed(Routes.cancelRequestScreen);
         },
       ),

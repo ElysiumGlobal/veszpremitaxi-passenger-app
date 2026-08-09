@@ -118,7 +118,7 @@ class _BookVehicleScreenState extends State<BookVehicleScreen> {
             polylineId: const PolylineId('route_main'),
             width: 5,
             zIndex: 2,
-            color: AppColors.routeGreen,
+            color: AppColors.brandNavy,
             points: route.points,
             endCap: Cap.roundCap,
             startCap: Cap.roundCap,

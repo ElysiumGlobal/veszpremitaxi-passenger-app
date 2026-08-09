@@ -15,10 +15,12 @@ class TripDetailsModal extends StatelessWidget {
     required this.destination,
     required this.origin,
     required this.onTap,
+    this.allowCancel = true,
     super.key,
   });
 
   final VoidCallback onTap;
+  final bool allowCancel;
   final String origin;
   final String destination;
   final String price;
@@ -91,24 +93,28 @@ class TripDetailsModal extends StatelessWidget {
             // Action Buttons
             Row(
               children: [
-                Expanded(
-                  child: CustomButton(
-                    text: AppString.cancelRide.tr,
-                    buttonColor: AppColors.warningBgColor,
-                    textColor: AppColors.errorColor,
-                    borderColor: AppColors.errorColor,
-                    height: 48.h,
-                    onTap: () {
-                      Navigator.pop(context);
-                      onTap();
-                    },
+                if (allowCancel) ...[
+                  Expanded(
+                    child: CustomButton(
+                      text: AppString.cancelRide.tr,
+                      buttonColor: AppColors.warningBgColor,
+                      textColor: AppColors.errorColor,
+                      borderColor: AppColors.errorColor,
+                      height: 48.h,
+                      onTap: () {
+                        Navigator.pop(context);
+                        onTap();
+                      },
+                    ),
                   ),
-                ),
-                SizedBox(width: 12.w),
+                  SizedBox(width: 12.w),
+                ],
                 Expanded(
                   child: CustomButton(
-                    text: AppString.close.tr,
-                    buttonColor: AppColors.blackColor,
+                    text: allowCancel
+                        ? AppString.close.tr
+                        : 'Rendben',
+                    buttonColor: AppColors.brandNavy,
                     textColor: AppColors.whiteColor,
                     height: 48.h,
                     onTap: () {

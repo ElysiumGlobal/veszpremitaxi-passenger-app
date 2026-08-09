@@ -292,50 +292,61 @@ class _TripDetailsScreenState extends State<TripDetailsScreen> {
           ),
         ),
       ),
-      bottomNavigationBar: SafeArea(
-        bottom: Utils().checkPlatForm,
-        child: Container(
-          padding: EdgeInsets.all(16.w),
-          child: Row(
-            children: [
-              GestureDetector(
-                onTap: () {
-                  Utils().launchDialer(
-                    riderBookingModel.value?.data?.driver?.phone ?? "",
-                  );
-                },
-                child: Container(
-                  padding: EdgeInsets.symmetric(
-                    horizontal: 16.w,
-                    vertical: 12.w,
-                  ),
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(12.r),
-                    color: AppColors.mainPrimaryColor,
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.call, color: AppColors.titleTextColor),
-                      10.horizontalSpace,
-                      CommonText(string: AppString.call.tr),
-                    ],
+      bottomNavigationBar: Obx(
+        () => SafeArea(
+          bottom: Utils().checkPlatForm,
+          child: Container(
+            padding: EdgeInsets.all(16.w),
+            child: Row(
+              children: [
+                Expanded(
+                  child: GestureDetector(
+                    onTap: () {
+                      Utils().launchDialer(
+                        riderBookingModel.value?.data?.driver?.phone ?? "",
+                      );
+                    },
+                    child: Container(
+                      height: 48.h,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(12.r),
+                        color: AppColors.mainPrimaryColor,
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.call_rounded, color: AppColors.brandNavy),
+                          8.horizontalSpace,
+                          CommonText(
+                            string: AppString.call.tr,
+                            color: AppColors.brandNavy,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
                 ),
-              ),
-              22.horizontalSpace,
-              Expanded(
-                child: CustomButton(
-                  text: AppString.cancelRequest.tr,
-                  borderColor: AppColors.errorColor,
-                  buttonColor: AppColors.warningBgColor,
-                  textColor: AppColors.errorColor,
-                  onTap: () {
-                    Navigation.pushNamed(Routes.cancelRequestScreen);
-                  },
-                ),
-              ),
-            ],
+                if (homeController.canPassengerCancelCurrentRide) ...[
+                  12.horizontalSpace,
+                  Expanded(
+                    child: CustomButton(
+                      text: AppString.cancelRequest.tr,
+                      borderColor: AppColors.errorColor,
+                      buttonColor: AppColors.warningBgColor,
+                      textColor: AppColors.errorColor,
+                      onTap: () {
+                        if (!homeController.ensurePassengerCancellationAllowed()) {
+                          return;
+                        }
+                        Navigation.pushNamed(Routes.cancelRequestScreen);
+                      },
+                    ),
+                  ),
+                ],
+              ],
+            ),
           ),
         ),
       ),

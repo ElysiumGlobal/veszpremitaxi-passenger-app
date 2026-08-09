@@ -1911,10 +1911,47 @@ class HomeController extends GetxController with LoadingMixin, LoadingApiMixin {
     }
   }
 
+  String get currentPassengerRideStatus {
+    return (riderBookingModel.value?.data?.booking?.status ??
+            bookingCreateModel.value?.data?.booking?.status ??
+            '')
+        .toString()
+        .trim()
+        .toLowerCase();
+  }
+
+  bool get canPassengerCancelCurrentRide {
+    const blockedStatuses = <String>{
+      'started',
+      'completed',
+      'cancelled',
+      'expired',
+    };
+    return !blockedStatuses.contains(currentPassengerRideStatus);
+  }
+
+  bool ensurePassengerCancellationAllowed() {
+    if (canPassengerCancelCurrentRide) return true;
+
+    PassengerFlowDebug.send(
+      'passenger_cancel_blocked_after_trip_start',
+      bookingId:
+          '${riderBookingModel.value?.data?.booking?.id ?? AppConstant().bookingId}',
+      data: <String, dynamic>{'status': currentPassengerRideStatus},
+    );
+    AppSnackBar.showErrorSnackBar(
+      message:
+          'Az utazás megkezdése után a fuvar már nem mondható le az alkalmazásból.',
+      isError: true,
+    );
+    return false;
+  }
+
   Future<void> cancelRide({
     required String bookingId,
     required String reason,
   }) async {
+    if (!ensurePassengerCancellationAllowed()) return;
     final normalizedBookingId = bookingId.trim();
     _passengerCancellationInProgressBookingId = normalizedBookingId;
     try {

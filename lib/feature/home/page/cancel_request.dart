@@ -77,6 +77,69 @@ class _CancelRequestScreenState extends State<CancelRequestScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (!homeController.canPassengerCancelCurrentRide) {
+      return Scaffold(
+        backgroundColor: AppColors.whiteGrey,
+        appBar: CustomAppBar(
+          title: AppString.cancelRequest.tr,
+          centerTitle: false,
+        ),
+        body: Padding(
+          padding: EdgeInsets.all(16.w),
+          child: Container(
+            width: double.infinity,
+            padding: EdgeInsets.all(18.w),
+            decoration: BoxDecoration(
+              color: AppColors.whiteColor,
+              borderRadius: BorderRadius.circular(14.r),
+              border: Border.all(color: AppColors.textFieldBorderColor),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 52.w,
+                  height: 52.w,
+                  decoration: BoxDecoration(
+                    color: AppColors.primaryContainer,
+                    borderRadius: BorderRadius.circular(14.r),
+                  ),
+                  alignment: Alignment.center,
+                  child: Icon(
+                    Icons.local_taxi_rounded,
+                    color: AppColors.brandNavy,
+                    size: 28.w,
+                  ),
+                ),
+                14.verticalSpace,
+                CommonText(
+                  string: 'Az utazás már megkezdődött',
+                  fontSize: 18.sp,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.brandNavy,
+                  textAlign: TextAlign.center,
+                ),
+                8.verticalSpace,
+                CommonText(
+                  string:
+                      'A fuvar indulása után az utas már nem mondhatja le az utazást az alkalmazásból.',
+                  fontSize: 13.sp,
+                  color: AppColors.textCaptionColor,
+                  softWrap: true,
+                  textAlign: TextAlign.center,
+                ),
+                18.verticalSpace,
+                CustomButton(
+                  text: 'Vissza a fuvarhoz',
+                  onTap: () => Get.back(),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
     return Scaffold(
       backgroundColor: AppColors.whiteGrey,
       appBar: CustomAppBar(
@@ -185,15 +248,19 @@ class _CancelRequestScreenState extends State<CancelRequestScreen> {
             width: 24.h,
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(4.r),
-              color: isSelected ? AppColors.greenColor : AppColors.whiteColor,
+              color: isSelected ? AppColors.brandNavy : AppColors.whiteColor,
               border: Border.all(
                 color: isSelected
-                    ? AppColors.transparent
-                    : AppColors.titleTextColor,
+                    ? AppColors.brandNavy
+                    : AppColors.textFieldBorderColor,
               ),
             ),
             alignment: Alignment.center,
-            child: Icon(Icons.done, size: 12, color: AppColors.whiteColor),
+            child: Icon(
+              Icons.done,
+              size: 12,
+              color: isSelected ? AppColors.mainPrimaryColor : AppColors.transparent,
+            ),
           ),
           12.horizontalSpace,
           CommonText(string: title, fontSize: 14.sp),

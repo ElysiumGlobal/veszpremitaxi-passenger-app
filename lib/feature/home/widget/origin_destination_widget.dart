@@ -32,21 +32,22 @@ class OriginDestinationWidget extends StatelessWidget {
 
   Widget _iconBubble({
     required IconData icon,
-    required Color color,
+    required Color foregroundColor,
+    required Color bubbleColor,
     Animation<double>? pulse,
   }) {
     final child = Container(
-      width: 32.w,
-      height: 32.w,
+      width: 30.w,
+      height: 30.w,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        color: AppColors.whiteColor.withValues(alpha: .18),
+        color: bubbleColor,
         border: Border.all(
-          color: AppColors.whiteColor.withValues(alpha: .30),
+          color: foregroundColor.withValues(alpha: .18),
         ),
       ),
       alignment: Alignment.center,
-      child: Icon(icon, color: AppColors.whiteColor, size: 18.w),
+      child: Icon(icon, color: foregroundColor, size: 17.w),
     );
 
     if (pulse == null) return child;
@@ -56,8 +57,8 @@ class OriginDestinationWidget extends StatelessWidget {
       builder: (context, widget) {
         final value = pulse.value;
         return Transform.scale(
-          scale: .94 + (value * .10),
-          child: Opacity(opacity: .60 + (value * .40), child: widget),
+          scale: .95 + (value * .08),
+          child: Opacity(opacity: .72 + (value * .28), child: widget),
         );
       },
       child: child,
@@ -65,7 +66,10 @@ class OriginDestinationWidget extends StatelessWidget {
   }
 
   Widget _locationCard({
-    required Color color,
+    required Color backgroundColor,
+    required Color foregroundColor,
+    required Color labelColor,
+    required Color bubbleColor,
     required IconData icon,
     required String label,
     required Widget child,
@@ -73,14 +77,19 @@ class OriginDestinationWidget extends StatelessWidget {
   }) {
     return Container(
       width: double.infinity,
-      padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 9.h),
+      padding: EdgeInsets.symmetric(horizontal: 11.w, vertical: 8.h),
       decoration: BoxDecoration(
-        color: color,
-        borderRadius: BorderRadius.circular(13.r),
+        color: backgroundColor,
+        borderRadius: BorderRadius.circular(12.r),
+        border: Border.all(
+          color: backgroundColor == AppColors.mainPrimaryColor
+              ? AppColors.brandNavy.withValues(alpha: .08)
+              : AppColors.brandNavy.withValues(alpha: .12),
+        ),
         boxShadow: [
           BoxShadow(
-            color: color.withValues(alpha: .18),
-            blurRadius: 8,
+            color: AppColors.brandNavy.withValues(alpha: .08),
+            blurRadius: 10,
             offset: const Offset(0, 3),
           ),
         ],
@@ -88,7 +97,12 @@ class OriginDestinationWidget extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          _iconBubble(icon: icon, color: color, pulse: pulse),
+          _iconBubble(
+            icon: icon,
+            foregroundColor: foregroundColor,
+            bubbleColor: bubbleColor,
+            pulse: pulse,
+          ),
           9.horizontalSpace,
           Expanded(
             child: Column(
@@ -96,7 +110,7 @@ class OriginDestinationWidget extends StatelessWidget {
               children: [
                 CommonText(
                   string: label,
-                  color: AppColors.whiteColor.withValues(alpha: .82),
+                  color: labelColor,
                   fontSize: 10.sp,
                   fontWeight: FontWeight.w700,
                 ),
@@ -125,7 +139,10 @@ class OriginDestinationWidget extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _locationCard(
-          color: AppColors.errorColor,
+          backgroundColor: AppColors.brandNavy,
+          foregroundColor: AppColors.mainPrimaryColor,
+          labelColor: AppColors.whiteColor.withValues(alpha: .72),
+          bubbleColor: AppColors.whiteColor.withValues(alpha: .10),
           icon: Icons.my_location_rounded,
           label: originLabel,
           child: CommonText(
@@ -145,22 +162,25 @@ class OriginDestinationWidget extends StatelessWidget {
         ),
         if (showDotLine) ...[
           Padding(
-            padding: EdgeInsets.only(left: 27.w),
+            padding: EdgeInsets.only(left: 26.w),
             child: SizedBox(
-              height: 14.h,
+              height: 12.h,
               child: DottedLine(
                 direction: Axis.vertical,
-                lineLength: 14.h,
+                lineLength: 12.h,
                 lineThickness: 2,
                 dashLength: 4,
-                dashColor: AppColors.textFieldBorderColor,
+                dashColor: AppColors.mainPrimaryColor.withValues(alpha: .72),
               ),
             ),
           ),
         ] else
-          6.verticalSpace,
+          5.verticalSpace,
         _locationCard(
-          color: AppColors.routeGreen,
+          backgroundColor: AppColors.mainPrimaryColor,
+          foregroundColor: AppColors.brandNavy,
+          labelColor: AppColors.brandNavy.withValues(alpha: .68),
+          bubbleColor: AppColors.whiteColor.withValues(alpha: .46),
           icon: Icons.location_on_rounded,
           label: destinationLabel,
           pulse: showTextField ? destinationPulse : null,
@@ -170,11 +190,11 @@ class OriginDestinationWidget extends StatelessWidget {
                   textAlign: TextAlign.start,
                   autofocus: true,
                   textAlignVertical: TextAlignVertical.center,
-                  cursorColor: AppColors.whiteColor,
+                  cursorColor: AppColors.brandNavy,
                   style: TextStyle(
-                    color: AppColors.whiteColor,
+                    color: AppColors.brandNavy,
                     fontSize: 14.sp,
-                    fontWeight: FontWeight.w600,
+                    fontWeight: FontWeight.w700,
                   ),
                   decoration: InputDecoration(
                     hintText:
@@ -184,9 +204,9 @@ class OriginDestinationWidget extends StatelessWidget {
                           'Írd be a címet',
                         ),
                     hintStyle: TextStyle(
-                      color: AppColors.whiteColor.withValues(alpha: .82),
+                      color: AppColors.brandNavy.withValues(alpha: .66),
                       fontSize: 13.sp,
-                      fontWeight: FontWeight.w500,
+                      fontWeight: FontWeight.w600,
                     ),
                     contentPadding: EdgeInsets.zero,
                     isDense: true,
@@ -204,8 +224,8 @@ class OriginDestinationWidget extends StatelessWidget {
                         )
                       : destination,
                   fontSize: 13.sp,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.whiteColor,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.brandNavy,
                   softWrap: true,
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,

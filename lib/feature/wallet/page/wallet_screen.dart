@@ -25,6 +25,11 @@ class WalletScreen extends StatefulWidget {
 class _WalletScreenState extends State<WalletScreen> {
   final walletController = Get.find<WalletController>();
 
+  bool get _openedFromRide {
+    final args = Get.arguments;
+    return args is Map && args['fromRide'] == true;
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -32,8 +37,9 @@ class _WalletScreenState extends State<WalletScreen> {
       appBar: CustomAppBar(
         title: AppString.wallet.tr,
         centerTitle: false,
-        leading: SizedBox(width: 16.w),
-        leadingSize: 16.w,
+        automaticallyImplyLeading: _openedFromRide,
+        leading: _openedFromRide ? null : SizedBox(width: 16.w),
+        leadingSize: _openedFromRide ? null : 16.w,
       ),
       body: Padding(
         padding: EdgeInsets.all(16.w),
@@ -53,6 +59,37 @@ class _WalletScreenState extends State<WalletScreen> {
                 ),
         ),
       ),
+      bottomNavigationBar: _openedFromRide
+          ? SafeArea(
+              top: false,
+              child: Material(
+                color: AppColors.brandNavy,
+                child: InkWell(
+                  onTap: () => Get.back(),
+                  child: Padding(
+                    padding: EdgeInsets.symmetric(vertical: 13.h),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.local_taxi_rounded,
+                          color: AppColors.mainPrimaryColor,
+                          size: 20.w,
+                        ),
+                        8.horizontalSpace,
+                        CommonText(
+                          string: 'Vissza az aktív fuvarhoz',
+                          color: AppColors.mainPrimaryColor,
+                          fontWeight: FontWeight.w700,
+                          fontSize: 13.sp,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            )
+          : null,
     );
   }
 

@@ -7,7 +7,6 @@ import 'package:e_taxi/utils/assets.dart';
 import 'package:e_taxi/utils/utils.dart';
 import 'package:e_taxi/widgets/cachenetworkimage.dart';
 import 'package:e_taxi/widgets/common_text.dart';
-import 'package:e_taxi/widgets/custom_textfeild.dart';
 import 'package:e_taxi/widgets/custome_img.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
@@ -282,15 +281,64 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               top: 16.h,
               left: 16.w,
               right: 16.w,
-              child: CustomTextField(
-                controller: TextEditingController(),
-                hintText: AppString.whereAreYouNow.tr,
-                suffixIcon: IconAsset.search,
-                enabled: true,
-                readOnly: true,
-                onTap: () {
-                  Navigation.pushNamed(Routes.searchFirstScreen);
-                },
+              child: Material(
+                color: AppColors.transparent,
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(14.r),
+                  onTap: () {
+                    Navigation.pushNamed(Routes.searchFirstScreen);
+                  },
+                  child: Container(
+                    height: 54.h,
+                    padding: EdgeInsets.symmetric(horizontal: 14.w),
+                    decoration: BoxDecoration(
+                      color: AppColors.brandNavy,
+                      borderRadius: BorderRadius.circular(14.r),
+                      border: Border.all(
+                        color: AppColors.mainPrimaryColor.withValues(alpha: .34),
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: AppColors.brandNavy.withValues(alpha: .20),
+                          blurRadius: 14,
+                          offset: const Offset(0, 5),
+                        ),
+                      ],
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 34.w,
+                          height: 34.w,
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(10.r),
+                            color: AppColors.mainPrimaryColor,
+                          ),
+                          alignment: Alignment.center,
+                          child: Icon(
+                            Icons.search_rounded,
+                            color: AppColors.brandNavy,
+                            size: 21.w,
+                          ),
+                        ),
+                        11.horizontalSpace,
+                        Expanded(
+                          child: CommonText(
+                            string: 'Kattints ide és keress sofőrt',
+                            color: AppColors.mainPrimaryColor,
+                            fontSize: 15.sp,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        Icon(
+                          Icons.arrow_forward_ios_rounded,
+                          color: AppColors.whiteColor.withValues(alpha: .72),
+                          size: 14.w,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
               ),
             ),
           ],

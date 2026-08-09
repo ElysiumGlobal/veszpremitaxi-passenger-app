@@ -63,21 +63,21 @@ class _SearchFirstScreenState extends State<SearchFirstScreen> {
                               width: 40.h,
                               decoration: BoxDecoration(
                                 shape: BoxShape.circle,
-                                color: AppColors.whiteGrey,
+                                color: AppColors.brandNavy,
                                 boxShadow: [
                                   BoxShadow(
-                                    blurRadius: 8,
+                                    blurRadius: 10,
                                     spreadRadius: 0,
-                                    offset: Offset(0, 1),
-                                    color: AppColors.blackColor.withValues(
-                                      alpha: .4,
-                                    ),
+                                    offset: const Offset(0, 3),
+                                    color: AppColors.brandNavy.withValues(alpha: .16),
                                   ),
                                 ],
                               ),
                               alignment: Alignment.center,
-                              child: CustomImage(
-                                image: IconAsset.arrowLeftIcon,
+                              child: Icon(
+                                Icons.arrow_back_rounded,
+                                color: AppColors.mainPrimaryColor,
+                                size: 21.w,
                               ),
                             ),
                           ),
@@ -86,9 +86,35 @@ class _SearchFirstScreenState extends State<SearchFirstScreen> {
                         Expanded(
                           child: CustomTextField(
                             controller: TextEditingController(),
-                            hintText: "Search here",
+                            hintText: 'Keress indulási címet',
                             autoFocus: true,
-                            suffixIcon: IconAsset.search,
+                            radius: 12.r,
+                            fillColor: AppColors.whiteColor,
+                            enableColor: AppColors.brandNavy.withValues(alpha: .12),
+                            focusedColor: AppColors.mainPrimaryColor,
+                            cursorColor: AppColors.brandNavy,
+                            hintTextStyle: TextStyle(
+                              color: AppColors.textCaptionColor,
+                              fontWeight: FontWeight.w600,
+                              fontSize: 14.sp,
+                            ),
+                            suffixWidget: Padding(
+                              padding: EdgeInsets.only(right: 8.w),
+                              child: Container(
+                                width: 36.w,
+                                height: 36.w,
+                                decoration: BoxDecoration(
+                                  color: AppColors.primaryContainer,
+                                  borderRadius: BorderRadius.circular(10.r),
+                                ),
+                                alignment: Alignment.center,
+                                child: Icon(
+                                  Icons.search_rounded,
+                                  color: AppColors.brandNavy,
+                                  size: 21.w,
+                                ),
+                              ),
+                            ),
 
                             onChanged: (search) {
                               if (search.isNotEmpty) {
@@ -148,8 +174,18 @@ class _SearchFirstScreenState extends State<SearchFirstScreen> {
                   padding: EdgeInsets.all(10.w),
                   margin: EdgeInsetsGeometry.symmetric(horizontal: 16.w),
                   decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(8.r),
-                    color: AppColors.whiteColor,
+                    borderRadius: BorderRadius.circular(14.r),
+                    color: AppColors.brandNavy,
+                    border: Border.all(
+                      color: AppColors.mainPrimaryColor.withValues(alpha: .28),
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: AppColors.brandNavy.withValues(alpha: .10),
+                        blurRadius: 12,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
                   ),
 
                   child: Column(
@@ -161,40 +197,31 @@ class _SearchFirstScreenState extends State<SearchFirstScreen> {
                         children: [
                           CommonText(
                             string: AppString.currentLocation.tr,
-                            fontSize: 14.sp,
-                            fontWeight: FontWeight.w500,
+                            fontSize: 13.sp,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.mainPrimaryColor,
                           ),
                         ],
                       ),
-                      Divider(color: AppColors.textFieldBorderColor),
+                      Divider(
+                        color: AppColors.whiteColor.withValues(alpha: .14),
+                      ),
                       Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Stack(
+                          Container(
+                            width: 34.w,
+                            height: 34.w,
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(10.r),
+                              color: AppColors.mainPrimaryColor,
+                            ),
                             alignment: Alignment.center,
-                            children: [
-                              Container(
-                                height: 15.w,
-                                width: 15.w,
-                                decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: Color(
-                                        0xff0993c0,
-                                      ).withValues(alpha: .2),
-                                      blurRadius: 1,
-                                      spreadRadius: 5,
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              CustomImage(
-                                image: IconAsset.currentLocation,
-                                ht: 22.w,
-                                wt: 22.w,
-                              ),
-                            ],
+                            child: Icon(
+                              Icons.my_location_rounded,
+                              color: AppColors.brandNavy,
+                              size: 20.w,
+                            ),
                           ),
                           8.horizontalSpace,
                           Expanded(
@@ -236,8 +263,10 @@ class _SearchFirstScreenState extends State<SearchFirstScreen> {
                                                 .split("**")
                                                 .first,
                                             fontSize: 14.sp,
+                                            fontWeight: FontWeight.w700,
+                                            color: AppColors.whiteColor,
                                           ),
-                                          4.verticalSpace,
+                                          3.verticalSpace,
                                           CommonText(
                                             string: LocationService()
                                                 .currentAddressUse
@@ -245,7 +274,7 @@ class _SearchFirstScreenState extends State<SearchFirstScreen> {
                                                 .split("**")
                                                 .last,
                                             fontSize: 12.sp,
-                                            color: AppColors.textCaptionColor,
+                                            color: AppColors.whiteColor.withValues(alpha: .68),
                                             overflow: TextOverflow.ellipsis,
                                           ),
                                         ],
@@ -266,8 +295,9 @@ class _SearchFirstScreenState extends State<SearchFirstScreen> {
                                       },
                                       child: CommonText(
                                         string: AppString.getCurrentLocation.tr,
-                                        fontSize: 15.sp,
-                                        fontWeight: FontWeight.w500,
+                                        fontSize: 14.sp,
+                                        fontWeight: FontWeight.w700,
+                                        color: AppColors.whiteColor,
                                       ),
                                     ),
                             ),
@@ -290,15 +320,45 @@ class _SearchFirstScreenState extends State<SearchFirstScreen> {
                             padding: EdgeInsets.all(8.w),
                             decoration: BoxDecoration(
                               color: AppColors.whiteColor,
-                              borderRadius: BorderRadius.circular(8.r),
+                              borderRadius: BorderRadius.circular(14.r),
+                              border: Border.all(
+                                color: AppColors.brandNavy.withValues(alpha: .08),
+                              ),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: AppColors.brandNavy.withValues(alpha: .06),
+                                  blurRadius: 14,
+                                  offset: const Offset(0, 4),
+                                ),
+                              ],
                             ),
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                CommonText(
-                                  string: AppString.recentSearch.tr,
-                                  fontSize: 16.sp,
-                                  fontWeight: FontWeight.w500,
+                                Row(
+                                  children: [
+                                    Container(
+                                      width: 30.w,
+                                      height: 30.w,
+                                      decoration: BoxDecoration(
+                                        color: AppColors.primaryContainer,
+                                        borderRadius: BorderRadius.circular(9.r),
+                                      ),
+                                      alignment: Alignment.center,
+                                      child: Icon(
+                                        Icons.place_rounded,
+                                        color: AppColors.brandNavy,
+                                        size: 18.w,
+                                      ),
+                                    ),
+                                    9.horizontalSpace,
+                                    CommonText(
+                                      string: 'Találatok',
+                                      fontSize: 15.sp,
+                                      fontWeight: FontWeight.w700,
+                                      color: AppColors.brandNavy,
+                                    ),
+                                  ],
                                 ),
                                 Divider(color: AppColors.textFieldBorderColor),
                                 8.verticalSpace,

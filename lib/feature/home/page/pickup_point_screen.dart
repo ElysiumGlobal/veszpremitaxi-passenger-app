@@ -197,20 +197,22 @@ class _PickupPointScreenState extends State<PickupPointScreen>
                         width: 40.h,
                         height: 40.h,
                         decoration: BoxDecoration(
-                          color: AppColors.whiteColor,
+                          color: AppColors.brandNavy,
                           borderRadius: BorderRadius.circular(20.r),
                           boxShadow: [
                             BoxShadow(
-                              color: AppColors.blackColor.withValues(
-                                alpha: 0.1,
-                              ),
-                              blurRadius: 8,
-                              offset: const Offset(0, 2),
+                              color: AppColors.brandNavy.withValues(alpha: .16),
+                              blurRadius: 10,
+                              offset: const Offset(0, 3),
                             ),
                           ],
                         ),
                         alignment: Alignment.center,
-                        child: CustomImage(image: IconAsset.arrowLeftIcon),
+                        child: Icon(
+                          Icons.arrow_back_rounded,
+                          color: AppColors.mainPrimaryColor,
+                          size: 21.w,
+                        ),
                       ),
                     ),
                   ),
@@ -228,8 +230,8 @@ class _PickupPointScreenState extends State<PickupPointScreen>
                               height: 74.w,
                               decoration: BoxDecoration(
                                 shape: BoxShape.circle,
-                                color: AppColors.errorColor.withValues(
-                                  alpha: .08 + (_pickupPulse.value * .08),
+                                color: AppColors.mainPrimaryColor.withValues(
+                                  alpha: .10 + (_pickupPulse.value * .10),
                                 ),
                               ),
                             ),
@@ -247,7 +249,7 @@ class _PickupPointScreenState extends State<PickupPointScreen>
                                 vertical: 7.h,
                               ),
                               decoration: BoxDecoration(
-                                color: AppColors.errorColor,
+                                color: AppColors.brandNavy,
                                 borderRadius: BorderRadius.circular(999.r),
                                 boxShadow: [
                                   BoxShadow(
@@ -264,7 +266,7 @@ class _PickupPointScreenState extends State<PickupPointScreen>
                                 children: [
                                   Icon(
                                     Icons.my_location_rounded,
-                                    color: AppColors.whiteColor,
+                                    color: AppColors.mainPrimaryColor,
                                     size: 16.w,
                                   ),
                                   5.horizontalSpace,
@@ -273,7 +275,7 @@ class _PickupPointScreenState extends State<PickupPointScreen>
                                       'vtaxi.pickup.you_are_here',
                                       'Most itt vagy',
                                     ),
-                                    color: AppColors.whiteColor,
+                                    color: AppColors.mainPrimaryColor,
                                     fontSize: 11.sp,
                                     fontWeight: FontWeight.w700,
                                   ),
@@ -307,6 +309,7 @@ class _PickupPointScreenState extends State<PickupPointScreen>
                       string: AppString.doubleCheckPickupPoint.tr,
                       fontSize: 17.sp,
                       fontWeight: FontWeight.w700,
+                      color: AppColors.brandNavy,
                     ),
                     5.verticalSpace,
                     CommonText(
@@ -324,10 +327,18 @@ class _PickupPointScreenState extends State<PickupPointScreen>
                       padding: EdgeInsets.symmetric(horizontal: 11.w, vertical: 9.h),
                       width: double.infinity,
                       decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(8.r),
+                        borderRadius: BorderRadius.circular(12.r),
+                        color: AppColors.whiteColor,
                         border: Border.all(
-                          color: AppColors.textFieldBorderColor,
+                          color: AppColors.brandNavy.withValues(alpha: .10),
                         ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: AppColors.brandNavy.withValues(alpha: .055),
+                            blurRadius: 10,
+                            offset: const Offset(0, 3),
+                          ),
+                        ],
                       ),
                       child: Obx(
                         () => Column(
@@ -491,7 +502,7 @@ class _PickupPointScreenState extends State<PickupPointScreen>
                                       16.verticalSpace,
                                       CustomButton(
                                         buttonColor: AppColors.transparent,
-                                        borderColor: AppColors.blackColor,
+                                        borderColor: AppColors.brandNavy,
                                         text: AppString.notNow.tr,
                                         onTap: () async {
                                           Get.back();
@@ -508,9 +519,10 @@ class _PickupPointScreenState extends State<PickupPointScreen>
                                 vertical: 8.h,
                               ),
                               decoration: BoxDecoration(
+                                color: AppColors.primaryContainer,
                                 borderRadius: BorderRadius.circular(24.r),
                                 border: Border.all(
-                                  color: AppColors.textFieldBorderColor,
+                                  color: AppColors.mainPrimaryColor.withValues(alpha: .32),
                                 ),
                               ),
 
@@ -519,10 +531,14 @@ class _PickupPointScreenState extends State<PickupPointScreen>
                                 children: [
                                   CustomImage(
                                     image: iconList[index],
-                                    color: AppColors.blackColor,
+                                    color: AppColors.brandNavy,
                                   ),
                                   8.horizontalSpace,
-                                  CommonText(string: nameList[index]),
+                                  CommonText(
+                                    string: nameList[index],
+                                    color: AppColors.brandNavy,
+                                    fontWeight: FontWeight.w600,
+                                  ),
                                 ],
                               ),
                             ),
