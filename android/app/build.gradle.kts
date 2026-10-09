@@ -50,6 +50,9 @@ val hasKeyPropertiesSigning =
         !localKeyPassword.isNullOrBlank()
 
 val hasStableSigning = hasCodemagicSigning || hasKeyPropertiesSigning
+val buildingRelease = gradle.startParameter.taskNames.any {
+    it.contains("release", ignoreCase = true)
+}
 
 android {
     namespace = "hu.veszpremitaxi.passenger"
@@ -104,13 +107,15 @@ android {
         }
 
         getByName("release") {
-            if (!hasStableSigning) {
+            if (!hasStableSigning && buildingRelease) {
                 throw GradleException(
                     "Hianyzik az allando Android alairas. Allitsd be a Codemagic code signingot " +
                         "vagy az android/key.properties fajlt."
                 )
             }
-            signingConfig = signingConfigs.getByName("stable")
+            if (hasStableSigning) {
+                signingConfig = signingConfigs.getByName("stable")
+            }
             isMinifyEnabled = false
             isShrinkResources = false
             proguardFiles(
