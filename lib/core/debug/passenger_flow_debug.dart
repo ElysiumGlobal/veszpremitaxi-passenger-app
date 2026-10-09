@@ -18,13 +18,14 @@ import '../../utils/app_preferences.dart';
 class PassengerFlowDebug {
   PassengerFlowDebug._();
 
-  static const String appVersion = '1.0.37+47';
+  static const String appVersion = '1.0.45+55';
   static const String expectedCollectorVersion =
       '2026-07-29-role2-role3-v2';
   static final String sessionId =
       'psg-${DateTime.now().millisecondsSinceEpoch}-${Random().nextInt(999999)}';
 
   static const String _queueStorageKey = 'vtaxi_passenger_debug_queue_v2';
+  static const String _instanceStorageKey = 'vtaxi_passenger_instance_id_v1';
   static const int _maxQueueLength = 1500;
 
   static int _sequence = 0;
@@ -34,6 +35,9 @@ class PassengerFlowDebug {
   static bool _persistDirty = false;
   static Timer? _retryTimer;
   static Timer? _persistTimer;
+  static Timer? _presenceTimer;
+  static String _instanceId = '';
+  static String _lastLifecycle = 'unknown';
   static final List<Map<String, dynamic>> _queue = <Map<String, dynamic>>[];
 
   static void send(
@@ -44,7 +48,12 @@ class PassengerFlowDebug {
     final int sequence = ++_sequence;
     final Map<String, dynamic> payload = <String, dynamic>{
       'event': event,
+      'client_role': 'passenger',
       'session_id': sessionId,
+      'instance_id': _instanceId.isEmpty ? sessionId : _instanceId,
+      'user_id': AppPreference.isInitialized
+          ? AppPreference.getString(AppPreference.userId).trim()
+          : '',
       'sequence': sequence,
       'booking_id': bookingId,
       'client_time': DateTime.now().toUtc().toIso8601String(),
@@ -144,9 +153,52 @@ class PassengerFlowDebug {
   /// szakítja meg a folyamatnaplót.
   static Future<void> initialize() async {
     if (!AppPreference.isInitialized) return;
+    await _ensureInstanceId();
     _hydratePersistedQueue();
     _schedulePersist();
+    _startPresenceHeartbeat();
     kick();
+    emitPresenceHeartbeat('initialize');
+  }
+
+  static Future<void> _ensureInstanceId() async {
+    String value = AppPreference.getString(_instanceStorageKey).trim();
+    if (value.isEmpty) {
+      value =
+          'passenger-install-${DateTime.now().millisecondsSinceEpoch}-${Random().nextInt(999999)}';
+      await AppPreference.setString(_instanceStorageKey, value);
+    }
+    _instanceId = value;
+  }
+
+  static void _startPresenceHeartbeat() {
+    _presenceTimer?.cancel();
+    _presenceTimer = Timer.periodic(const Duration(seconds: 30), (_) {
+      emitPresenceHeartbeat('timer');
+    });
+  }
+
+  static void emitPresenceHeartbeat([String reason = 'manual']) {
+    if (!AppPreference.isInitialized) return;
+    final String token =
+        AppPreference.getString(AppPreference.userToken).trim();
+    if (token.isEmpty) return;
+
+    send(
+      'passenger_presence_heartbeat',
+      data: <String, dynamic>{
+        'instance_id': _instanceId.isEmpty ? sessionId : _instanceId,
+        'user_id': AppPreference.getString(AppPreference.userId).trim(),
+        'lifecycle': _lastLifecycle,
+        'reason': reason,
+        'queue_depth_before_heartbeat': _queue.length,
+        'collector_endpoint': ApiConstants.flowDebugEvent,
+      },
+    );
+  }
+
+  static void updateLifecycle(String state) {
+    _lastLifecycle = state;
   }
 
   static void _hydratePersistedQueue() {
@@ -225,6 +277,7 @@ class PassengerFlowDebug {
   static void kick() {
     _retryTimer?.cancel();
     _retryTimer = null;
+    emitPresenceHeartbeat('kick');
     unawaited(_drainQueue());
   }
 
@@ -505,6 +558,7 @@ class PassengerDebugNavigatorObserver extends NavigatorObserver {
 class PassengerDebugLifecycleObserver with WidgetsBindingObserver {
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    PassengerFlowDebug.updateLifecycle(state.name);
     PassengerFlowDebug.send(
       'app_lifecycle_changed',
       data: <String, dynamic>{'state': state.name},
