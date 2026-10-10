@@ -27,6 +27,18 @@ val googleMapsApiKey =
         ?: System.getenv("GOOGLE_MAPS_API_KEY")
         ?: ""
 
+
+val requestedAndroidBuild = gradle.startParameter.taskNames.any {
+    it.contains("assemble", ignoreCase = true) ||
+        it.contains("bundle", ignoreCase = true)
+}
+if (requestedAndroidBuild && googleMapsApiKey.isBlank()) {
+    throw GradleException(
+        "Hianyzik a Google Maps API kulcs. Allitsd be a GOOGLE_MAPS_API_KEY environment variable-t " +
+            "vagy az android/local.properties google.maps.api.key erteket."
+    )
+}
+
 val cmKeystorePath = System.getenv("CM_KEYSTORE_PATH")
 val cmKeystorePassword = System.getenv("CM_KEYSTORE_PASSWORD")
 val cmKeyAlias = System.getenv("CM_KEY_ALIAS")
