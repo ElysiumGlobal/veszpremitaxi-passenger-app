@@ -17,13 +17,25 @@ workflows:
       - name: Google Maps kulcs ellenorzese
         script: |
           if [ -z "$GOOGLE_MAPS_API_KEY" ]; then
-            echo "HIBA: A GOOGLE_MAPS_API_KEY Codemagic valtozo nincs beallitva."
+            echo "HIBA: A GOOGLE_MAPS_API_KEY Codemagic secret nincs beallitva."
             exit 1
           fi
+          echo "Google Maps secret OK (hossz: ${#GOOGLE_MAPS_API_KEY})"
 
-      - name: Android local.properties letrehozasa
+      - name: Android Maps + Flutter Maps konfiguracio
         script: |
           printf "sdk.dir=%s\nflutter.sdk=%s\ngoogle.maps.api.key=%s\n" "$ANDROID_SDK_ROOT" "$FLUTTER_ROOT" "$GOOGLE_MAPS_API_KEY" > "$CM_BUILD_DIR/android/local.properties"
+          mkdir -p "$CM_BUILD_DIR/assets"
+          printf "GOOGLE_MAPS_API_KEY_Android=%s\nGOOGLE_MAPS_API_KEY_Ios=\n" "$GOOGLE_MAPS_API_KEY" > "$CM_BUILD_DIR/assets/.env"
+          grep -q '^GOOGLE_MAPS_API_KEY_Android=.' "$CM_BUILD_DIR/assets/.env" || { echo "HIBA: assets/.env Maps kulcs ures."; exit 1; }
+
+      - name: Firebase + Google Sign-In konfiguracio ellenorzese
+        script: |
+          test -f "$CM_BUILD_DIR/android/app/google-services.json" || { echo "HIBA: google-services.json hianyzik."; exit 1; }
+          test -f "$CM_BUILD_DIR/lib/firebase_options.dart" || { echo "HIBA: firebase_options.dart hianyzik."; exit 1; }
+          grep -q '"package_name": "hu.veszpremitaxi.passenger"' "$CM_BUILD_DIR/android/app/google-services.json" || { echo "HIBA: Firebase package nem egyezik."; exit 1; }
+          grep -q '"project_id": "vtaxi-503221"' "$CM_BUILD_DIR/android/app/google-services.json" || { echo "HIBA: nem a VTaxi Firebase projekt van bekotve."; exit 1; }
+          grep -q '"oauth_client"' "$CM_BUILD_DIR/android/app/google-services.json" || { echo "HIBA: Google Sign-In OAuth konfiguracio hianyzik."; exit 1; }
 
       - name: Flutter csomagok letoltese
         script: |
@@ -33,5 +45,11 @@ workflows:
         script: |
           flutter build apk --debug --target-platform android-arm64 --no-pub
 
+      - name: APK vegleges fajlnev
+        script: |
+          cp "$CM_BUILD_DIR/build/app/outputs/flutter-apk/app-debug.apk" "$CM_BUILD_DIR/utas.apk"
+          test -s "$CM_BUILD_DIR/utas.apk"
+
     artifacts:
+      - utas.apk
       - build/app/outputs/flutter-apk/app-debug.apk
